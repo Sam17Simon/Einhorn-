@@ -238,37 +238,10 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
   font-variant-numeric:tabular-nums; text-wrap:balance;
 }
 .runQ small{display:block; font-size:15px; font-family:var(--font-body); color:var(--muted); font-weight:700;}
-/* ===== Wolkenritt v3: Welten, Tore, Reiter-Sicht ===== */
-.sky{--skytop:#BBDDF8; --skymid:#E9E2FA; --skybot:#FBEFF7; --ringO:#C9B6EE;
-  background:linear-gradient(180deg,var(--skytop) 0%, var(--skymid) 55%, var(--skybot) 100%);
-  transition:background 1.8s;
-}
-.world{position:relative; flex:1; min-height:0; z-index:2; overflow:hidden;}
-#sun{position:absolute; left:5%; top:3%; width:42px; height:42px; border-radius:50%; background:#FFE9A8; box-shadow:0 0 26px 10px rgba(255,233,168,.7); pointer-events:none; transition:opacity 1.5s;}
-#moon{position:absolute; right:7%; top:5%; width:40px; height:40px; border-radius:50%; background:#FFF3C9; box-shadow:-10px 4px 0 2px var(--skytop), 0 0 22px 8px rgba(255,243,201,.5); pointer-events:none; opacity:0; transition:opacity 1.5s;}
-#starsLayer{position:absolute; inset:0; pointer-events:none; opacity:0; transition:opacity 1.5s;}
-#starsLayer i{position:absolute; color:#FFF3C9; font-style:normal; animation:twinkle 2.6s ease-in-out infinite;}
-@keyframes twinkle{50%{opacity:.25}}
-#seaBand{position:absolute; left:0; right:0; top:calc(var(--horizon,38%) + 2%); height:16%; background:linear-gradient(180deg,rgba(74,144,196,.55),rgba(74,144,196,0)); opacity:0; transition:opacity 1.5s; pointer-events:none;}
-#seaBand::after{content:'✦ ✦  ✦   ✦ ✦'; position:absolute; top:6px; left:10%; right:10%; color:rgba(255,255,255,.8); letter-spacing:18px; font-size:10px;}
-#hillBand{position:absolute; left:-12%; right:-12%; top:calc(var(--horizon,38%) - 10px); height:120px; background:#F6B9D9; border-radius:50% 50% 0 0; opacity:0; transition:opacity 1.5s; pointer-events:none;}
-.horizonband{position:absolute; left:-10%; right:-10%; top:calc(var(--horizon,38%) - 14px); height:28px; background:rgba(255,255,255,.55); filter:blur(10px); border-radius:50%; pointer-events:none;}
-/* vorbeirauschende Wolken/Sterne aus dem Fluchtpunkt */
-.whoosh{position:absolute; left:50%; top:var(--horizon,38%); pointer-events:none; will-change:transform,opacity; opacity:0;
-  animation:whoosh var(--dur,2.6s) linear forwards;}
-.whoosh.cl{width:84px; height:30px; background:#fff; border-radius:999px; box-shadow:22px 8px 0 -4px #fff,-20px 9px 0 -6px #fff;}
-.whoosh.st{width:16px; height:16px;}
-@keyframes whoosh{
-  0%{opacity:0; transform:translate(-50%,-50%) translate(calc(var(--dx)*0.06),calc(var(--dy)*0.04)) scale(.1);}
-  12%{opacity:var(--op,.9);}
-  100%{opacity:0; transform:translate(-50%,-50%) translate(var(--dx),var(--dy)) scale(var(--sc,2.4));}
-}
-/* Welt-Bewohner ziehen quer durchs Bild */
-.ambfly{position:absolute; font-size:26px; pointer-events:none; will-change:transform; animation:ambdrift var(--adur,9s) linear forwards;}
-@keyframes ambdrift{from{transform:translateX(0) translateY(0)}to{transform:translateX(var(--ax)) translateY(var(--ay))}}
-.ambfly.arc{animation:ambarc var(--adur,3.6s) ease-in-out forwards;}
-@keyframes ambarc{0%{transform:translate(0,0) rotate(-20deg)}50%{transform:translate(calc(var(--ax)*0.5),-90px) rotate(0deg)}100%{transform:translate(var(--ax),6px) rotate(24deg)}}
-/* Fortschritt + Frage */
+/* ===== Wolkenritt: Szene läuft in PixiJS (game.js), hier nur Rahmen und Overlays ===== */
+.sky{background:linear-gradient(180deg,#BBDDF8 0%,#E9E2FA 55%,#FBEFF7 100%);}
+.world{position:relative; flex:1; min-height:0; z-index:2; overflow:hidden; border-radius:0 0 26px 26px;}
+.world canvas{display:block;}
 .runQ{position:relative; z-index:3; display:flex; flex-direction:column; align-items:center; gap:4px; padding:8px 16px 2px;}
 .runQ .qchip{background:rgba(255,255,255,.92); border-radius:18px; padding:4px 18px 7px; text-align:center;
   font-family:var(--font-disp); font-weight:700; font-size:clamp(26px,5.6vw,40px); font-variant-numeric:tabular-nums; color:var(--ink);
@@ -279,82 +252,10 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
 #runDots b.done{background:var(--gold); border-color:var(--gold);}
 #runDots b.now{background:var(--accent); border-color:var(--accent);}
 #runDots s{width:7px;}
-/* Portale */
-.portal{position:absolute; left:0; top:0; width:150px; height:190px; margin-left:-75px; margin-top:-95px;
-  will-change:transform,opacity; padding:0; background:none; border:0; z-index:2;}
-.portal .swingbox{display:block; width:100%; height:100%; position:relative; animation:portalswing 3.4s ease-in-out infinite;}
-.portal:nth-child(2) .swingbox{animation-delay:-1.1s;}
-.portal:nth-child(3) .swingbox{animation-delay:-2.2s;}
-@keyframes portalswing{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-9px) rotate(2deg)}}
-.portal.waiting .swingbox{animation:portalwait 1.2s ease-in-out infinite;}
-@keyframes portalwait{50%{transform:scale(1.05)}}
-.portal .rsvg{position:absolute; inset:0 0 36px 0; width:100%; height:calc(100% - 36px); overflow:visible;}
-.portal .fillE{fill:rgba(210,232,252,.6); animation:shimmer 2.2s ease-in-out infinite;}
-.portal .ringO{fill:none; stroke:var(--ringO); stroke-width:21; vector-effect:non-scaling-stroke;}
-.portal .ringW{fill:none; stroke:#FFFFFF; stroke-width:14; vector-effect:non-scaling-stroke;}
-@keyframes shimmer{50%{fill:rgba(255,255,255,.75)}}
-.glowy .portal .fillE{fill:rgba(255,240,200,.3);}
-.glowy .portal .rsvg{filter:drop-shadow(0 0 14px rgba(255,233,168,.9));}
-.portal.worldgate .ringW{stroke:url(#rbw);}
-.portal.worldgate .fillE{fill:rgba(255,255,255,.5);}
-.portal .puff{position:absolute; background:#fff; border-radius:50%;}
-.portal .puff.p1{width:36px; height:30px; top:-8px; left:6px;}
-.portal .puff.p2{width:26px; height:22px; top:6px; right:-2px;}
-.portal .puff.p3{width:30px; height:24px; bottom:30px; left:-6px;}
-.portal .orbit{position:absolute; inset:0 12px 36px 12px; animation:orbit 3s linear infinite; pointer-events:none;}
-.portal .orbit::before{content:''; position:absolute; top:-7px; left:50%; width:12px; height:12px; margin-left:-6px;
-  background:#FFD98A; clip-path:polygon(50% 0,63% 36%,100% 38%,70% 60%,80% 100%,50% 76%,20% 100%,30% 60%,0 38%,37% 36%);}
-@keyframes orbit{to{transform:rotate(360deg)}}
-.portal .n{position:absolute; left:50%; bottom:0; transform:translateX(-50%);
-  background:#fff; border:3px solid #E3D6F6; border-radius:16px; padding:3px 14px;
-  font-family:var(--font-disp); font-weight:700; font-size:30px; font-variant-numeric:tabular-nums; color:var(--ink);
-  box-shadow:0 4px 0 rgba(170,195,230,.6); white-space:nowrap;}
-.portal.good .ringW{stroke:var(--gold);} .portal.good .ringO{stroke:#FFE6A8;} .portal.good .fillE{fill:rgba(255,244,214,.85); animation:none;}
-.portal.good .n{background:#FFF4D6; border-color:var(--gold); color:#9c6a00;}
-.portal.bad .ringW{stroke:#F3B6BA;}
-.portal.dim{opacity:.25;}
-/* Weltenwechsel */
-#flash{position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; z-index:5; transition:opacity .18s;}
 #worldBanner{position:absolute; top:12%; left:50%; transform:translateX(-50%) translateY(-30px); z-index:5; opacity:0;
   background:rgba(255,255,255,.95); border-radius:999px; padding:8px 22px; font-family:var(--font-disp); font-weight:700; font-size:21px; color:var(--ink);
   box-shadow:0 5px 0 rgba(170,195,230,.5); transition:transform .5s ease, opacity .5s; pointer-events:none; white-space:nowrap;}
 #worldBanner.show{opacity:1; transform:translateX(-50%) translateY(0);}
-/* Reiter-Sicht: Lumis Kopf, echter Galopp */
-#rider{position:absolute; left:50%; bottom:-6px; width:min(360px,86%); z-index:4; pointer-events:none;
-  transition:transform .4s ease; will-change:transform; transform:translateX(-50%); --gal:0.66s;}
-#rider .headwrap{display:block; transform-origin:50% 100%;}
-#rider.riding .headwrap{animation:gallopCycle var(--gal) cubic-bezier(.45,.05,.55,.95) infinite;}
-@keyframes gallopCycle{
-  0%  {transform:translateY(7px) rotate(1.4deg) scale(.985);}
-  28% {transform:translateY(-11px) rotate(-2.6deg) scale(1.015);}
-  52% {transform:translateY(-13px) rotate(-1.2deg) scale(1.01);}
-  74% {transform:translateY(5px) rotate(2deg) scale(.99);}
-  100%{transform:translateY(7px) rotate(1.4deg) scale(.985);}
-}
-#rider.braking .headwrap{animation:brakeNod .7s ease forwards;}
-@keyframes brakeNod{0%{transform:translateY(-6px)}45%{transform:translateY(16px) rotate(2.6deg) scale(.97)}100%{transform:translateY(5px) rotate(.6deg)}}
-#rider.standing .headwrap{animation:standIdle 2.6s ease-in-out infinite;}
-@keyframes standIdle{0%,100%{transform:translateY(5px)}50%{transform:translateY(1px) rotate(-.6deg)}}
-#rider.launch .headwrap{animation:launchKick .8s cubic-bezier(.3,.1,.3,1) forwards;}
-@keyframes launchKick{0%{transform:translateY(5px)}35%{transform:translateY(14px) rotate(3deg) scale(.97)}70%{transform:translateY(-16px) rotate(-3deg) scale(1.03)}100%{transform:translateY(7px) rotate(1.4deg)}}
-#rider.cheer .headwrap{animation:ridercheer .6s ease;}
-@keyframes ridercheer{40%{transform:translateY(-26px) scale(1.07)}}
-/* Mähne und Ohren leben mit */
-#runLumi svg .mane{transform-box:fill-box; transform-origin:50% 0%;}
-#rider.riding svg .mane{animation:maneSway var(--gal) ease-in-out infinite;}
-#rider.riding svg .m2{animation-delay:calc(var(--gal)*-.18);}
-#rider.riding svg .m3{animation-delay:calc(var(--gal)*-.36);}
-@keyframes maneSway{0%,100%{transform:skewX(2.5deg)}50%{transform:skewX(-3deg)}}
-#runLumi svg .ear{transform-box:fill-box; transform-origin:50% 90%;}
-#rider.riding svg .earL{animation:earTwitch calc(var(--gal)*2) ease-in-out infinite;}
-#rider.riding svg .earR{animation:earTwitch calc(var(--gal)*2) ease-in-out infinite; animation-delay:calc(var(--gal)*.5);}
-@keyframes earTwitch{0%,100%{transform:rotate(0)}30%{transform:rotate(-7deg)}}
-#rider.standing svg .earL,#rider.standing svg .earR{animation:earPerk 1.4s ease-in-out infinite;}
-@keyframes earPerk{0%,100%{transform:rotate(0)}40%{transform:rotate(-10deg)}60%{transform:rotate(6deg)}}
-.brakepuff{position:absolute; bottom:24%; font-size:26px; opacity:0; animation:puffout 1s ease-out forwards; pointer-events:none; z-index:3;}
-@keyframes puffout{0%{opacity:.9; transform:translateY(0) scale(.6)}100%{opacity:0; transform:translateY(-34px) scale(1.5)}}
-.funkel{position:absolute; width:13px; height:13px; border-radius:50%; background:#FFE066; box-shadow:0 0 13px 5px rgba(255,224,102,.8); animation:flit 3.2s ease-in-out infinite; pointer-events:none;}
-@keyframes flit{0%,100%{transform:translate(0,0)}25%{transform:translate(16px,-22px)}50%{transform:translate(-8px,-34px)}75%{transform:translate(12px,-10px)}}
 /* Freund auf Wölkchen, Blase hängt an ihm */
 #friendRig{position:absolute; left:50%; top:-170px; transform:translateX(-50%); z-index:4; text-align:center; transition:top .8s cubic-bezier(.3,.9,.4,1.1), opacity .5s; pointer-events:none; width:min(86%,420px);}
 #friendRig .fig{display:inline-block; animation:friendbob 2.2s ease-in-out infinite;}
@@ -369,8 +270,7 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
 #friendRig.talk .fbubble{transform:scale(1);}
 #friendRig.hop .fig{animation:friendhop .6s ease;}
 @keyframes friendhop{40%{transform:translateY(-20px) rotate(-8deg)}}
-.collectStar{position:absolute; z-index:5; font-size:26px; pointer-events:none; animation:collect .9s ease-in forwards;}
-@keyframes collect{0%{opacity:0; transform:translate(0,0) scale(.5)}20%{opacity:1}100%{opacity:0; transform:translate(var(--cx,-40px),var(--cy,260px)) scale(1.4)}}
+20%{opacity:1}100%{opacity:0; transform:translate(var(--cx,-40px),var(--cy,260px)) scale(1.4)}}
 .combochip{
   display:flex; align-items:center; gap:8px; background:var(--card); border:2px solid var(--line);
   border-radius:18px; padding:8px 12px; font-family:var(--font-disp); font-weight:700; font-size:18px;
@@ -502,21 +402,10 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
       <div class="combochip">Combo <span id="comboN">0</span><span class="m"><i id="comboBar"></i></span></div>
     </div>
     <div class="sky">
-      <div class="cloudband cb1"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-      <div class="cloudband cb2"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-      <div class="cloudband cb3"><span></span><span></span><span></span><span></span><span></span><span></span></div>
       <div class="runQ" id="runQ"><div class="qchip"></div><div id="runDots"></div></div>
       <div class="world" id="world">
-        <div id="sun"></div><div id="moon"></div>
-        <div id="starsLayer"></div>
-        <div id="seaBand"></div><div id="hillBand"></div>
-        <div class="horizonband"></div>
-        <div id="whooshLayer"></div>
-        <div id="gateTrain"></div>
         <div id="friendRig" hidden></div>
         <div id="worldBanner"></div>
-        <div id="rider"><div class="funkel" style="left:18%;top:-26px;"></div><div class="headwrap" id="runLumi"></div></div>
-        <div id="flash"></div>
       </div>
     </div>
   </section>
@@ -568,6 +457,8 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
 <div id="overlay"><div class="box" id="overlayBox"></div></div>
 <canvas id="fx"></canvas>
 
+<script src="vendor/pixi.min.js"></script>
+<script src="game.js"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -1451,68 +1342,40 @@ function finishBlitz(){
   if(unlockedItem) setTimeout(()=>showItemOverlay(unlockedItem),1400);
 }
 
-/* ---------- Wolkenritt v3: Welten, Weltentore, Rätsel-Stopp ---------- */
-let RN=null, runDeadline=null, whooshTimer=null, ambTimer=null;
-const RUN_GATES=12, LANE_X=[-0.30,0,0.30];
-const WORLDS=[
-  {name:'Wolkenhimmel', em:'☁️', top:'#BBDDF8', mid:'#E9E2FA', bot:'#FBEFF7', ringO:'#C9B6EE', amb:[['🎈','drift'],['🕊️','drift']], sun:1},
-  {name:'Abendrot-Meer', em:'🌅', top:'#F6A86E', mid:'#F78BA4', bot:'#8FBEEA', ringO:'#F2B83C', amb:[['🐬','arc'],['🕊️','drift']], sea:1, sun:1},
-  {name:'Sternennacht', em:'🌙', top:'#2E3060', mid:'#4B3E86', bot:'#8468B6', ringO:'#B089F2', amb:[['☄️','drift'],['🦉','drift']], night:1, glow:1},
-  {name:'Zuckerwatte-Land', em:'🍭', top:'#FBD3E8', mid:'#F6C1DC', bot:'#EFD9FA', ringO:'#F96D9B', amb:[['🍭','drift'],['🍬','drift']], hills:1, sun:1},
-];
+/* ---------- Wolkenritt v4: PixiJS-Szene, Welten, Weltentore, Rätsel-Stopp ---------- */
+let RN=null;
+const RUN_GATES=12;
+const WORLD_INFO={wolken:{name:'Wolkenhimmel',em:'☁️'}, meer:{name:'Abendrot-Meer',em:'🌅'}, nacht:{name:'Sternennacht',em:'🌙'}, zucker:{name:'Zuckerwatte-Land',em:'🍭'}};
+const WORLD_KEYS=Object.keys(WORLD_INFO);
 function masteredFriends(){ return ROW_ORDER.filter(r=>rowMastery(S,r)>=ROW_UNLOCK_SHARE).map(r=>FRIENDS[r]); }
-function worldBox(){ return $('world').getBoundingClientRect(); }
 function shuffleArr(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+const G=()=>window.Wolkenritt;
 
-function startRun(){
-  RN={gate:0, n:RUN_GATES, ok:0, combo:0, bestCombo:0, stars:0, task:null, locked:false, recent:[],
-      first:(S.flights||0)===0, friends:masteredFriends(), worlds:shuffleArr(WORLDS).slice(0,3), wIdx:0, braked:false};
-  bumpStreak(S,Date.now());
-  $('runLumi').innerHTML=unicornHeadSVG(S.items,'100%');
-  $('runStars').textContent='0'; $('comboN').textContent='0'; $('comboBar').style.width='0%';
-  hideFriend(true); $('gateTrain').innerHTML=''; $('whooshLayer').innerHTML='';
+async function startRun(){
+  const eng=G();
+  if(!eng){ showOverlay('<h2>Hoppla</h2><p>Der Wolkenritt lädt gerade noch. Gleich nochmal probieren!</p>','Okay'); return; }
   show('run');
-  riderMode('riding'); setGallopSpeed(); setRiderLane(1,true);
-  applyWorld(RN.worlds[0]);
+  if(!eng.ready){
+    $('runQ').querySelector('.qchip').innerHTML='<small>Lumi sattelt …</small>🦄';
+    try{ await eng.init($('world')); }catch(e){ showOverlay('<h2>Hoppla</h2><p>Der Wolkenritt konnte nicht starten. Bitte die App einmal neu öffnen.</p>','Okay'); show('home'); return; }
+    if(current!=='run') return;
+  }
+  RN={gate:0, n:RUN_GATES, ok:0, combo:0, bestCombo:0, stars:0, task:null, locked:false, recent:[],
+      first:(S.flights||0)===0, friends:masteredFriends(), worlds:shuffleArr(WORLD_KEYS).slice(0,3), wIdx:0};
+  bumpStreak(S,Date.now());
+  $('runStars').textContent='0'; $('comboN').textContent='0'; $('comboBar').style.width='0%';
+  hideFriend(true);
+  eng.start({world:RN.worlds[0]});
+  eng.onPick=(lane)=>{ if(RN&&!RN.locked) chooseGate(RN.task.opts[lane], lane); };
+  eng.onArrive=()=>{ if(RN&&!RN.locked) chooseGate(null, null); };
   renderRunDots();
-  startWhoosh(); startAmbient();
   if(RN.first){
     showFriend('✨','Tipp das Tor mit der richtigen Zahl – Lumi reitet hindurch!');
     speak('Steig auf, '+S.name+'! Tippe das Tor mit der richtigen Zahl, dann reitet Lumi hindurch. Lass dir Zeit!');
   }else{
-    speak('Steig auf, '+S.name+'! Auf in '+(RN.worlds[0].name)+'!');
+    speak('Steig auf, '+S.name+'! Auf in den '+WORLD_INFO[RN.worlds[0]].name+'!');
   }
-  setTimeout(()=>{ if(RN) nextGate(); }, 700);
-}
-function riderMode(m){
-  const r=$('rider');
-  r.classList.remove('riding','braking','standing','launch');
-  if(m) r.classList.add(m);
-}
-function setGallopSpeed(){ $('rider').style.setProperty('--gal', Math.max(0.45, 0.68-((RN&&RN.combo)||0)*0.022)+'s'); }
-function setRiderLane(lane, instant){
-  const w=worldBox().width, x=LANE_X[lane]*w*0.12;
-  const r=$('rider');
-  if(instant) r.style.transition='none';
-  r.style.transform='translateX(calc(-50% + '+x+'px)) rotate('+(LANE_X[lane]*10)+'deg)';
-  if(instant){ void r.offsetWidth; r.style.transition=''; }
-}
-function applyWorld(w){
-  const sky=document.querySelector('#scr-run .sky');
-  sky.style.setProperty('--skytop',w.top); sky.style.setProperty('--skymid',w.mid); sky.style.setProperty('--skybot',w.bot);
-  sky.style.setProperty('--ringO',w.ringO);
-  sky.classList.toggle('glowy',!!w.glow);
-  $('sun').style.opacity=w.sun?1:0;
-  $('moon').style.opacity=w.night?1:0;
-  $('starsLayer').style.opacity=w.night?1:0;
-  $('seaBand').style.opacity=w.sea?1:0;
-  $('hillBand').style.opacity=w.hills?1:0;
-}
-function worldBannerShow(w){
-  const b=$('worldBanner');
-  b.textContent=w.em+' '+w.name+'!';
-  b.classList.add('show');
-  setTimeout(()=>b.classList.remove('show'),1900);
+  setTimeout(()=>{ if(RN) nextGate(); }, 900);
 }
 function renderRunDots(){
   const d=$('runDots'); d.innerHTML='';
@@ -1523,53 +1386,10 @@ function renderRunDots(){
     d.appendChild(b);
   }
 }
-function startWhoosh(){
-  clearInterval(whooshTimer);
-  const spawn=()=>{
-    if(current!=='run'||(RN&&RN.braked)) return;
-    const wb=worldBox(), L=$('whooshLayer');
-    const e=document.createElement('i');
-    const star=Math.random()<0.25;
-    e.className='whoosh '+(star?'st':'cl');
-    if(star){ e.style.background='#FFD98A'; e.style.clipPath='polygon(50% 0,63% 36%,100% 38%,70% 60%,80% 100%,50% 76%,20% 100%,30% 60%,0 38%,37% 36%)'; }
-    const side=Math.random()<0.5?-1:1;
-    e.style.setProperty('--dx', side*(0.35+Math.random()*0.5)*wb.width+'px');
-    e.style.setProperty('--dy', (0.15+Math.random()*0.75)*wb.height+'px');
-    e.style.setProperty('--sc', (1.6+Math.random()*1.6).toFixed(2));
-    e.style.setProperty('--op', star?0.95:0.8);
-    const fast=RN&&RN.combo>=5;
-    e.style.setProperty('--dur',(fast?1.5:2.5)+Math.random()*0.8+'s');
-    L.appendChild(e);
-    setTimeout(()=>e.remove(),3600);
-  };
-  whooshTimer=setInterval(spawn,430); spawn();
-}
-function stopWhoosh(){ clearInterval(whooshTimer); const l=$('whooshLayer'); if(l) l.innerHTML=''; }
-function startAmbient(){
-  clearInterval(ambTimer);
-  const spawn=()=>{
-    if(current!=='run'||!RN||RN.braked) return;
-    const w=RN.worlds[RN.wIdx], wb=worldBox();
-    const [g,mode]=w.amb[Math.floor(Math.random()*w.amb.length)];
-    const e=document.createElement('span');
-    e.className='ambfly'+(mode==='arc'?' arc':'');
-    e.textContent=g;
-    const fromLeft=Math.random()<0.5;
-    e.style.left=fromLeft?'-40px':'auto'; e.style.right=fromLeft?'auto':'-40px';
-    e.style.top=(10+Math.random()*45)+'%';
-    e.style.setProperty('--ax',(fromLeft?1:-1)*(wb.width+90)+'px');
-    e.style.setProperty('--ay',(Math.random()*60-20)+'px');
-    e.style.setProperty('--adur',(mode==='arc'?3.8:8+Math.random()*4)+'s');
-    if(mode==='arc'){ e.style.top='52%'; }
-    $('world').appendChild(e);
-    setTimeout(()=>e.remove(),13000);
-  };
-  ambTimer=setInterval(spawn,6500); setTimeout(spawn,1800);
-}
-function stopAmbient(){ clearInterval(ambTimer); }
-function approachMs(){ if(RN.first) return 15000; return Math.max(5500, 9500-RN.combo*450); }
+function approachMs(){ if(RN.first) return 15000; return Math.max(5200, 9500-RN.combo*450); }
+function setQ(small,big){ $('runQ').querySelector('.qchip').innerHTML='<small>'+small+'</small>'+(big||''); }
 
-/* Freund-Auftritt */
+/* Freund-Auftritt (DOM über der Szene) */
 function showFriend(icon,text){
   const r=$('friendRig');
   r.innerHTML='<div class="fig"><div class="fav">'+icon+'</div><div class="fcloud"></div></div><div class="fbubble">'+text+'</div>';
@@ -1587,16 +1407,11 @@ function hideFriend(instant){
   r.style.top='-180px'; r.style.opacity='0';
   setTimeout(()=>{ r.hidden=true; r.style.opacity='1'; },600);
 }
-function brakePuffs(){
-  const wb=worldBox();
-  for(let i=0;i<3;i++){
-    const p=document.createElement('span');
-    p.className='brakepuff'; p.textContent='💨';
-    p.style.left=(32+i*16+Math.random()*8)+'%';
-    p.style.animationDelay=(i*0.12)+'s';
-    $('world').appendChild(p);
-    setTimeout(()=>p.remove(),1400);
-  }
+function worldBannerShow(key){
+  const w=WORLD_INFO[key], b=$('worldBanner');
+  b.textContent=w.em+' '+w.name+'!';
+  b.classList.add('show');
+  setTimeout(()=>b.classList.remove('show'),1900);
 }
 function sndBrake(){ tone(520,.16,0,'triangle',.12); tone(390,.16,.12,'triangle',.12); tone(290,.26,.24,'triangle',.12); }
 function sndWorld(){ [659,784,988].forEach((f,i)=>tone(f,.18,i*0.11)); }
@@ -1604,10 +1419,9 @@ function pling(){ tone(1319,.12,0,'sine',.12); }
 
 function nextGate(){
   if(!RN) return;
+  const eng=G();
   if(RN.gate>=RN.n){ finishRun(); return; }
-  clearTimeout(runDeadline);
   renderRunDots();
-  // Fragen-Mix: Rätsel hält den Ritt an; sonst Mal-Aufgabe oder Reihen-Sprung
   const roll=Math.random();
   const isWorldGate = (RN.gate%4===3) && RN.gate<RN.n-1;
   let t, riddle=false;
@@ -1623,101 +1437,39 @@ function nextGate(){
     if(p.type!=='mul'){ const pr=p.key.split('x').map(Number); p={key:p.key,a:pr[0],b:pr[1],show:pr[0]+' · '+pr[1],answer:pr[0]*pr[1]}; }
     t={kind:'fact', key:p.key, answer:p.answer, opts:makeOptions(p.answer,p.a,p.b)};
     RN.recent.push(p.key); if(RN.recent.length>4) RN.recent.shift();
-    setQ(isWorldGate?'Das Weltentor! Gleich geht es weiter nach '+RN.worlds[RN.wIdx+1].name+'!':'Durch welches Tor, Lumi?', p.show+' = ?');
+    setQ(isWorldGate?'Das Weltentor! Dahinter wartet '+WORLD_INFO[RN.worlds[RN.wIdx+1]].name+'!':'Durch welches Tor, Lumi?', p.show+' = ?');
   }
   RN.task=t; RN.locked=false; RN.riddle=riddle; RN.isWorldGate=isWorldGate; RN.t0=performance.now();
-  buildPortals(t.opts, isWorldGate, riddle);
   if(riddle){
-    // Brems-Inszenierung: Partikel stoppen, Lumi bremst, Freund schwebt ein
-    RN.braked=true;
-    riderMode('braking'); sndBrake(); brakePuffs();
-    setTimeout(()=>{ if(RN&&RN.braked) riderMode('standing'); },700);
-    setTimeout(()=>{ if(!RN||!RN.braked) return;
+    // Brems-Inszenierung: Lumi bremst, Tore stehen vor dir, Freund schwebt ein
+    eng.brake(); sndBrake();
+    eng.spawnGates(t.opts,{hold:true});
+    setTimeout(()=>{ if(!RN||!RN.riddle) return;
       showFriend(t.icon, t.text);
       speak(t.text.replace(/[„“]/g,''));
       RN.t0=performance.now();
-    },650);
-    // kein Zeitablauf beim Rätsel
+    },700);
   }else{
-    runDeadline=setTimeout(()=>{ if(RN&&!RN.locked) chooseGate(null,null,null); }, RN.win);
+    eng.spawnGates(t.opts,{approachMs:approachMs(), worldgate:isWorldGate});
   }
 }
-function setQ(small,big){ $('runQ').querySelector('.qchip').innerHTML='<small>'+small+'</small>'+big; }
-function buildPortals(opts, worldgate, riddle){
-  const wb=worldBox(), train=$('gateTrain');
-  train.innerHTML='';
-  const hy=wb.height*0.34, ey=wb.height*0.56, cx=wb.width/2;
-  const endScale=(Math.min(1.15, Math.max(0.6, wb.width/520)))*(worldgate?1.18:1);
-  const nEnd=Math.min(1.5, 0.95/endScale);
-  RN.endScale=endScale;
-  const win = riddle? 900 : approachMs();
-  RN.win=win;
-  opts.forEach((v,lane)=>{
-    const b=document.createElement('button');
-    b.className='portal'+(worldgate?' worldgate':'');
-    b.innerHTML='<span class="swingbox">'
-      +'<svg class="rsvg" viewBox="0 0 150 154">'
-      +(worldgate?'<defs><linearGradient id="rbw" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F96D6D"/><stop offset=".3" stop-color="#F2CE4B"/><stop offset=".55" stop-color="#4FC47F"/><stop offset=".8" stop-color="#58A6F0"/><stop offset="1" stop-color="#C77DF0"/></linearGradient></defs>':'')
-      +'<ellipse class="fillE" cx="75" cy="77" rx="57" ry="69"/>'
-      +'<ellipse class="ringO" cx="75" cy="77" rx="57" ry="69"/><ellipse class="ringW" cx="75" cy="77" rx="57" ry="69"/></svg>'
-      +'<span class="puff p1"></span><span class="puff p2"></span><span class="puff p3"></span><span class="orbit"></span>'
-      +'<span class="n">'+v+'</span></span>';
-    const sx=cx+LANE_X[lane]*wb.width*0.16, ex=cx+LANE_X[lane]*wb.width;
-    const mx=cx+LANE_X[lane]*wb.width*0.55, my=hy+(ey-hy)*0.5, ms=0.22+(endScale-0.22)*0.5;
-    b.dataset.end='translate('+ex+'px,'+ey+'px) scale('+endScale+')';
-    b.style.transition='none';
-    b.style.transform='translate('+sx+'px,'+hy+'px) scale(0.22)';
-    b.style.opacity='0.98';
-    b.addEventListener('click',()=>chooseGate(v,b,lane));
-    train.appendChild(b);
-    const n=b.querySelector('.n');
-    n.style.transition='none';
-    n.style.transform='translateX(-50%) scale(2.3)';
-    requestAnimationFrame(()=>{
-      if(riddle){
-        // nur bis zur Mitte anreiten, dort wartend pulsieren
-        b.style.transition='transform 900ms ease-out';
-        b.style.transform='translate('+mx+'px,'+my+'px) scale('+ms.toFixed(3)+')';
-        n.style.transition='transform 900ms ease-out';
-        n.style.transform='translateX(-50%) scale('+(2.3-(2.3-nEnd)*0.5).toFixed(2)+')';
-        setTimeout(()=>b.classList.add('waiting'),950);
-      }else{
-        b.style.transition='transform '+win+'ms ease-in';
-        b.style.transform=b.dataset.end;
-        n.style.transition='transform '+win+'ms ease-in';
-        n.style.transform='translateX(-50%) scale('+nEnd.toFixed(2)+')';
-      }
-    });
-    b.dataset.nend=nEnd.toFixed(2);
-  });
-}
 
-function chooseGate(val, btn, lane){
+async function chooseGate(val, lane){
   if(!RN||RN.locked) return;
-  RN.locked=true; clearTimeout(runDeadline);
+  RN.locked=true;
+  const eng=G();
   const t=RN.task, rt=performance.now()-RN.t0, good=val===t.answer;
+  const goodLane=t.opts.indexOf(t.answer);
   applyResult(S, t.key, good, good?rt:Math.max(rt,5000), Date.now());
   logDay(S,Date.now(),0,1,good?1:0);
-  const portals=[...document.querySelectorAll('.portal')];
-  let goodPortal=null, goodLane=1;
-  portals.forEach((b,i)=>{
-    b.classList.remove('waiting');
-    const isAns=parseInt(b.querySelector('.n').textContent,10)===t.answer;
-    if(isAns){ b.classList.add('good'); goodPortal=b; goodLane=i; }
-    else if(b===btn) b.classList.add('bad');
-    else b.classList.add('dim');
-  });
-  setRiderLane(goodLane);
   if(RN.first && RN.gate===0) hideFriend();
   const wasRiddle=RN.riddle, wasWorldGate=RN.isWorldGate;
-  // Punkte, Combo, Reaktionen
   if(good){
     RN.ok++; RN.combo++; RN.bestCombo=Math.max(RN.bestCombo,RN.combo);
     let gained=1; if(RN.combo%4===0){ gained=2; burst(30,0.5,0.3,8); }
     RN.stars+=gained; S.stars+=gained;
     $('runStars').textContent=RN.stars;
     $('comboN').textContent=RN.combo; $('comboBar').style.width=Math.min(100,RN.combo*12.5)+'%';
-    if(btn) starFly(btn, $('runStars').parentElement);
     sndGoodN(RN.combo);
     if(wasRiddle){ friendSay('Juhu! Genau richtig! 🎉'); friendHop(); }
   }else{
@@ -1727,79 +1479,42 @@ function chooseGate(val, btn, lane){
     if(wasRiddle){ friendSay('Macht nix! Es war '+t.answer+'.'); }
     else setQ(msg,'');
   }
-  setGallopSpeed();
+  eng.setCombo(RN.combo);
   save();
   RN.gate++;
-  // Ablauf: (Rätsel: Freund verabschiedet sich, Anritt) -> Tore fahren zu Ende -> Durchflug
-
   if(wasRiddle){
-    setTimeout(()=>{ if(!RN) return;
-      hideFriend();
-      riderMode('launch'); sndWorld();
-      setTimeout(()=>{ if(RN){ riderMode('riding'); RN.braked=false; } },800);
-      portals.forEach(b=>{
-        b.style.transition='transform 1100ms ease-in';
-        b.style.transform=b.dataset.end;
-        const n=b.querySelector('.n');
-        n.style.transition='transform 1100ms ease-in';
-        n.style.transform='translateX(-50%) scale('+b.dataset.nend+')';
-      });
-    }, good?900:1500);
+    await wait(good?900:1500); if(!RN) return;
+    hideFriend(); eng.launch(); sndWorld();
+    eng.resumeGates(1100);
+    await wait(1100); if(!RN) return;
   }
-  const flyDelay = wasRiddle? ((good?900:1500)+1150) : (good?220:800);
-  setTimeout(()=>{ if(!RN) return;
-    const wb=worldBox();
-    portals.forEach(b=>{
-      b.style.transition='transform .6s ease-in, opacity .6s ease-in';
-      if(b===goodPortal){
-        b.style.transform='translate('+(wb.width/2+LANE_X[goodLane]*wb.width*0.22)+'px,'+(wb.height*1.12)+'px) scale('+(3.4*(RN.endScale||1)+1.2)+')';
-        b.style.opacity='0';
-        const gn=b.querySelector('.n'); gn.style.transition='opacity .4s'; gn.style.opacity='0.25';
-      }else{
-        b.style.transform=b.dataset.end+' scale(1.4)';
-        b.style.opacity='0';
-      }
-    });
-    setTimeout(()=>{ if(!RN) return;
-      const f=$('flash'); f.style.opacity=wasWorldGate?'0.95':'0.75';
-      burst(wasWorldGate?44:26,0.5,0.75,wasWorldGate?11:9);
-      const r=$('rider'); r.classList.remove('cheer'); void r.offsetWidth; if(good) r.classList.add('cheer');
-      // Sternschnuppe einsammeln (reine Belohnung nach der Antwort)
-      if(good){ setTimeout(()=>{ collectStar(); pling(); },180); }
-      setTimeout(()=>{ f.style.opacity='0';
-        if(wasWorldGate){
-          RN.wIdx++;
-          const w=RN.worlds[RN.wIdx];
-          applyWorld(w); worldBannerShow(w); sndWorld();
-          $('whooshLayer').innerHTML='';
-          speak('Willkommen in '+w.name.replace('-',' ')+'!');
-        }
-      }, wasWorldGate?360:140);
-    },430);
-  }, flyDelay);
-  setTimeout(()=>{ if(RN) nextGate(); }, flyDelay + (wasWorldGate?2300:(good?1250:1900)) - (good?0:0));
+  await eng.resolve({goodLane, pickedLane:lane, good, worldgate:wasWorldGate});
+  if(!RN) return;
+  if(good){ eng.collectStar(); pling(); }
+  if(wasWorldGate){
+    RN.wIdx++;
+    const w=RN.worlds[RN.wIdx];
+    eng.changeWorld(w); worldBannerShow(w); sndWorld();
+    speak('Willkommen im '+WORLD_INFO[w].name.replace('-',' ')+'!');
+    await wait(1800); if(!RN) return;
+  }else{
+    await wait(good?350:900); if(!RN) return;
+  }
+  nextGate();
 }
-function collectStar(){
-  const wb=worldBox();
-  const s=document.createElement('span');
-  s.className='collectStar'; s.textContent='🌠';
-  s.style.left=(30+Math.random()*40)+'%'; s.style.top='8%';
-  s.style.setProperty('--cx',(Math.random()*120-60)+'px');
-  s.style.setProperty('--cy',(wb.height*0.6)+'px');
-  $('world').appendChild(s);
-  setTimeout(()=>s.remove(),1000);
-}
+function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
 
 function finishRun(){
   if(!RN) return;
-  clearTimeout(runDeadline); stopWhoosh(); stopAmbient(); hideFriend(true);
+  const eng=G();
+  hideFriend(true);
   S.flights=(S.flights||0)+1;
   const ok=RN.ok, n=RN.n, best=RN.bestCombo, stars=RN.stars;
   const comboRecord = best>(S.best.combo||0);
   if(comboRecord) S.best.combo=best;
   const unlockedItem=checkItemUnlock();
   save();
-  RN=null;
+  RN=null; eng.stop();
   $('unicornEnd').innerHTML=unicornSVG(S.items,170);
   $('endTitle').textContent= comboRecord?'Combo-Rekord! 🌟': ok===n?'Perfekter Ritt! 🦄':'Angekommen!';
   $('endStars').textContent='+ '+plural(stars,'Stern','Sterne');
@@ -1812,7 +1527,7 @@ function finishRun(){
   if(unlockedItem) setTimeout(()=>showItemOverlay(unlockedItem),1400);
   maybeRowParty();
 }
-function stopRun(){ RN=null; clearTimeout(runDeadline); stopWhoosh(); stopAmbient(); if($('friendRig')) hideFriend(true); }
+function stopRun(){ RN=null; const eng=G(); if(eng&&eng.ready) eng.stop(); if($('friendRig')) hideFriend(true); }
 /* ---------- Mein Weg ---------- */
 function starSVG(fill){ return '<svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 16.9 5.9 20.4l1.5-6.8L2.2 9l6.9-.7z" fill="'+fill+'"/></svg>'; }
 function renderPath(){

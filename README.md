@@ -18,4 +18,4 @@ Leitner-System pro Fakt (Box 0 bis 5), gewichtete Auswahl mit Wiederholung nach 
 - **Android**: Seite in Chrome öffnen, Menü, "App installieren".
 
 ## Entwicklung
-Alles steckt in `index.html`. Nach Änderungen in `sw.js` die Cache-Version hochzählen, sonst sehen installierte Geräte das Update erst verzögert.
+`index.html` enthält Lernlogik, Menü, Trainingsmodi und Elternbereich. `game.js` ist die Wolkenritt-Szene auf PixiJS (`vendor/pixi.min.js`), die Figur- und Tor-Teile liegen als PNG in `assets/`. Nach Änderungen in `sw.js` die Cache-Version hochzählen, sonst sehen installierte Geräte das Update erst verzögert.
