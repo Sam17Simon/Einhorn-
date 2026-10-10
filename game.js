@@ -4,6 +4,7 @@
 (function(){
 'use strict';
 const P = window.PIXI;
+const VERSION='17';   // wird vom Release-Skript hochgezählt (Cache-Buster)
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*t;
 const easeOut=t=>1-Math.pow(1-t,3);
@@ -42,7 +43,7 @@ G.init=async function(host){
   app.canvas.style.position='absolute'; app.canvas.style.inset='0'; app.canvas.style.touchAction='none';
   G.app=app;
   const names=['head','ear','horn','mane1','mane2','mane3','hand','cloud','star','spark','puff','ring','ringfill','sign'];
-  await P.Assets.load(names.map(n=>({alias:n, src:'assets/'+n+'.png'})));
+  await P.Assets.load(names.map(n=>({alias:n, src:'assets/'+n+'.png?v='+VERSION})));
   names.forEach(n=>G.tex[n]=P.Assets.get(n));
   // Ebenen von hinten nach vorn
   for(const n of ['sky','deco','far','mid','portals','near','lumi','fx','flash']){ const c=new P.Container(); G.layers[n]=c; app.stage.addChild(c); }
