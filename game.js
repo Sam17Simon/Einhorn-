@@ -59,7 +59,7 @@ G.init=async function(host){
   G.ready=true;
 };
 function layout(){
-  G.W=G.app.renderer.width/G.app.renderer.resolution; G.H=G.app.renderer.height/G.app.renderer.resolution;
+  G.W=G.app.screen.width; G.H=G.app.screen.height;   // CSS-Pixel, unabhängig von der Pixeldichte
   G.vp.x=G.W/2; G.vp.y=G.H*0.36;
   G.app.stage.hitArea=new P.Rectangle(0,0,G.W,G.H);
   drawSky(); placeLumi();
