@@ -4,7 +4,7 @@
 (function(){
 'use strict';
 const P = window.PIXI;
-const VERSION='23';   // wird vom Release-Skript hochgezählt (Cache-Buster)
+const VERSION='24';   // wird vom Release-Skript hochgezählt (Cache-Buster)
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*t;
 const easeOut=t=>1-Math.pow(1-t,3);
@@ -42,11 +42,13 @@ G.init=async function(host){
   host.appendChild(app.canvas);
   app.canvas.style.position='absolute'; app.canvas.style.inset='0'; app.canvas.style.touchAction='none';
   G.app=app;
-  const names=['head','ear','horn','mane1','mane2','mane3','hand','cloud','star','spark','puff','ring','ringfill','sign','glint','body_side','leg','tail1','tail2','tail3','wing'];
+  const names=['cloud','star','spark','puff','ring','ringfill','sign','glint','body_side','leg','tail1','tail2','tail3','wing','neck','headR','earL2','earR2','horn2','hand2','mane0','mane1','mane2','mane3','mane4','mane5','mane6'];
   await P.Assets.load(names.map(n=>({alias:n, src:'assets/'+n+'.png?v='+VERSION})));
   names.forEach(n=>G.tex[n]=P.Assets.get(n));
   // Ebenen von hinten nach vorn
-  for(const n of ['sky','deco','far','mid','portals','near','lumi','fx','flash']){ const c=new P.Container(); G.layers[n]=c; app.stage.addChild(c); }
+  G.cam=new P.Container(); app.stage.addChild(G.cam);
+  for(const n of ['sky','deco','far','mid','portals','near','fx']){ const c=new P.Container(); G.layers[n]=c; G.cam.addChild(c); }
+  for(const n of ['lumi','flash']){ const c=new P.Container(); G.layers[n]=c; app.stage.addChild(c); }
   G.layers.flash.addChild(G.flashRect=new P.Graphics());
   buildLumi();
   app.stage.eventMode='static';
@@ -71,7 +73,7 @@ function proj(lx,ly,t){
   // weiche Tiefenkurve: früh sichtbar, am Ende explosiv groß
   const p = t<=1 ? 0.1+0.9*Math.pow(Math.max(0,t),1.6) : 1+(t-1)*8;
   const spread = LANE_SPREAD*p + 0.22*(1-Math.min(p,1));   // in der Ferne etwas auseinanderziehen, damit die Schilder lesbar bleiben
-  const ground = G.W>G.H ? 0.56 : 0.62;   // Querformat: Tore etwas höher, damit Lumi nichts verdeckt
+  const ground = G.W>G.H ? 0.52 : 0.58;   // Querformat: Tore etwas höher, damit Lumi nichts verdeckt
   return {x:G.vp.x+lx*G.W*spread, y:G.vp.y+(G.H*ground-G.vp.y)*p+ly*G.H*0.5*p, s:p};
 }
 
@@ -131,31 +133,30 @@ function curPaletteAsWorld(){
   return {top:h(c.top),mid:h(c.mid),bot:h(c.bot),ring:h(c.ring),sun:c.sun,night:c.night,sea:c.sea,hills:c.hills,glow:c.glow};
 }
 
-/* ---------- Lumi-Rig ---------- */
+/* ---------- Lumi-Rig (Reiter-Sicht v2: Hals, Mähnenkamm, Hinterkopf, Ohren, Horn) ---------- */
 function buildLumi(){
   const T=G.tex, L=new P.Container(); G.lumi=L; G.layers.lumi.addChild(L);
   const inner=new P.Container(); inner.scale.set(0.5); L.addChild(inner); L.inner=inner;
-  const mk=(t,x,y,ax,ay)=>{ const s=new P.Sprite(t); s.anchor.set(ax,ay); s.position.set(x,y); return s; };
-  // Reihenfolge: Mähne hinten, Kopf, Ohren, Horn, Hände vorn. Koordinaten relativ zur Kopfmitte unten.
-  L.maneL=[mk(T.mane1,-74,0,1,1), mk(T.mane2,-58,0,1,1), mk(T.mane3,-42,0,1,1)];
-  L.maneR=[mk(T.mane1,74,0,0,1), mk(T.mane2,58,0,0,1), mk(T.mane3,42,0,0,1)];
-  L.maneR.forEach(s=>{ s.scale.x=-1; s.anchor.set(1,1); });
-  L.maneL.concat(L.maneR).forEach(s=>inner.addChild(s));
-  L.head=mk(T.head,0,0,0.5,1); inner.addChild(L.head);
-  L.earL=mk(T.ear,-40,-98,0.5,0.92); L.earL.rotation=-0.25; inner.addChild(L.earL);
-  L.earR=mk(T.ear,40,-98,0.5,0.92); L.earR.rotation=0.25; L.earR.scale.x=-1; inner.addChild(L.earR);
-  L.horn=mk(T.horn,0,-106,0.5,1); L.horn.scale.set(1.35); inner.addChild(L.horn);
+  // Alle Rig-Teile liegen im selben 600x680-Pixelraum (Ursprung oben links, y-Offset 120 für das Horn)
+  const part=(t,px,py)=>{ const sp=new P.Sprite(T[t]); sp.anchor.set(0); sp.position.set(-300,-680); if(px!==undefined){ sp.pivot.set(px,py); sp.position.set(px-300,py-680); } return sp; };
+  L.neck=part('neck'); inner.addChild(L.neck);
+  // Mähne liegt auf dem Hals: Strähnen wurzeln auf der Mittellinie, Pivot an der Wurzel
+  L.mane=[]; for(let i=6;i>=0;i--){ const m=part('mane'+i, 300, (96+i*24)*2+120); m.idx=i; inner.addChild(m); L.mane.push(m); }
+  L.head=part('headR'); inner.addChild(L.head);
+  L.earL=part('earL2', 256, 116+120); inner.addChild(L.earL);
+  L.earR=part('earR2', 344, 116+120); inner.addChild(L.earR);
+  L.horn=part('horn2', 300, 104+120); inner.addChild(L.horn);
+  const hl=new P.Sprite(T.hand2); hl.anchor.set(0.5,0.5); hl.position.set(-90,-60); inner.addChild(hl); L.handL=hl;
+  const hr=new P.Sprite(T.hand2); hr.anchor.set(0.5,0.5); hr.scale.x=-1; hr.position.set(96,-66); inner.addChild(hr); L.handR=hr;
+  L.funkel=new P.Sprite(T.spark); L.funkel.anchor.set(0.5); L.funkel.tint=0xFFE066; L.funkel.scale.set(0.9); inner.addChild(L.funkel);
   L.glints=[]; L.glintT=0;
-  L.handL=mk(T.hand,-86,-36,0.3,1); inner.addChild(L.handL);
-  L.handR=mk(T.hand,86,-36,0.3,1); L.handR.scale.x=-1; inner.addChild(L.handR);
-  L.funkel=mk(T.spark,-70,-120,0.5,0.5); L.funkel.tint=0xFFE066; L.funkel.scale.set(0.9); inner.addChild(L.funkel);
-  L.body=L;
 }
 function placeLumi(){
   const L=G.lumi; if(!L) return;
-  L.baseScale=clamp(Math.min(300,G.W*0.58,G.H*0.36)/168,0.6,1.8);
+  // Hals füllt das untere Drittel, Kopf endet bei etwa 62 % der Höhe
+  L.baseScale=clamp(Math.min(G.W*0.72, G.H*0.44)/300, 0.5, 2.4);
   L.scale.set(L.baseScale);
-  L.position.set(G.W/2+G.laneX, G.H+26*L.baseScale);
+  L.position.set(G.W/2+G.laneX, G.H+8);
 }
 G.setLane=function(lane){ G.lane=lane; };
 G.setLumiState=function(s){ if(G.lumiState===s) return; G.lumiState=s; G.stateT=0; };
@@ -164,48 +165,57 @@ function animLumi(dt){
   const target=LANE_X[G.lane]*G.W*0.1;
   G.laneX=lerp(G.laneX,target,1-Math.pow(0.001,dt));
   const sp=clamp(G.speed/0.12,0,2.2);
-  let y=0, rot=0, sc=1, earK=0, maneK=0;
+  let y=0, rot=0, sc=1, earK=0, maneK=0, headNod=0;
   if(st==='ride'){
     G.phase+= dt*(5.5+sp*3.2);
     const ph=G.phase;
-    y = -Math.max(0,Math.sin(ph))*14*(0.6+sp*0.3) + Math.sin(ph*2)*2;
-    rot = Math.sin(ph+0.6)*0.035;
-    sc = 1+Math.sin(ph)*0.012;
-    earK = Math.sin(ph*0.5)*0.12; maneK=Math.sin(ph-0.8)*0.09;
+    y = -Math.max(0,Math.sin(ph))*12*(0.6+sp*0.3) + Math.sin(ph*2)*2;
+    rot = Math.sin(ph+0.6)*0.02;
+    sc = 1+Math.sin(ph)*0.008;
+    earK = Math.sin(ph*0.5)*0.12; maneK=Math.sin(ph-0.8)*0.5; headNod=Math.sin(ph+0.3)*6;
   }else if(st==='brake'){
     const t=clamp(G.stateT/0.6,0,1), e=easeOut(t);
-    y = lerp(-6, 14, e) - Math.sin(t*Math.PI)*6; rot = lerp(0,0.05,e); sc=lerp(1,0.97,e);
-    earK=-0.2*e; maneK=0.18*(1-t);
+    y = lerp(-6, 12, e) - Math.sin(t*Math.PI)*6; rot = lerp(0,0.03,e); sc=lerp(1,0.98,e);
+    earK=-0.2*e; maneK=0.9*(1-t); headNod=18*e;
   }else if(st==='stand'){
     y = 6+Math.sin(G.stateT*1.8)*2.5; rot=0.01;
-    earK = Math.sin(G.stateT*2.4)*0.22; maneK=Math.sin(G.stateT*1.2)*0.03;
+    earK = Math.sin(G.stateT*2.4)*0.22; maneK=Math.sin(G.stateT*1.2)*0.15; headNod=4+Math.sin(G.stateT*1.5)*3;
   }else if(st==='launch'){
     const t=clamp(G.stateT/0.8,0,1);
-    y = t<0.35? lerp(6,18,t/0.35) : lerp(18,-18,easeOut((t-0.35)/0.65)) ; rot=t<0.35?0.05:-0.04; sc=t<0.35?0.96:1.04;
-    maneK=-0.2*(1-t);
+    y = t<0.35? lerp(6,16,t/0.35) : lerp(16,-16,easeOut((t-0.35)/0.65)); rot=t<0.35?0.03:-0.02; sc=t<0.35?0.97:1.03;
+    maneK=-1.2*(1-t); headNod=t<0.35?10:-8;
     if(t>=1){ G.setLumiState('ride'); }
   }else if(st==='cheer'){
     const t=clamp(G.stateT/0.6,0,1);
-    y = -Math.sin(t*Math.PI)*34; sc=1+Math.sin(t*Math.PI)*0.07; rot=-Math.sin(t*Math.PI)*0.06;
-    earK=Math.sin(t*Math.PI)*0.3;
+    y = -Math.sin(t*Math.PI)*30; sc=1+Math.sin(t*Math.PI)*0.05; rot=-Math.sin(t*Math.PI)*0.04;
+    earK=Math.sin(t*Math.PI)*0.3; headNod=-Math.sin(t*Math.PI)*16;
     if(t>=1){ G.setLumiState('ride'); }
   }
-  // Lean in die Spur
-  rot += (G.laneX/(G.W*0.1||1))*0.06;
-  L.position.set(G.W/2+G.laneX, G.H+26*L.baseScale+y*L.baseScale);
+  const lean=(G.laneX/(G.W*0.1||1));
+  rot += lean*0.05;
+  L.position.set(G.W/2+G.laneX, G.H+8+y*L.baseScale);
   L.rotation=rot; L.scale.set(L.baseScale*sc);
-  L.earL.rotation=-0.25-earK; L.earR.rotation=0.25+earK;
-  L.maneL.forEach((s,i)=>{ s.skew.x= Math.sin(G.phase-0.5*i)*0.07+maneK*0.6; });
-  L.maneR.forEach((s,i)=>{ s.skew.x=-(Math.sin(G.phase-0.5*i)*0.07+maneK*0.6); });
-  L.funkel.position.set(-70+Math.sin(G.stateT*2.1)*16, -120+Math.cos(G.stateT*1.7)*14);
+  // Kopf nickt im Galopp, Ohren zucken, Horn und Ohren wandern mit dem Kopf
+  const ny=headNod*2;
+  L.head.position.y=-680+ny; L.earL.position.y=116+120-680+ny; L.earR.position.y=116+120-680+ny; L.horn.position.y=104+120-680+ny;
+  L.earL.rotation=-earK*0.8; L.earR.rotation=earK*0.8;
+  L.horn.rotation=lean*0.04;
+  // Mähnenkamm weht nach hinten (zum Reiter) und flattert mit Phasenversatz
+  L.mane.forEach((m)=>{ const i=m.idx; m.rotation = 0.12*maneK + Math.sin(G.phase*1.1 - i*0.55)*0.09*(0.4+sp*0.4); m.scale.y = 1+Math.sin(G.phase*1.1-i*0.55)*0.06; });
+  L.funkel.position.set(-150+Math.sin(G.stateT*2.1)*16, -700+Math.cos(G.stateT*1.7)*14);
   L.funkel.alpha=0.8+Math.sin(G.stateT*9)*0.2;
-  // Glitzer: alle paar Frames ein Funkelstern auf Mähne oder Horn, blitzt auf und verschwindet
+  // Kamera: wippt gegen den Galopp, legt sich in die Kurve
+  if(G.cam){
+    G.cam.pivot.set(G.W/2,G.H/2); G.cam.position.set(G.W/2, G.H/2 - y*0.35);
+    G.cam.rotation = lerp(G.cam.rotation, -lean*0.035, 1-Math.pow(0.01,dt));
+  }
+  // Glitzer: Funkelsterne auf Mähne und Horn
   L.glintT+=dt;
   if(L.glintT>0.09 && !G.reduce){ L.glintT=0;
     const g=new P.Sprite(G.tex.glint); g.anchor.set(0.5);
     const onHorn=Math.random()<0.3;
-    g.position.set(onHorn? (Math.random()-0.5)*16 : (Math.random()<0.5?-1:1)*(40+Math.random()*60), onHorn? -120-Math.random()*90 : -20-Math.random()*70);
-    g.scale.set(0); g.age=0; g.life=0.5+Math.random()*0.4; g.rot=(Math.random()-0.5)*4; g.big=0.35+Math.random()*0.45;
+    g.position.set(onHorn? (Math.random()-0.5)*20 : 20+Math.random()*150, onHorn? -720-Math.random()*150 : -480+Math.random()*300);
+    g.scale.set(0); g.age=0; g.life=0.5+Math.random()*0.4; g.rot=(Math.random()-0.5)*4; g.big=0.4+Math.random()*0.5;
     g.tint=[0xFFFFFF,0xFFF3C9,0xFFE9F5,0xE9F5FF][Math.floor(Math.random()*4)];
     L.inner.addChild(g); L.glints.push(g);
   }
@@ -256,7 +266,7 @@ function makePortal(value,lane,worldgate){
   const star=new P.Sprite(T.star); star.anchor.set(0.5); star.scale.set(0.6); inner.addChild(star); c.star=star; c.orb=Math.random()*6;
   const sign=new P.Container(); const sb=new P.Sprite(T.sign); sb.anchor.set(0.5); sign.addChild(sb);
   const txt=new P.Text({text:String(value), style:{fontFamily:'"Baloo 2", Nunito, sans-serif', fontSize:84, fontWeight:'700', fill:0x3B2A52}}); txt.anchor.set(0.5); txt.position.set(0,-4); sign.addChild(txt);
-  sign.position.set(0,262); inner.addChild(sign); c.sign=sign; c.txt=txt; c.sb=sb;
+  sign.position.set(0,-286); inner.addChild(sign); c.sign=sign; c.txt=txt; c.sb=sb;
   c.worldgate=!!worldgate; c.base=Math.min(G.W*0.34,170)/208*(worldgate?1.18:1);
   c.eventMode='static'; c.cursor='pointer';
   c.on('pointertap',(e)=>{ e.stopPropagation(); pick(lane); });
@@ -324,7 +334,7 @@ G.resolve=function(o){
   const delay=o.good?0.2:0.8;
   return new Promise(res=>{
     G.after(delay,()=>{
-      G.portals.forEach(p=>{ p.fly=true; p.flyT=0; p.flyDur=o.good?0.95:0.8; p.t0=p.t; p.lx0=p.lx; p.ly0=p.ly; });
+      G.portals.forEach(p=>{ p.fly=true; p.flyT=0; p.flyDur=o.good?0.95:0.8; p.t0=p.t; p.lx0=p.lx; p.ly0=p.ly; p.sign.visible=false; });
       G.targetSpeed=1/Math.max(4,G.gateDur*0.8);
       G.after(0.66,()=>{
         const q=proj(LANE_X[o.goodLane]*0.25,0.2,1.05);
