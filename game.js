@@ -4,7 +4,7 @@
 (function(){
 'use strict';
 const P = window.PIXI;
-const VERSION='25';   // wird vom Release-Skript hochgezählt (Cache-Buster)
+const VERSION='26';   // wird vom Release-Skript hochgezählt (Cache-Buster)
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*t;
 const easeOut=t=>1-Math.pow(1-t,3);
@@ -42,7 +42,7 @@ G.init=async function(host){
   host.appendChild(app.canvas);
   app.canvas.style.position='absolute'; app.canvas.style.inset='0'; app.canvas.style.touchAction='none';
   G.app=app;
-  const names=['cloud','star','spark','puff','ring','ringfill','sign','glint','body_side','leg','tail1','tail2','tail3','wing','neck','headR','earL2','earR2','horn2','hand2','mane0','mane1','mane2','mane3','mane4','mane5','mane6'];
+  const names=['cloud','star','spark','puff','ring','ringfill','sign','glint','body_side','leg','tail1','tail2','tail3','wing','neck','poll','earL2','earR2','horn2','hand2','mane0','mane1','mane2','mane3','mane4','mane5','mane6','mane7'];
   await P.Assets.load(names.map(n=>({alias:n, src:'assets/'+n+'.png?v='+VERSION})));
   names.forEach(n=>G.tex[n]=P.Assets.get(n));
   // Ebenen von hinten nach vorn
@@ -141,20 +141,20 @@ function buildLumi(){
   const part=(t,px,py)=>{ const sp=new P.Sprite(T[t]); sp.anchor.set(0); sp.position.set(-300,-680); if(px!==undefined){ sp.pivot.set(px,py); sp.position.set(px-300,py-680); } return sp; };
   L.neck=part('neck'); inner.addChild(L.neck);
   // Mähne liegt auf dem Hals: Strähnen wurzeln auf der Mittellinie, Pivot an der Wurzel
-  L.mane=[]; for(let i=6;i>=0;i--){ const m=part('mane'+i, 300, (96+i*24)*2+120); m.idx=i; inner.addChild(m); L.mane.push(m); }
-  L.head=part('headR'); inner.addChild(L.head);
-  L.earL=part('earL2', 256, 116+120); inner.addChild(L.earL);
-  L.earR=part('earR2', 344, 116+120); inner.addChild(L.earR);
-  L.horn=part('horn2', 300, 104+120); inner.addChild(L.horn);
-  const hl=new P.Sprite(T.hand2); hl.anchor.set(0.5,0.5); hl.position.set(-90,-60); inner.addChild(hl); L.handL=hl;
-  const hr=new P.Sprite(T.hand2); hr.anchor.set(0.5,0.5); hr.scale.x=-1; hr.position.set(96,-66); inner.addChild(hr); L.handR=hr;
+  L.mane=[]; for(let i=7;i>=0;i--){ const m=part('mane'+i, 300, (98+i*24+60)*2); m.idx=i; inner.addChild(m); L.mane.push(m); }
+  L.head=part('poll'); inner.addChild(L.head);
+  L.earL=part('earL2', 266, 284); inner.addChild(L.earL);
+  L.earR=part('earR2', 334, 284); inner.addChild(L.earR);
+  L.horn=part('horn2', 300, 280); inner.addChild(L.horn);
+  const hl=new P.Sprite(T.hand2); hl.anchor.set(0.5,0.5); hl.position.set(-120,-70); inner.addChild(hl); L.handL=hl;
+  const hr=new P.Sprite(T.hand2); hr.anchor.set(0.5,0.5); hr.scale.x=-1; hr.position.set(120,-76); inner.addChild(hr); L.handR=hr;
   L.funkel=new P.Sprite(T.spark); L.funkel.anchor.set(0.5); L.funkel.tint=0xFFE066; L.funkel.scale.set(0.9); inner.addChild(L.funkel);
   L.glints=[]; L.glintT=0;
 }
 function placeLumi(){
   const L=G.lumi; if(!L) return;
   // Hals füllt das untere Drittel, Kopf endet bei etwa 62 % der Höhe
-  L.baseScale=clamp(Math.min(G.W*0.72, G.H*0.44)/300, 0.5, 2.4);
+  L.baseScale=clamp(Math.min(G.W*0.95, G.H*0.42)/300, 0.5, 2.6);
   L.scale.set(L.baseScale);
   L.position.set(G.W/2+G.laneX, G.H+8);
 }
@@ -197,12 +197,12 @@ function animLumi(dt){
   L.rotation=rot; L.scale.set(L.baseScale*sc);
   // Kopf nickt im Galopp, Ohren zucken, Horn und Ohren wandern mit dem Kopf
   const ny=headNod*2;
-  L.head.position.y=-680+ny; L.earL.position.y=116+120-680+ny; L.earR.position.y=116+120-680+ny; L.horn.position.y=104+120-680+ny;
+  L.head.position.y=-680+ny; L.earL.position.y=284-680+ny; L.earR.position.y=284-680+ny; L.horn.position.y=280-680+ny;
   L.earL.rotation=-earK*0.8; L.earR.rotation=earK*0.8;
   L.horn.rotation=lean*0.04;
   // Mähnenkamm weht nach hinten (zum Reiter) und flattert mit Phasenversatz
   L.mane.forEach((m)=>{ const i=m.idx; m.rotation = 0.12*maneK + Math.sin(G.phase*1.1 - i*0.55)*0.09*(0.4+sp*0.4); m.scale.y = 1+Math.sin(G.phase*1.1-i*0.55)*0.06; });
-  L.funkel.position.set(-150+Math.sin(G.stateT*2.1)*16, -700+Math.cos(G.stateT*1.7)*14);
+  L.funkel.position.set(-130+Math.sin(G.stateT*2.1)*16, -520+Math.cos(G.stateT*1.7)*14);
   L.funkel.alpha=0.8+Math.sin(G.stateT*9)*0.2;
   // Kamera: wippt gegen den Galopp, legt sich in die Kurve
   if(G.cam){
@@ -214,7 +214,7 @@ function animLumi(dt){
   if(L.glintT>0.09 && !G.reduce){ L.glintT=0;
     const g=new P.Sprite(G.tex.glint); g.anchor.set(0.5);
     const onHorn=Math.random()<0.3;
-    g.position.set(onHorn? (Math.random()-0.5)*20 : 20+Math.random()*150, onHorn? -720-Math.random()*150 : -480+Math.random()*300);
+    g.position.set(onHorn? (Math.random()-0.5)*20 : 10+Math.random()*170, onHorn? -420-Math.random()*200 : -360+Math.random()*300);
     g.scale.set(0); g.age=0; g.life=0.5+Math.random()*0.4; g.rot=(Math.random()-0.5)*4; g.big=0.4+Math.random()*0.5;
     g.tint=[0xFFFFFF,0xFFF3C9,0xFFE9F5,0xE9F5FF][Math.floor(Math.random()*4)];
     L.inner.addChild(g); L.glints.push(g);
