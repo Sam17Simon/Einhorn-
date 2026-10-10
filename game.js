@@ -4,7 +4,7 @@
 (function(){
 'use strict';
 const P = window.PIXI;
-const VERSION='26';   // wird vom Release-Skript hochgezählt (Cache-Buster)
+const VERSION='27';   // wird vom Release-Skript hochgezählt (Cache-Buster)
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*t;
 const easeOut=t=>1-Math.pow(1-t,3);
@@ -351,6 +351,95 @@ G.resolve=function(o){
   });
 };
 
+
+/* ---------- Weltentor: echtes Tor mit Flügeltüren, dahinter die nächste Welt ---------- */
+G.worldGate=function(values, nextWorld){
+  clearPortals(); G.clearGate();
+  const w=WORLDS[nextWorld]||WORLDS.wolken;
+  const c=new P.Container(); G.gate=c; G.layers.portals.addChild(c);
+  c.t=0.86; c.lx=0; c.ly=0.02; c.base=Math.min(G.W*0.92, G.H*0.62)/320;
+  const inner=new P.Container(); c.addChild(inner); c.inner=inner;
+  // Blick durch die Türöffnung: Himmel der nächsten Welt (nur sichtbar, wenn die Türen aufgehen)
+  const view=new P.Container(); inner.addChild(view);
+  const vg=new P.Graphics(); const top=hex(w.top), mid=hex(w.mid), bot=hex(w.bot);
+  for(let i=0;i<16;i++){ const q=i/15; const col=q<0.55?lerpColor(top,mid,q/0.55):lerpColor(mid,bot,(q-0.55)/0.45); vg.rect(-110,-180+q*240,220,16).fill(col); }
+  vg.ellipse(0,-40,150,8).fill({color:0xffffff,alpha:0.5});
+  if(w.sun){ vg.circle(-60,-130,18).fill({color:0xFFE9A8}); }
+  if(w.night){ vg.circle(60,-135,14).fill({color:0xFFF3C9}); for(let i=0;i<14;i++){ vg.star(-100+Math.random()*200,-170+Math.random()*120,5,3+Math.random()*3,1.3).fill({color:0xFFF3C9,alpha:0.9}); } }
+  if(w.sea){ vg.rect(-110,-30,220,40).fill({color:0x4A90C4,alpha:0.45}); for(let i=0;i<8;i++) vg.circle(-100+Math.random()*200,-25+Math.random()*30,2).fill({color:0xffffff,alpha:0.8}); }
+  if(w.hills){ vg.ellipse(-40,-20,110,36).fill({color:0xF6B9D9}); vg.ellipse(70,-10,100,34).fill({color:0xF3A8D0}); }
+  for(let i=0;i<3;i++){ const cl=new P.Sprite(G.tex.cloud); cl.anchor.set(0.5); cl.scale.set(0.25+i*0.08); cl.position.set(-80+i*80,-70+i*25); cl.alpha=0.9; view.addChild(cl); }
+  view.addChildAt(vg,0);
+  const mask=new P.Graphics().rect(-110,-180,220,240).fill(0xffffff); inner.addChild(mask); view.mask=mask;
+  // Tor: Pfeiler, Bogen, Flügeltüren
+  const stone=0xF6F0FA, trim=0xC9B6EE, gold=0xF2B83C, ink=0x3B2A52;
+  const frame=new P.Graphics();
+  frame.roundRect(-165,-220,55,290,14).fill(stone).stroke({width:6,color:ink});
+  frame.roundRect(110,-220,55,290,14).fill(stone).stroke({width:6,color:ink});
+  frame.ellipse(0,-200,165,70).fill(stone).stroke({width:6,color:ink});
+  frame.rect(-170,-200,340,40).fill(stone);
+  frame.ellipse(0,-200,110,42).fill({color:0xE9E0F6}).stroke({width:5,color:ink});
+  frame.rect(-110,-200,220,30).fill(0xE9E0F6);
+  frame.star(0,-205,5,22,10).fill(gold).stroke({width:3,color:0xD99A1E});
+  [[-137,-150],[-137,-60],[-137,30],[137,-150],[137,-60],[137,30]].forEach(([x,y])=>frame.circle(x,y,8).fill(trim));
+  // Türen: zwei Flügel, Drehpunkt an der Außenkante
+  const mkDoor=(side)=>{ const d=new P.Container(); d.position.set(side*110,0); const g=new P.Graphics();
+    g.roundRect(side<0?0:-110,-180,110,240,10).fill(0xEDE4F8).stroke({width:6,color:ink});
+    g.star(side*-55,-80,5,26,12).fill(gold).stroke({width:3,color:0xD99A1E});
+    g.circle(side*-18,-50,6).fill(ink);
+    d.addChild(g); d.side=side; inner.addChild(d); return d; };
+  c.doorL=mkDoor(-1); c.doorR=mkDoor(1);
+  inner.addChild(frame);
+  // Drei Antwort-Schilder: linker Pfeiler, Schlussstein, rechter Pfeiler
+  c.signs=[[-137,-100],[0,-262],[137,-100]].map(([x,y],lane)=>{
+    const sg=new P.Container(); sg.position.set(x,y);
+    const sb=new P.Sprite(G.tex.sign); sb.anchor.set(0.5); sb.scale.set(0.62); sg.addChild(sb);
+    const tx=new P.Text({text:String(values[lane]), style:{fontFamily:'"Baloo 2", Nunito, sans-serif', fontSize:42, fontWeight:'700', fill:ink}}); tx.anchor.set(0.5); tx.position.set(0,-2); sg.addChild(tx);
+    sg.eventMode='static'; sg.cursor='pointer'; sg.on('pointertap',e=>{ e.stopPropagation(); if(window.sndClick) window.sndClick('gate'); G.onPick&&G.onPick(lane); });
+    sg.sb=sb; sg.tx=tx; inner.addChild(sg); return sg; });
+  c.open=0; c.held=true;
+  G.held=true; G.targetSpeed=0; G.gatesActive=true; G.resolved=false;
+  updGate();
+};
+function updGate(dt){
+  const c=G.gate; if(!c) return;
+  const q=proj(c.lx,c.ly,c.t);
+  c.position.set(q.x,q.y); c.scale.set(q.s*c.base);
+  // Türen schwingen nach hinten auf (Perspektive: schmaler und dunkler)
+  const k=easeInOut(clamp(c.open,0,1));
+  c.doorL.scale.x=lerp(1,0.12,k); c.doorR.scale.x=lerp(1,0.12,k);
+  c.doorL.tint=c.doorR.tint=lerpColor(0xffffff,0xB7A8CF,k);
+  if(c.shake>0){ c.shake-=dt||0.016; c.rotation=Math.sin(c.shake*60)*0.02; } else c.rotation=0;
+  if(c.signs) c.signs.forEach(sg=>{ sg.scale.set(1+Math.sin(G.time*3+sg.x)*0.03); });
+}
+G.clearGate=function(){ if(G.gate){ G.gate.destroy({children:true}); G.gate=null; } };
+/* Tor-Auflösung: richtig -> Türen auf, Anritt, Durchritt; falsch -> Rütteln, Lösung zeigen, dann trotzdem auf */
+G.resolveWorldGate=function(o){
+  const c=G.gate; if(!c) return Promise.resolve();
+  G.resolved=true; G.gatesActive=false;
+  c.signs.forEach((sg,i)=>{ if(i===o.goodLane){ sg.sb.tint=0xFFF4D6; sg.tx.style.fill=0x9C6A00; } else if(i===o.pickedLane){ sg.sb.tint=0xF3B6BA; } else sg.alpha=0.3; });
+  return new Promise(res=>{
+    const wait=o.good?0.2:1.2;
+    if(!o.good){ c.shake=0.5; }
+    G.after(wait,()=>{
+      // Türen öffnen
+      const t0=G.time; const openDur=0.9;
+      const tick=()=>{ if(!G.gate) return; const k=(G.time-t0)/openDur; c.open=k; if(k<1) G.after(0.016,tick); };
+      tick();
+      if(o.onOpen) G.after(0.5,o.onOpen);
+      G.after(openDur+0.3,()=>{
+        G.held=false; G.setLumiState('launch');
+        const t1=G.time, dur=1.3, from=c.t;
+        const ride=()=>{ if(!G.gate) return; const k=clamp((G.time-t1)/dur,0,1); c.t=lerp(from,1.36,easeIn(k)); c.ly=lerp(0.02,0.3,k); c.signs.forEach(sg=>sg.visible=k<0.3); if(k<1) G.after(0.016,ride); };
+        ride();
+        G.targetSpeed=0.12;
+        G.after(dur*0.82,()=>{ G.flash(0.95); G.shake(1.4); const q=proj(0,0.2,1.05); G.burst(q.x,q.y,70,true); G.setLumiState('cheer'); });
+        G.after(dur+0.15,()=>{ G.clearGate(); res(); });
+      });
+    });
+  });
+};
+
 /* ---------- Effekte ---------- */
 G.after=function(sec,fn){ G.tweens.push({t:sec,fn}); };
 G.flash=function(a){ G.flashA=Math.max(G.flashA,a); };
@@ -428,7 +517,7 @@ function tick(tk){
   // Sterne funkeln, Meer glitzert
   if(starsC&&starsC.alpha>0.01) starsC.children.forEach(s=>{ s.alpha=0.55+Math.sin(G.time*2+s.ph)*0.45; });
   if(seaC&&seaC.alpha>0.01) seaC.children.forEach(s=>{ s.alpha=0.3+Math.sin(G.time*3+s.ph)*0.3; s.x=(s.rx*G.W+Math.sin(G.time+s.ph)*6); });
-  moveField(dt); updPortals(dt); updParts(dt); updSpeedLines(dt); updAmb(dt); animLumi(dt);
+  moveField(dt); updPortals(dt); updGate(dt); updParts(dt); updSpeedLines(dt); updAmb(dt); animLumi(dt);
   // Timer-Callbacks
   for(let i=G.tweens.length-1;i>=0;i--){ const w=G.tweens[i]; w.t-=dt; if(w.t<=0){ G.tweens.splice(i,1); w.fn(); } }
   // Blitz und Wackeln
@@ -442,7 +531,7 @@ G.start=function(opts){
   if(G.fit) G.fit();
   G.worldName=opts.world||'wolken'; G.setWorld(G.worldName,true);
   G.combo=0; G.speed=0; G.targetSpeed=0.1; G.held=false; G.gatesActive=false; G.resolved=false; G.lane=1; G.laneX=0;
-  clearPortals(); G.clouds.forEach(c=>c.destroy()); G.clouds=[]; G.sparks.forEach(c=>c.destroy()); G.sparks=[]; G.amb.forEach(c=>c.destroy()); G.amb=[];
+  clearPortals(); G.clearGate(); G.clouds.forEach(c=>c.destroy()); G.clouds=[]; G.sparks.forEach(c=>c.destroy()); G.sparks=[]; G.amb.forEach(c=>c.destroy()); G.amb=[];
   G.setLumiState('ride'); G.tweens=[]; G.lastAmb=4;
   for(let i=0;i<8;i++) spawnCloud(Math.random());
   G.app.ticker.start();
@@ -450,7 +539,7 @@ G.start=function(opts){
 G.changeWorld=function(name){ G.worldName=name; G.setWorld(name,false); };
 G.setCombo=function(n){ G.combo=n; G.boost=Math.min(1.9, 1+n*0.15); };
 G.setSpeedFactor=function(f){ G.targetSpeed = f; };
-G.stop=function(){ clearPortals(); G.hideGroups(); G.tweens=[]; G.app.ticker.stop(); };
+G.stop=function(){ clearPortals(); G.clearGate(); G.hideGroups(); G.tweens=[]; G.app.ticker.stop(); };
 G.brake=function(){ G.setLumiState('brake'); G.brakePuffs(); G.targetSpeed=0; G.after(0.65,()=>{ if(G.lumiState==='brake') G.setLumiState('stand'); }); };
 G.launch=function(){ G.setLumiState('launch'); G.held=false; };
 
