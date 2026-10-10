@@ -37,7 +37,7 @@ G.init=async function(host){
   G.host=host;
   G.reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
   const app=new P.Application();
-  await app.init({resizeTo:host, backgroundAlpha:0, antialias:true, resolution:Math.min(2,devicePixelRatio||1), autoDensity:true});
+  await app.init({width:Math.max(2,host.clientWidth), height:Math.max(2,host.clientHeight), backgroundAlpha:0, antialias:true, resolution:Math.min(2,devicePixelRatio||1), autoDensity:true});
   host.appendChild(app.canvas);
   app.canvas.style.position='absolute'; app.canvas.style.inset='0'; app.canvas.style.touchAction='none';
   G.app=app;
@@ -51,7 +51,10 @@ G.init=async function(host){
   app.stage.eventMode='static';
   app.stage.on('pointertap',onTap);
   app.ticker.add(tick);
-  app.renderer.on('resize',layout);
+  // Fläche kann sich ohne Fenster-Resize ändern (Panel, Drehen, Tastatur): Host beobachten
+  const fit=()=>{ const w=host.clientWidth, h=host.clientHeight; if(w>2&&h>2&&(w!==G.W||h!==G.H)){ app.renderer.resize(w,h); layout(); } };
+  try{ new ResizeObserver(fit).observe(host); }catch(e){ addEventListener('resize',fit); }
+  G.fit=fit;
   layout();
   G.ready=true;
 };
@@ -412,6 +415,7 @@ function tick(tk){
 /* ---------- Lebenszyklus ---------- */
 G.start=function(opts){
   // opts: {world, items}
+  if(G.fit) G.fit();
   G.worldName=opts.world||'wolken'; G.setWorld(G.worldName,true);
   G.combo=0; G.speed=0; G.targetSpeed=0.1; G.held=false; G.gatesActive=false; G.resolved=false; G.lane=1; G.laneX=0;
   clearPortals(); G.clouds.forEach(c=>c.destroy()); G.clouds=[]; G.sparks.forEach(c=>c.destroy()); G.sparks=[]; G.amb.forEach(c=>c.destroy()); G.amb=[];
