@@ -35,3 +35,13 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 - Tier schläft (zzz), bis die Reihe zu 80 % sicher ist, dann ist es wach und hüpft beim Antippen.
 - Sterne: `S.stars` bleibt die Gesamtsumme (Lumis Extras hängen daran). `S.spent` zählt Ausgaben, verfügbar ist `starsAvail()`. Ausbauten kosten 8, 15, 25 Sterne je Insel und liegen in `S.islands[reihe]`.
 - Neue Ausbauten: in `BUILDS` zeichnen (80x80, Boden y=76) und in `ISLANDS[reihe].builds` eintragen. Es gibt genau drei Bauplätze je Insel.
+
+## Lumis Extras in Stufen (seit v31)
+- `ITEMS` in index.html: acht Extras mit je drei Stufen (`names`, `desc`, `crop`). Stand liegt in `S.gear` = {id: stufe}, `S.rewards` zählt eingelöste Geschenke. `S.items` ist nur noch Altlast (Zahl), `gearOf()` übersetzt alles.
+- Geschenk-Meilensteine über Gesamtsterne (`rewardsEarned`, `rewardCost`: 20, dann 30, dann 45). Ausgaben für Inseln ändern daran nichts.
+- Bei jedem Meilenstein wählt das Kind in `showGiftChoice` zwischen zwei Extras (immer die mit der niedrigsten Stufe). Kein Laden, keine Preise. Nichts daran als Shop umbauen.
+- game.js bekommt die Ausrüstung als `gearKey(S.gear)` (JSON-Text), damit der Textur-Cache vergleichen kann.
+- Jede Stufe muss in `unicornSVG` (Seite) und `unicornHeadSVG` (Reiter) sichtbar anders sein. Brillen überdecken das Auge nur halbtransparent.
+
+## Inselbild (seit v31)
+- `islands.js`: `scene` je Insel steuert ferne Bergkette (`farRange`), Berge und Bäume auf der Insel (`islandHills`, Basis y=116, rechts hinter den Bauplätzen) und die Klippe unter schwebenden Inseln (`islandCliff`). Berge haben keine Bodenlinie (`shape()` strichelt nur die Oberkante).

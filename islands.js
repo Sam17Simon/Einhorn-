@@ -135,18 +135,104 @@ const BUILDS={
 
 /* ---------- Inseln: Thema je Reihe ---------- */
 const ISLANDS={
-  2:{animal:'kueken', title:'Wiesen-Insel',    ground:'#A9E3A1', rim:'#7BC57E', sky:'#EAF4FD', builds:['huhnhaus','sonnenblume','zaun']},
-  10:{animal:'eule',  title:'Nachtwald-Insel', ground:'#8FA8E0', rim:'#6B7FC9', sky:'#2E3060', night:true, builds:['baumhaus','laterne','mondschaukel']},
-  5:{animal:'frosch', title:'Teich-Insel',     ground:'#9FD9C3', rim:'#6EC0A3', sky:'#E3F3F0', water:true, builds:['seerose','schilf','steg']},
-  1:{animal:'hase',   title:'Möhren-Insel',    ground:'#C9E8A0', rim:'#9FCB7A', sky:'#FDF4E3', builds:['moehrenbeet','hasenbau','vogelscheuche']},
-  4:{animal:'fuchs',  title:'Herbstwald-Insel',ground:'#F6C690', rim:'#E0A266', sky:'#FBEDE0', builds:['hoehle','pilze','laubhaufen']},
-  8:{animal:'schildi',title:'Strand-Insel',    ground:'#F7E2B2', rim:'#E7C98A', sky:'#DCF1FB', water:true, builds:['palme','sonnenschirm','sandburg']},
-  3:{animal:'falter', title:'Blüten-Insel',    ground:'#F8C7DF', rim:'#E99FC4', sky:'#FFF0F7', builds:['blumen','bienenhaus','regenbogenbogen']},
-  6:{animal:'delfin', title:'Riff-Insel',      ground:'#A6D8F5', rim:'#7CBEEA', sky:'#E6F3FD', water:true, builds:['leuchtturm','boot','koralle']},
-  9:{animal:'panda',  title:'Bambus-Insel',    ground:'#B5E3B0', rim:'#86C98A', sky:'#F0F8EC', builds:['bambus','pagode','lampion']},
-  7:{animal:'drache', title:'Drachen-Insel',    ground:'#D5B3F0', rim:'#B48BE0', sky:'#F3E9FB', builds:['burg','fahne','schatz']}
+  2:{animal:'kueken', title:'Wiesen-Insel',    ground:'#A9E3A1', rim:'#7BC57E', sky:'#EAF4FD', builds:['huhnhaus','sonnenblume','zaun'],
+     scene:{far:'#C9DFF1', kind:'hills', c1:'#78C98A', c2:'#58B074', trees:'round', flowers:true}},
+  10:{animal:'eule',  title:'Nachtwald-Insel', ground:'#8FA8E0', rim:'#6B7FC9', sky:'#2E3060', night:true, builds:['baumhaus','laterne','mondschaukel'],
+     scene:{far:'#3C4080', kind:'peaks', c1:'#5A5FA8', c2:'#474C92', snow:true, trees:'pine', treeColor:'#2F4F6E'}},
+  5:{animal:'frosch', title:'Teich-Insel',     ground:'#9FD9C3', rim:'#6EC0A3', sky:'#E3F3F0', water:true, builds:['seerose','schilf','steg'],
+     scene:{far:'#BFE2DA', kind:'hills', c1:'#76C3A4', c2:'#54AB8A', trees:'round', treeColor:'#5FB98C', waterfall:true}},
+  1:{animal:'hase',   title:'Möhren-Insel',    ground:'#C9E8A0', rim:'#9FCB7A', sky:'#FDF4E3', builds:['moehrenbeet','hasenbau','vogelscheuche'],
+     scene:{far:'#E8DFC4', kind:'hills', c1:'#A3D078', c2:'#82B95A', trees:'round', fields:true}},
+  4:{animal:'fuchs',  title:'Herbstwald-Insel',ground:'#F6C690', rim:'#E0A266', sky:'#FBEDE0', builds:['hoehle','pilze','laubhaufen'],
+     scene:{far:'#EBCDB0', kind:'hills', c1:'#F0A868', c2:'#D98A4E', trees:'round', treeColor:'#F28C5A', treeColor2:'#F96D6D'}},
+  8:{animal:'schildi',title:'Strand-Insel',    ground:'#F7E2B2', rim:'#E7C98A', sky:'#DCF1FB', water:true, builds:['palme','sonnenschirm','sandburg'],
+     scene:{far:'#C5E3F2', kind:'dunes', c1:'#F3D79A', c2:'#E6C277', rock:true}},
+  3:{animal:'falter', title:'Blüten-Insel',    ground:'#F8C7DF', rim:'#E99FC4', sky:'#FFF0F7', builds:['blumen','bienenhaus','regenbogenbogen'],
+     scene:{far:'#F2D3E4', kind:'hills', c1:'#EE93BC', c2:'#D977A4', trees:'round', treeColor:'#F8A0C8', treeColor2:'#B493F0', flowers:true}},
+  6:{animal:'delfin', title:'Riff-Insel',      ground:'#A6D8F5', rim:'#7CBEEA', sky:'#E6F3FD', water:true, builds:['leuchtturm','boot','koralle'],
+     scene:{far:'#C9E2F4', kind:'cliffs', c1:'#9DB9D6', c2:'#7E9BBC', snow:false, grassTop:'#8FD6B0'}},
+  9:{animal:'panda',  title:'Bambus-Insel',    ground:'#B5E3B0', rim:'#86C98A', sky:'#F0F8EC', builds:['bambus','pagode','lampion'],
+     scene:{far:'#CFE4D6', kind:'karst', c1:'#7FBFA8', c2:'#5FA68C', mist:true, trees:'round', treeColor:'#5FB98C'}},
+  7:{animal:'drache', title:'Drachen-Insel',    ground:'#D5B3F0', rim:'#B48BE0', sky:'#F3E9FB', builds:['burg','fahne','schatz'],
+     scene:{far:'#DCCBEF', kind:'volcano', c1:'#9A7BD0', c2:'#7E5BB8', crystals:true, sunLeft:true}}
 };
 const BUILD_COST=[8,15,25];
+
+
+/* ---------- Landschaft: Berge, Hügel, Bäume (Stil wie Lumi: Kontur, runde Formen) ---------- */
+function shape(d,fill,stroke){ return `<path d="${d} Z" fill="${fill}"/>`+(stroke?`<path d="${d}" fill="none" stroke="${INK}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>`:''); }
+function bump(x,base,w,h,fill,stroke){ return shape(`M${x-w/2} ${base} Q${x-w/4} ${base-h*0.6} ${x} ${base-h} Q${x+w/4} ${base-h*0.6} ${x+w/2} ${base}`,fill,stroke); }
+function peak(x,base,w,h,fill,stroke,snow){
+  const p=shape(`M${x-w/2} ${base} L${x-w*0.12} ${base-h*0.88} Q${x} ${base-h*1.08} ${x+w*0.12} ${base-h*0.88} L${x+w/2} ${base}`,fill,stroke);
+  const cap=snow?`<path d="M${x-w*0.2} ${base-h*0.62} L${x-w*0.12} ${base-h*0.88} Q${x} ${base-h*1.08} ${x+w*0.12} ${base-h*0.88} L${x+w*0.2} ${base-h*0.62} L${x+w*0.12} ${base-h*0.56} L${x+w*0.04} ${base-h*0.66} L${x-w*0.05} ${base-h*0.55} L${x-w*0.12} ${base-h*0.64} Z" fill="#FFFFFF" ${stroke?`stroke="${INK}" stroke-width="2.2" stroke-linejoin="round"`:''}/>`:'';
+  return p+cap;
+}
+function karst(x,base,w,h,fill,stroke){ return shape(`M${x-w/2} ${base} L${x-w*0.42} ${base-h*0.7} Q${x-w*0.3} ${base-h} ${x} ${base-h} Q${x+w*0.3} ${base-h} ${x+w*0.42} ${base-h*0.7} L${x+w/2} ${base}`,fill,stroke); }
+function pine(x,base,h,c){ const w=h*0.7; return `<path d="M${x} ${base} v-${h*0.18}" stroke="#6B4A2E" stroke-width="3" stroke-linecap="round"/><path d="M${x-w/2} ${base-h*0.18} L${x} ${base-h*0.62} L${x+w/2} ${base-h*0.18} Z M${x-w*0.38} ${base-h*0.5} L${x} ${base-h*0.86} L${x+w*0.38} ${base-h*0.5} Z M${x-w*0.26} ${base-h*0.74} L${x} ${base-h} L${x+w*0.26} ${base-h*0.74} Z" fill="${c}" stroke="${INK}" stroke-width="2.2" stroke-linejoin="round"/>`; }
+function roundTree(x,base,h,c){ const r=h*0.42; return `<path d="M${x} ${base} v-${h*0.5}" stroke="#8A5A3B" stroke-width="3.5" stroke-linecap="round"/><circle cx="${x}" cy="${base-h*0.58}" r="${r}" fill="${c}" stroke="${INK}" stroke-width="2.4"/><circle cx="${x-r*0.35}" cy="${base-h*0.68}" r="${r*0.3}" fill="#fff" opacity=".35"/>`; }
+function flowerDots(pts,cols){ return pts.map(([x,y],i)=>`<circle cx="${x}" cy="${y}" r="2.2" fill="${cols[i%cols.length]}" stroke="${INK}" stroke-width="1"/>`).join(''); }
+
+/* Ferne Bergkette hinter der Insel, in Himmelsnähe. Bei Wasserinseln auf der Horizontlinie. */
+function farRange(I){
+  const sc=I.scene; if(!sc) return '';
+  const base=I.water?131:138, c=sc.far;
+  const sharp=['peaks','cliffs','volcano'].includes(sc.kind);
+  const f=sharp?(x,w,h)=>peak(x,base,w,h,c,false,sc.snow):(x,w,h)=>bump(x,base,w,h,c,false);
+  return `<g opacity=".9">${f(26,90,46)}${f(78,110,64)}${f(140,96,52)}${f(196,120,70)}${f(246,90,48)}</g>`;
+}
+
+/* Berge und Bäume auf der Insel selbst (hinten rechts), links ein kleiner Hügel hinter dem Tier. */
+function islandHills(I){
+  const sc=I.scene; if(!sc) return '';
+  const base=116; let out='';
+  const tc=sc.treeColor||'#5FB98C', tc2=sc.treeColor2||tc;
+  switch(sc.kind){
+    case 'peaks':
+      out+=peak(158,base,70,58,sc.c2,true,sc.snow)+peak(204,base,78,74,sc.c1,true,sc.snow)+peak(232,base,50,44,sc.c2,true,sc.snow);
+      out+=pine(142,base+2,22,tc)+pine(176,base+4,26,tc)+pine(224,base+3,20,tc);
+      break;
+    case 'cliffs':
+      out+=peak(166,base,64,50,sc.c2,true)+peak(210,base,76,68,sc.c1,true)+`<path d="M178 ${base-32} q8 -16 20 -14 q10 2 14 12 q-12 -4 -20 0 q-8 2 -14 2 Z" fill="${sc.grassTop}" stroke="${INK}" stroke-width="2.2" stroke-linejoin="round"/><path d="M196 86 l-6 10 M214 80 l-5 9" stroke="${INK}" stroke-width="1.6" opacity=".35"/>`;
+      break;
+    case 'karst':
+      out+=karst(150,base,44,56,sc.c2,true)+karst(186,base,48,76,sc.c1,true)+karst(222,base,42,62,sc.c2,true);
+      out+=`<g class="isl-cloud2" opacity=".75"><ellipse cx="190" cy="82" rx="46" ry="7" fill="#fff"/><ellipse cx="160" cy="92" rx="30" ry="5" fill="#fff"/></g>`;
+      out+=roundTree(146,base+4,20,tc)+roundTree(206,base+5,16,tc);
+      break;
+    case 'volcano':
+      out+=peak(214,base,88,78,sc.c1,true)+`<path d="M200 ${base-62} q14 -6 28 0 l-4 8 q-10 -4 -20 0 Z" fill="#F96D9B" stroke="${INK}" stroke-width="2.4" stroke-linejoin="round"/><path d="M206 ${base-56} q8 -3 16 0 q-2 6 -8 6 q-6 0 -8 -6 Z" fill="#FFE27A"/>`;
+      out+=`<g class="isl-cloud"><ellipse cx="214" cy="38" rx="12" ry="7" fill="#D5B3F0" opacity=".8"/><ellipse cx="224" cy="28" rx="8" ry="5" fill="#D5B3F0" opacity=".6"/></g>`;
+      out+=bump(160,base,56,30,sc.c2,true);
+      if(sc.crystals) out+=`<g fill="#8CC6F4" stroke="${INK}" stroke-width="2" stroke-linejoin="round"><path d="M150 ${base} l5 -22 l5 22 Z"/><path d="M162 ${base} l4 -14 l4 14 Z"/><path d="M236 ${base} l4 -18 l4 18 Z"/></g>`;
+      break;
+    case 'dunes':
+      out+=bump(170,base,90,26,sc.c2,true)+bump(214,base,80,36,sc.c1,true);
+      if(sc.rock) out+=`<path d="M232 ${base} q-2 -22 12 -24 q12 4 10 24 Z" fill="#B8A79A" stroke="${INK}" stroke-width="2.6" stroke-linejoin="round"/>`;
+      out+=`<path d="M150 ${base-4} q10 -6 22 -2 M196 ${base-12} q10 -5 20 -2" fill="none" stroke="#fff" stroke-width="2" opacity=".6" stroke-linecap="round"/>`;
+      break;
+    default: // hills
+      out+=bump(160,base,78,40,sc.c2,true)+bump(206,base,88,56,sc.c1,true)+bump(236,base,56,34,sc.c2,true);
+      if(sc.fields) out+=`<path d="M176 ${base-10} q30 -14 56 -6 M184 ${base-2} q28 -10 50 -2" fill="none" stroke="${INK}" stroke-width="1.6" opacity=".25"/>`;
+      if(sc.waterfall) out+=`<path d="M204 ${base-50} q2 20 -2 50" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".85"/><path d="M204 ${base-50} q2 20 -2 50" stroke="#8CC6F4" stroke-width="2" stroke-linecap="round"/>`;
+      if(sc.trees==='round') out+=roundTree(150,base+3,22,tc)+roundTree(226,base+4,18,tc2)+roundTree(188,base+5,16,tc);
+      if(sc.flowers) out+=flowerDots([[160,106],[172,110],[198,104],[214,110],[228,108]],['#F8A0C8','#FFE27A','#B493F0','#F96D6D']);
+  }
+  // kleiner Hügel links hinter dem Tier
+  out=bump(40,base-2,96,24,sc.c2,true)+out;
+  if(sc.trees==='pine') out+=pine(16,base,22,tc)+pine(30,base+2,16,tc);
+  else if(sc.kind==='dunes') out+='';
+  else out+=roundTree(18,base+2,18,tc2);
+  return `<g class="isl-hills">${out}</g>`;
+}
+
+/* Klippe unter einer schwebenden Insel */
+function islandCliff(I){
+  if(I.water) return '';
+  const dark=I.night?'#4A5188':'#A8865F', mid=I.night?'#59619E':'#C9A47C';
+  return `<path d="M44 150 Q58 180 100 186 Q120 189 140 186 Q182 180 196 150 Z" fill="${dark}" stroke="${INK}" stroke-width="3.5" stroke-linejoin="round"/>
+    <path d="M70 160 Q84 176 112 180 M156 178 Q174 172 182 158" fill="none" stroke="${mid}" stroke-width="4" stroke-linecap="round" opacity=".8"/>
+    <g class="isl-cloud2"><ellipse cx="60" cy="176" rx="30" ry="9" fill="#fff" opacity="${I.night?'.35':'.9'}"/><ellipse cx="184" cy="178" rx="28" ry="8" fill="#fff" opacity="${I.night?'.35':'.9'}"/></g>`;
+}
 
 /* Ein Stück: Himmel, Wolken/Wasser, Insel, Ausbauten, Tier. opts: {built:[ids], mastered, open, animate, size} */
 function islandSVG(row, opts){
@@ -156,7 +242,7 @@ function islandSVG(row, opts){
   const A=ANIMALS[I.animal];
   const cls=opts.animate?' isl-anim':'';
   const w=opts.size||240, h=Math.round(w*200/240);
-  const water=I.water;
+  const water=I.water, sunLeft=!!(I.scene&&I.scene.sunLeft);
   const slots=[[26,114,0.66],[152,120,0.8],[206,100,0.6]];   // x, y(Boden), Skalierung je Ausbau
   const buildsHtml=I.builds.map((id,i)=>{ if(!built.includes(id)) return ''; const [x,y,s]=slots[i]; return `<g class="isl-build" transform="translate(${x-40*s} ${y-76*s}) scale(${s})">${BUILDS[id].draw()}</g>`; }).join('');
   const sleeping=!opts.mastered;
@@ -165,13 +251,17 @@ function islandSVG(row, opts){
     <defs><clipPath id="islclip${row}"><rect x="0" y="0" width="240" height="200" rx="28"/></clipPath></defs>
     <g clip-path="url(#islclip${row})">
       <rect width="240" height="200" fill="${I.sky}"/>
-      ${I.night?`<circle cx="196" cy="40" r="16" fill="#FFF3C9"/><circle cx="188" cy="34" r="14" fill="${I.sky}"/>${[20,60,120,150,230].map((x,i)=>`<circle cx="${x}" cy="${18+i*9}" r="1.8" fill="#FFF3C9" class="isl-twinkle" style="animation-delay:${i*0.4}s"/>`).join('')}`:`<circle cx="200" cy="38" r="18" fill="#FFE9A8" opacity=".9"/>`}
-      <g class="isl-cloud"><ellipse cx="44" cy="40" rx="26" ry="11" fill="#fff" opacity=".9"/><ellipse cx="58" cy="34" rx="16" ry="10" fill="#fff" opacity=".9"/></g>
-      <g class="isl-cloud2"><ellipse cx="150" cy="60" rx="20" ry="8" fill="#fff" opacity=".7"/></g>
+      ${I.night?`<circle cx="196" cy="40" r="16" fill="#FFF3C9"/><circle cx="188" cy="34" r="14" fill="${I.sky}"/>${[20,60,120,150,230].map((x,i)=>`<circle cx="${x}" cy="${18+i*9}" r="1.8" fill="#FFF3C9" class="isl-twinkle" style="animation-delay:${i*0.4}s"/>`).join('')}`:`<circle cx="${sunLeft?46:200}" cy="38" r="18" fill="#FFE9A8" opacity=".9"/>`}
+      <g class="isl-cloud" transform="${sunLeft?'translate(140 0)':''}"><ellipse cx="44" cy="40" rx="26" ry="11" fill="#fff" opacity=".9"/><ellipse cx="58" cy="34" rx="16" ry="10" fill="#fff" opacity=".9"/></g>
+      <g class="isl-cloud2"><ellipse cx="${sunLeft?100:150}" cy="60" rx="20" ry="8" fill="#fff" opacity=".7"/></g>
+      ${farRange(I)}
       ${water?`<rect x="0" y="130" width="240" height="70" fill="#8CC6F4"/><g class="isl-wave"><path d="M-20 142 q20 -8 40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0" fill="none" stroke="#fff" stroke-width="4" opacity=".7"/></g>`:
         `<rect x="0" y="134" width="240" height="70" fill="${I.night?'#3A3F7A':'#DCEBF7'}"/><g class="isl-cloud"><ellipse cx="30" cy="170" rx="46" ry="16" fill="#fff" opacity="${I.night?'.35':'.95'}"/><ellipse cx="210" cy="176" rx="50" ry="16" fill="#fff" opacity="${I.night?'.35':'.95'}"/></g>`}
+      ${islandCliff(I)}
       <path d="M12 134 q0 -26 44 -30 q64 -8 128 0 q44 4 44 30 q0 24 -20 28 q-88 10 -176 0 q-20 -4 -20 -28 Z" fill="${I.rim}" stroke="${INK}" stroke-width="3.5"/>
       <path d="M26 124 q0 -18 36 -22 q58 -6 116 0 q36 4 36 22 q-94 16 -188 0 Z" fill="${I.ground}"/>
+      ${islandHills(I)}
+      <path d="M40 126 q80 10 160 0" fill="none" stroke="#fff" stroke-width="3" opacity=".35" stroke-linecap="round"/>
       ${buildsHtml}
       <g class="isl-animal${sleeping?' isl-sleep':''}" transform="translate(44 28) scale(1.0)">${A.draw()}
         ${sleeping?`<g class="isl-zzz" fill="${INK}" font-family="'Baloo 2',sans-serif" font-weight="700"><text x="78" y="26" font-size="12">z</text><text x="86" y="16" font-size="15">z</text><text x="96" y="4" font-size="18">Z</text></g>`:''}
