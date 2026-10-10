@@ -28,3 +28,10 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 - Combo beschleunigt nur sichere Fakten.
 - Nicht rechtzeitig getippt zählt als Zögern (`applyTimeout`): eine Box runter, nicht zurück auf Box 1.
 - Icons (`icon-*.png`, `apple-touch-icon.png`) werden aus `unicornSVG` gerendert. Ändert sich Lumi, Icons neu erzeugen und `?v=` am Intro-Bild hochzählen.
+
+## Inselwelt (seit v30)
+- `islands.js`: zehn Inseln (`ISLANDS`, Schlüssel = Reihe), zehn Tiere (`ANIMALS`), 30 Ausbauten (`BUILDS`), Zeichenfunktion `islandSVG(row, {open, mastered, built, animate, size})`. Gleicher Stil wie Lumi.
+- Menü: "Inselwelt" ersetzt "Meine Inseln" und "Reihen-Ritt". Der Ritt heißt Inselritt und startet nur noch vom Inselscreen.
+- Tier schläft (zzz), bis die Reihe zu 80 % sicher ist, dann ist es wach und hüpft beim Antippen.
+- Sterne: `S.stars` bleibt die Gesamtsumme (Lumis Extras hängen daran). `S.spent` zählt Ausgaben, verfügbar ist `starsAvail()`. Ausbauten kosten 8, 15, 25 Sterne je Insel und liegen in `S.islands[reihe]`.
+- Neue Ausbauten: in `BUILDS` zeichnen (80x80, Boden y=76) und in `ISLANDS[reihe].builds` eintragen. Es gibt genau drei Bauplätze je Insel.

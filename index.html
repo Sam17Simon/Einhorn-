@@ -172,6 +172,49 @@ button:focus-visible, input:focus-visible{outline:3px solid var(--accent); outli
 .station .lbl{font-weight:700;}
 .station .sub{font-size:13px; color:var(--muted); font-weight:600;}
 
+/* Inselwelt */
+.islmap{flex:1; overflow-y:auto; display:grid; grid-template-columns:repeat(2,1fr); gap:12px; padding-block:8px 24px; align-content:start;}
+.islcard{background:var(--card); border:2px solid var(--line); border-radius:22px; padding:8px 8px 10px; text-align:left; display:flex; flex-direction:column; gap:4px; box-shadow:0 3px 0 var(--line);}
+.islcard:active{transform:translateY(2px); box-shadow:0 1px 0 var(--line);}
+.islcard > svg.isl{width:100%; height:auto; display:block; border-radius:14px;}
+.islcard .nm{font-family:var(--font-disp); font-weight:700; font-size:17px; line-height:1.15;}
+.islcard .st{font-size:12px; color:var(--muted); font-weight:700;}
+.islcard.locked{opacity:.75;}
+.islcard .ministars{margin-top:2px;}
+.isltitle{font-family:var(--font-disp); font-size:19px; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;}
+.islwrap{flex:1; overflow-y:auto; display:flex; flex-direction:column; align-items:center; gap:10px; padding-block:4px 30px;}
+.islstage{width:100%; max-width:420px;}
+.islstage svg{width:100%; height:auto; display:block; border-radius:28px; border:2px solid var(--line);}
+.islbubble{background:var(--card); border:2px solid var(--line); border-radius:18px; padding:8px 14px; font-weight:700; text-align:center; max-width:420px; min-height:40px;}
+.islprogress{display:flex; gap:4px; align-items:center; font-size:13px; color:var(--muted); font-weight:700;}
+.islprogress svg{width:16px;height:16px;}
+.islh2{font-family:var(--font-disp); font-size:20px; margin:8px 0 0;}
+.shop{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; width:100%; max-width:420px;}
+.shopcard{background:var(--card); border:2px solid var(--line); border-radius:18px; padding:8px 6px 10px; display:flex; flex-direction:column; align-items:center; gap:4px; text-align:center;}
+.shopcard svg{width:56px; height:56px;}
+.shopcard .nm{font-size:12px; font-weight:700; line-height:1.15; min-height:2.3em;}
+.shopbtn{font-family:var(--font-disp); font-weight:700; font-size:15px; border-radius:12px; padding:6px 10px; background:var(--accent); color:#fff; box-shadow:0 3px 0 #5C36A0; display:flex; align-items:center; gap:4px;}
+.shopbtn svg{width:14px;height:14px;}
+.shopbtn[disabled]{background:var(--line); color:var(--muted); box-shadow:none;}
+.shopbtn.done{background:var(--soft-ok); color:var(--ok); box-shadow:none;}
+/* Insel-Animationen (nur mit .isl-anim) */
+.isl-anim .isl-animal{transform-box:fill-box; transform-origin:50% 100%; animation:islbob 2.4s ease-in-out infinite;}
+.isl-anim .isl-animal.isl-sleep{animation:islbreathe 3.2s ease-in-out infinite;}
+.isl-anim .isl-animal.hop{animation:islhop .7s ease;}
+@keyframes islbob{0%,100%{transform:translateY(0) scaleY(1)}50%{transform:translateY(-6px) scaleY(1.02)}}
+@keyframes islbreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.025)}}
+@keyframes islhop{0%{transform:translateY(0)}35%{transform:translateY(-26px) rotate(-6deg)}70%{transform:translateY(0) scaleY(.92)}100%{transform:translateY(0)}}
+.isl-anim .isl-zzz{animation:islzzz 3.2s ease-in-out infinite; transform-box:fill-box; transform-origin:0 100%;}
+@keyframes islzzz{0%{opacity:0; transform:translateY(4px)}30%{opacity:1}100%{opacity:0; transform:translateY(-10px)}}
+.isl-anim .isl-cloud{animation:islcloud 9s ease-in-out infinite;}
+.isl-anim .isl-cloud2{animation:islcloud 13s ease-in-out infinite reverse;}
+@keyframes islcloud{50%{transform:translateX(10px)}}
+.isl-anim .isl-wave{animation:islwave 3s linear infinite;}
+@keyframes islwave{to{transform:translateX(40px)}}
+.isl-anim .isl-twinkle{animation:twinkle 2.4s ease-in-out infinite;}
+.isl-anim .isl-build{transform-box:fill-box; transform-origin:50% 100%;}
+.isl-anim .isl-build.pop{animation:islpop .6s cubic-bezier(.3,1.4,.5,1);}
+@keyframes islpop{0%{transform:scale(0)}100%{transform:scale(1)}}
 /* end / reward */
 .endcard{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; flex:1; text-align:center;}
 .endcard h2{font-family:var(--font-disp); font-size:clamp(28px,6vw,40px); margin:0;}
@@ -348,9 +391,8 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
     <div class="menu">
       <button class="bigbtn" id="btnRun"><span class="em">🦄</span><span>Wolkenflug<span class="badge-new">Neu</span><small>Flieg mit Lumi und fang Sternschnuppen!</small></span></button>
       <button class="bigbtn" id="btnPractice"><span class="em">✨</span><span>Zaubertraining<small>Rechnen und Sterne sammeln</small></span></button>
-      <button class="bigbtn" id="btnRide"><span class="em">🌈</span><span>Reihen-Ritt<small>Eine Reihe aufsagen</small></span></button>
       <button class="bigbtn" id="btnBlitz"><span class="em">⭐</span><span>Sternschnuppe<small>Wie viele schaffst du in einer Minute?</small></span></button>
-      <button class="bigbtn" id="btnPath"><span class="em">🗺</span><span>Meine Inseln<small>Das kann ich schon – und wer schon frei ist</small></span></button>
+      <button class="bigbtn" id="btnPath"><span class="em">🏝</span><span>Inselwelt<small>Deine Tierfreunde, ihre Inseln und der Inselritt</small></span></button>
     </div>
     <div class="footrow"><span class="ghostbtn" id="streakInfo"></span></div>
   </section>
@@ -374,13 +416,22 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
     </div>
   </section>
 
-  <!-- RIDE SELECT -->
-  <section class="screen" id="scr-rideselect">
+  <!-- INSEL -->
+  <section class="screen" id="scr-island">
     <div class="bar">
-      <button class="iconbtn" data-home aria-label="Zurück">←</button>
-      <h1 style="font-family:var(--font-disp);font-size:24px;margin:0;">Welche Reihe reitest du?</h1>
+      <button class="iconbtn" id="btnIslandBack" aria-label="Zurück zur Karte">←</button>
+      <h1 class="isltitle" id="islTitle"></h1>
+      <div class="spacer"></div>
+      <div class="starchip" id="islStars"><svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 16.9 5.9 20.4l1.5-6.8L2.2 9l6.9-.7z" fill="#F2B83C"/></svg><span id="islStarCount">0</span></div>
     </div>
-    <div class="rowpick" id="rowPick"></div>
+    <div class="islwrap">
+      <div class="islstage" id="islStage"></div>
+      <div class="islbubble" id="islBubble"></div>
+      <div class="islprogress" id="islProgress"></div>
+      <button class="cta" id="btnIslandRide">Inselritt starten</button>
+      <h2 class="islh2">Insel ausbauen</h2>
+      <div class="shop" id="islShop"></div>
+    </div>
   </section>
 
   <!-- RIDE -->
@@ -436,9 +487,11 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
   <section class="screen" id="scr-path">
     <div class="bar">
       <button class="iconbtn" data-home aria-label="Zurück">←</button>
-      <h1 style="font-family:var(--font-disp);font-size:24px;margin:0;">Meine Inseln</h1>
+      <h1 style="font-family:var(--font-disp);font-size:24px;margin:0;">Inselwelt</h1>
+      <div class="spacer"></div>
+      <div class="starchip"><svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 16.9 5.9 20.4l1.5-6.8L2.2 9l6.9-.7z" fill="#F2B83C"/></svg><span id="mapStarCount">0</span></div>
     </div>
-    <div class="pathlist" id="pathList"></div>
+    <div class="islmap" id="pathList"></div>
   </section>
 
   <!-- END -->
@@ -481,7 +534,8 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="game.js?v=29"></script>
+<script src="islands.js?v=30"></script>
+<script src="game.js?v=30"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -505,6 +559,7 @@ function defaultState(now){
     days:{},                      // 'YYYY-MM-DD' -> {sec,tasks,ok}
     streak:{len:0,last:''},
     best:{blitz:0, rows:{}},     // rows: reihe -> sekunden
+    spent:0, islands:{},         // Sterne ausgegeben, Ausbauten je Insel: {reihe:[ids]}
     created: now
   };
 }
@@ -715,7 +770,7 @@ function friendRiddle(state, rng, friends){
 const LS_KEY='einhorn1x1_v1';
 let S;
 function load(){
-  try{ const raw=localStorage.getItem(LS_KEY); if(raw){ const p=JSON.parse(raw); if(p&&p.v===1&&p.facts){ S=p; return; } } }catch(e){}
+  try{ const raw=localStorage.getItem(LS_KEY); if(raw){ const p=JSON.parse(raw); if(p&&p.v===1&&p.facts){ S=p; if(!S.islands) S.islands={}; if(!S.spent) S.spent=0; return; } } }catch(e){}
   S=defaultState();
 }
 function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(e){} }
@@ -1105,9 +1160,10 @@ $('btnSound').addEventListener('click',()=>{ S.sound=!S.sound; save(); renderHom
 $('btnParent').addEventListener('click',openGate);
 $('btnRun').addEventListener('click',()=>startRun());
 $('btnPractice').addEventListener('click',()=>startPractice());
-$('btnRide').addEventListener('click',()=>{ renderRideSelect(); show('rideselect'); });
 $('btnBlitz').addEventListener('click',()=>{ if(!$('btnBlitz').disabled) startBlitz(); });
 $('btnPath').addEventListener('click',()=>{ renderPath(); show('path'); });
+$('btnIslandBack').addEventListener('click',()=>{ renderPath(); show('path'); });
+$('btnIslandRide').addEventListener('click',()=>{ if(ISL) startRide(ISL); });
 
 /* ---------- Zahlenfeld ---------- */
 function buildPad(el,onKey){
@@ -1247,10 +1303,10 @@ function maybeRowParty(){
     setTimeout(()=>{
       showOverlay('<h2>Die '+done+'er-Insel leuchtet! 🌈</h2>'
         +'<div style="font-size:64px;line-height:1">'+fr[0]+'</div>'
-        +'<div class="pill">'+fr[1]+' ist frei und fliegt jetzt mit!</div>'
+        +'<div class="pill">'+fr[1]+' ist aufgewacht und fliegt jetzt mit!</div>'
         +'<p style="margin:0;font-weight:600;color:var(--muted)">Nächstes Abenteuer: die '+row+'er-Insel</p>','Weiter zur '+row+'er-Insel!');
       bigKnall(); sndFanfare();
-      speak('Juhu! Die '+done+'er-Insel leuchtet wieder! '+fr[1]+' ist frei! Weiter zur '+row+'er-Insel!');
+      speak('Juhu! Die '+done+'er-Insel leuchtet wieder! '+fr[1]+' ist aufgewacht! Weiter zur '+row+'er-Insel!');
     },2000);
   }
 }
@@ -1293,20 +1349,8 @@ function setMicUI(){
   }
 }
 
-/* ---------- Reihen-Ritt ---------- */
+/* ---------- Inselritt ---------- */
 let RD=null, rideTick=null;
-function renderRideSelect(){
-  const open=unlockedRows(S), next=nextLockedRow(S);
-  const el=$('rowPick'); el.innerHTML='';
-  for(const r of ROW_ORDER){
-    const b=document.createElement('button');
-    b.className='rowbtn'+(open.includes(r)?'':' locked');
-    const best=S.best.rows[r];
-    b.innerHTML=r+'er<small>'+(open.includes(r)?(best?('Rekord '+(best/1000).toFixed(1).replace('.',',')+' s'):'bereit'):(r===next?'bald frei':'🔒'))+'</small>';
-    if(open.includes(r)) b.addEventListener('click',()=>startRide(r));
-    el.appendChild(b);
-  }
-}
 function startRide(row){
   RD={row, idx:0, t0:performance.now(), done:false, input:'', errors:0};
   bumpStreak(S,Date.now());
@@ -1314,12 +1358,12 @@ function startRide(row){
   show('ride');
   renderRide();
   $('btnRideMic').style.display = srBlocked?'none':'';
-  $('rideHint').textContent = srBlocked
+  $('rideHint').textContent = (window.Inselwelt?window.Inselwelt.ISLANDS[row].title+': ':'')+(srBlocked
     ? 'Sag das Ergebnis laut – und tippe es ein.'
-    : 'Sag das Ergebnis laut – oder tippe es ein.';
+    : 'Sag das Ergebnis laut – oder tippe es ein.');
   clearInterval(rideTick);
   rideTick=setInterval(()=>{ if(RD&&!RD.done) $('rideTimer').textContent=((performance.now()-RD.t0)/1000).toFixed(1).replace('.',',')+' s'; },100);
-  speak('Los geht der Ritt durch die '+row+'er-Reihe! Sag die Ergebnisse laut.',
+  speak('Inselritt! Die ganze '+row+'er-Reihe. Sag die Ergebnisse laut.',
     ()=>{ if(!RD) return; RD.t0=performance.now(); if(!srBlocked) startRideRec(); });
 }
 function rideKey(k){
@@ -1345,7 +1389,7 @@ function renderRideInput(){
   const c=document.querySelector('.cloud.next .v');
   if(c) c.textContent=RD.input||'?';
 }
-$('btnRideBack').addEventListener('click',()=>{ stopRide(); show('rideselect'); renderRideSelect(); });
+$('btnRideBack').addEventListener('click',()=>{ stopRide(); openIsland(RD?RD.row:ISL); });
 $('btnRideMic').addEventListener('click',()=>{ if(recWanted){ stopAllRec(); } else startRideRec(); setRideMicUI(); });
 function renderRide(){
   const g=$('rideGrid'); g.innerHTML='';
@@ -1401,7 +1445,7 @@ function finishRide(){
   renderRide();
   const row=RD.row, errs=RD.errors; RD=null;
   $('unicornEnd').innerHTML=unicornSVG(S.items,170);
-  $('endTitle').textContent=record?'Neuer Rekord! 🏆':'Ritt geschafft!';
+  $('endTitle').textContent=record?'Neuer Rekord! 🏆':'Inselritt geschafft!';
   $('endStars').textContent='+ 3 Sterne';
   $('endDetail').textContent=row+'er-Reihe in '+(ms/1000).toFixed(1).replace('.',',')+' s'
     +(errs?' · '+errs+(errs===1?' Ausrutscher':' Ausrutscher'):' · ohne Fehler!');
@@ -1709,20 +1753,79 @@ function finishRun(){
 function stopRun(){ RN=null; const eng=G(); if(eng&&eng.ready) eng.stop(); if($('friendRig')) hideFriend(true); }
 /* ---------- Mein Weg ---------- */
 function starSVG(fill){ return '<svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 16.9 5.9 20.4l1.5-6.8L2.2 9l6.9-.7z" fill="'+fill+'"/></svg>'; }
+const IW=()=>window.Inselwelt;
+let ISL=null;
+function starsAvail(){ return Math.max(0, S.stars-(S.spent||0)); }
+function islandBuilt(r){ return (S.islands&&S.islands[r])||[]; }
 function renderPath(){
-  const open=unlockedRows(S), next=nextLockedRow(S);
+  const open=unlockedRows(S), next=nextLockedRow(S), W=IW();
+  $('mapStarCount').textContent=starsAvail();
   const el=$('pathList'); el.innerHTML='';
   for(const r of ROW_ORDER){
     const facts=rowFacts(S,r);
     const stars=facts.map(f=> f.box>=5?starSVG('#F2B83C') : f.box>=3?starSVG('#9A6AE8') : f.seen>0?starSVG('#D9CFF0'):starSVG('#EEE8F8')).join('');
-    const mastered=rowMastery(S,r)>=ROW_UNLOCK_SHARE;
-    const d=document.createElement('div');
-    d.className='station'+(open.includes(r)?'':' locked')+(mastered?' mastered':'');
-    d.innerHTML='<div class="num">'+r+'</div><div style="min-width:0"><div class="lbl">'+r+'er-Insel</div><div class="ministars">'+stars+'</div><div class="sub">'
-      +(mastered?'Leuchtet! '+FRIENDS[r][1]+' ist frei ✨': open.includes(r)?'Hier bist du gerade unterwegs': r===next?'Taucht bald aus den Wolken auf':'Noch hinter den Wolken')+'</div></div>'
-      +'<div class="friend">'+(mastered?FRIENDS[r][0]:'')+'</div>';
-    el.appendChild(d);
+    const mastered=rowMastery(S,r)>=ROW_UNLOCK_SHARE, isOpen=open.includes(r);
+    const b=document.createElement('button');
+    b.className='islcard'+(isOpen?'':' locked');
+    b.innerHTML=W.islandSVG(r,{open:isOpen, mastered, built:islandBuilt(r), size:200})
+      +'<div class="nm">'+r+'er · '+W.ISLANDS[r].title+'</div>'
+      +'<div class="ministars">'+stars+'</div>'
+      +'<div class="st">'+(mastered?FRIENDS[r][1]+' ist wach ✨': isOpen?FRIENDS[r][1]+' wartet auf dich': r===next?'Taucht bald aus den Wolken auf':'Noch hinter den Wolken')+'</div>';
+    if(isOpen) b.addEventListener('click',()=>openIsland(r));
+    else b.addEventListener('click',()=>{ speak(r===next?'Diese Insel taucht bald auf. Erst die '+open[open.length-1]+'er-Reihe schaffen!':'Diese Insel ist noch hinter den Wolken.'); });
+    el.appendChild(b);
   }
+}
+const ANIMAL_LINES={
+  wait:['Hallo! Ich bin {n}. Übst du die {r}er-Reihe mit mir?','Psst, ich warte hier auf dich. Schaffst du die {r}er-Reihe?','Die {r}er-Reihe macht mich ganz müde. Hilfst du mir?'],
+  awake:['Juhu, du bist da! Die {r}er-Reihe kannst du schon!','Reiten wir noch eine Runde? Ich liebe den Inselritt!','Schau dir meine Insel an! Hast du Sterne für etwas Neues?']
+};
+function islandLine(r){
+  const m=rowMastery(S,r)>=ROW_UNLOCK_SHARE, pool=ANIMAL_LINES[m?'awake':'wait'];
+  return pool[Math.floor(Math.random()*pool.length)].replace('{n}',FRIENDS[r][1]).replace('{r}',r);
+}
+function openIsland(r){
+  const W=IW(); ISL=r;
+  const mastered=rowMastery(S,r)>=ROW_UNLOCK_SHARE;
+  $('islTitle').textContent=r+'er · '+W.ISLANDS[r].title;
+  $('islStarCount').textContent=starsAvail();
+  $('islStage').innerHTML=W.islandSVG(r,{open:true, mastered, built:islandBuilt(r), animate:true, size:420});
+  const line=islandLine(r);
+  $('islBubble').textContent=line;
+  const facts=rowFacts(S,r), sure=facts.filter(f=>f.box>=3).length;
+  $('islProgress').innerHTML=facts.map(f=> f.box>=5?starSVG('#F2B83C') : f.box>=3?starSVG('#9A6AE8') : f.seen>0?starSVG('#D9CFF0'):starSVG('#EEE8F8')).join('')+'<span style="margin-left:6px">'+sure+' von 10 sicher'+(S.best.rows[r]?' · Rekord '+(S.best.rows[r]/1000).toFixed(1).replace('.',',')+' s':'')+'</span>';
+  const an=$('islStage').querySelector('.isl-animal');
+  if(an) an.addEventListener('click',()=>{ an.classList.remove('hop'); void an.getBBox(); an.classList.add('hop'); smallSparkle(); sndGood(); const t=islandLine(r); $('islBubble').textContent=t; speak(t); });
+  renderShop(r);
+  show('island');
+  speak(line);
+}
+function renderShop(r){
+  const W=IW(), built=islandBuilt(r), avail=starsAvail(), el=$('islShop'); el.innerHTML='';
+  W.ISLANDS[r].builds.forEach((id,i)=>{
+    const cost=W.BUILD_COST[i], has=built.includes(id);
+    const d=document.createElement('div'); d.className='shopcard';
+    d.innerHTML=W.buildIconSVG(id,56)+'<div class="nm">'+W.BUILDS[id].name+'</div>'
+      +(has?'<button class="shopbtn done" disabled>Gebaut ✓</button>'
+          :'<button class="shopbtn" '+(avail>=cost?'':'disabled')+' data-id="'+id+'" data-cost="'+cost+'">'+STAR_SVG.replace('width="30" height="30"','')+' '+cost+'</button>');
+    el.appendChild(d);
+  });
+  el.querySelectorAll('.shopbtn[data-id]').forEach(b=>b.addEventListener('click',()=>buyBuild(r,b.dataset.id,+b.dataset.cost)));
+}
+function buyBuild(r,id,cost){
+  if(starsAvail()<cost) return;
+  S.spent=(S.spent||0)+cost;
+  S.islands=S.islands||{}; S.islands[r]=islandBuilt(r).concat([id]);
+  save();
+  const W=IW(), mastered=rowMastery(S,r)>=ROW_UNLOCK_SHARE;
+  $('islStage').innerHTML=W.islandSVG(r,{open:true, mastered, built:islandBuilt(r), animate:true, size:420});
+  const bs=$('islStage').querySelectorAll('.isl-build'); const last=bs[bs.length-1]; if(last) last.classList.add('pop');
+  const an=$('islStage').querySelector('.isl-animal'); if(an){ an.classList.add('hop'); }
+  $('islStarCount').textContent=starsAvail(); $('starCount').textContent=S.stars;
+  burst(40,0.5,0.35,9); sndFanfare();
+  const t=W.BUILDS[id].name+'! '+FRIENDS[r][1]+' freut sich riesig!';
+  $('islBubble').textContent=t; speak(t);
+  renderShop(r);
 }
 
 /* ---------- Elternbereich ---------- */
@@ -1781,7 +1884,7 @@ function renderParent(){
     +'<h2>Lern-Backlog: alle 100 Fakten</h2>'
     +'<div class="legend"><span><i style="background:#F3F0F8"></i>neu</span><span><i style="background:#E3D6F6"></i>in Arbeit</span><span><i style="background:#CDB4F0"></i>sicher</span><span><i style="background:#F2B83C"></i>blitzschnell</span><span>! = Stolperfakt</span></div>'
     +heat
-    +'<h2>Bestzeiten Reihen-Ritt</h2><div class="besttimes">'+bests+'</div>'
+    +'<h2>Bestzeiten Inselritt</h2><div class="besttimes">'+bests+'</div>'
     +'<h2>Einstellungen</h2>'
     +'<div class="setrow"><label>Name des Kindes</label><input type="text" id="setName" value="'+S.name.replace(/"/g,'&quot;')+'"></div>'
     +'<div class="setrow"><label>Ton und Vorlesen</label><button class="toggle'+(S.sound?' on':'')+'" id="setSound" role="switch" aria-checked="'+S.sound+'" aria-label="Ton"><i></i></button></div>'
