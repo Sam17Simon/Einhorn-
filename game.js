@@ -4,7 +4,7 @@
 (function(){
 'use strict';
 const P = window.PIXI;
-const VERSION='21';   // wird vom Release-Skript hochgezählt (Cache-Buster)
+const VERSION='22';   // wird vom Release-Skript hochgezählt (Cache-Buster)
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*t;
 const easeOut=t=>1-Math.pow(1-t,3);
@@ -469,12 +469,14 @@ G.playIntro=async function(host, opts){
   // Lumi-Rig (Seitenansicht), Koordinaten in 1x-Einheiten, Texturen 2x
   const L=new P.Container(); const inner=new P.Container(); inner.scale.set(0.5); L.addChild(inner);
   const mk=(t,x,y,ax,ay)=>{ const s=new P.Sprite(T(t)); s.anchor.set(ax,ay); s.position.set(x,y); return s; };
-  const tails=[mk('tail1',58,96,1,0),mk('tail2',58,104,1,0),mk('tail3',58,112,1,0)]; tails.forEach(t=>inner.addChild(t));
-  const wingB=mk('wing',86,86,0.8,1); wingB.scale.set(0.9); wingB.alpha=0.9; inner.addChild(wingB);
-  const legs=[[72,118],[90,122],[108,122],[124,118]].map(([x,y])=>{ const l=mk('leg',x,y,0.5,0.05); inner.addChild(l); return l; });
+  // Koordinaten in Textur-Pixeln (2x): Körper ist 416 x 316
+  const tails=[mk('tail1',124,180,1,0),mk('tail2',124,196,1,0),mk('tail3',124,212,1,0)]; tails.forEach(t=>inner.addChild(t));
+  const wingB=mk('wing',176,184,0.8,1); wingB.scale.set(0.9); wingB.alpha=0.9; inner.addChild(wingB);
+  // zwei Beinpaare unter dem Bauch (hinten, vorn); das hintere Bein jedes Paars leicht versetzt und etwas dunkler
+  const legs=[[144,236,1],[162,240,0],[236,240,1],[254,236,0]].map(([x,y,back])=>{ const l=mk('leg',x,y,0.5,0.05); if(back) l.tint=0xE6E0F2; inner.addChild(l); return l; });
   const body=mk('body_side',0,0,0,0); inner.addChild(body);
-  const wingF=mk('wing',92,92,0.8,1); inner.addChild(wingF);
-  inner.pivot.set(100,100);
+  const wingF=mk('wing',190,196,0.8,1); inner.addChild(wingF);
+  inner.pivot.set(208,200);
   stage.addChild(L);
   // Ziel: dort, wo auf der Startseite das Einhorn sitzt
   const tgt=opts.target||{x:W/2,y:H*0.3,w:200};
@@ -486,8 +488,9 @@ G.playIntro=async function(host, opts){
   const finish=()=>{ if(done) return; done=true; app.ticker.stop(); try{ app.destroy(true,{children:true}); }catch(e){} G._introDone(); };
   host.addEventListener('pointerdown',()=>{ skipped=true; finish(); },{once:true});
   const total=4.6;
+  G._introApp=app;
   app.ticker.add(tk=>{
-    const dt=Math.min(0.1,tk.deltaMS/1000); t+=dt;
+    const dt=Math.min(0.1,tk.deltaMS/1000); t+=dt; G._introT=t;
     // Flugbahn
     let x,y,sc,rot, gallop=true;
     // Lumi bleibt aufrecht wie ein Pferd: Neigung nur aus der Flugrichtung (Nase hoch beim Steigen)
@@ -501,7 +504,7 @@ G.playIntro=async function(host, opts){
     L.position.set(x,y); L.scale.set(sc); L.rotation=rot;
     const ph=t*9;
     // Beine hängen nach unten und paddeln sanft; beim Landen ruhig
-    legs.forEach((l,i)=>{ l.rotation= gallop? Math.sin(ph+i*1.6)*0.16+0.05 : Math.sin(t*2+i)*0.03; });
+    legs.forEach((l,i)=>{ const pair=i<2?0:1, back=i%2===0; l.rotation= gallop? Math.sin(ph+pair*Math.PI+(back?0.6:0))*0.16 : Math.sin(t*2+i)*0.03; });
     tails.forEach((tl,i)=>{ tl.skew.y=Math.sin(ph*0.5+i)*0.18; });
     wingF.rotation=Math.sin(ph*0.6)*0.35-0.1; wingB.rotation=Math.sin(ph*0.6+0.4)*0.3-0.1;
     if(t>3.8 && !L.landed){ L.landed=true; for(let i=0;i<40;i++) spawnSpark(x+(Math.random()-0.5)*tgt.w, y+(Math.random()-0.5)*tgt.w*0.7); if(opts.onLand) opts.onLand(); }
