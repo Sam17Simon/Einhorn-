@@ -4,7 +4,7 @@
 (function(){
 'use strict';
 const P = window.PIXI;
-const VERSION='22';   // wird vom Release-Skript hochgezählt (Cache-Buster)
+const VERSION='23';   // wird vom Release-Skript hochgezählt (Cache-Buster)
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*t;
 const easeOut=t=>1-Math.pow(1-t,3);
@@ -274,7 +274,7 @@ G.spawnGates=function(values,opts){
   else G.targetSpeed = 1/G.gateDur;
 };
 function clearPortals(){ G.portals.forEach(p=>p.destroy({children:true})); G.portals=[]; }
-function pick(lane){ if(!G.gatesActive||G.resolved) return; G.onPick&&G.onPick(lane); }
+function pick(lane){ if(!G.gatesActive||G.resolved) return; if(window.sndClick) window.sndClick('gate'); G.onPick&&G.onPick(lane); }
 function onTap(e){
   if(!G.gatesActive||G.resolved||!G.portals.length) return;
   const x=e.global.x, y=e.global.y;

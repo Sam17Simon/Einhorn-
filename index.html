@@ -298,10 +298,17 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
 .badge-new{background:var(--gold); color:#fff; font-size:12px; border-radius:999px; padding:2px 8px; font-family:var(--font-body); vertical-align:middle; margin-left:6px;}
 .friend{font-size:22px; margin-left:auto;}
 /* Intro */
-#intro{position:fixed; inset:0; z-index:45; background:#BBDDF8; transition:opacity .6s;}
+#intro{position:fixed; inset:0; z-index:45; background:linear-gradient(180deg,#BBDDF8 0%,#E9E2FA 55%,#FBEFF7 100%); transition:opacity .6s;}
+#intro .callcard{position:absolute; left:50%; top:16%; transform:translateX(-50%); text-align:center; pointer-events:none;}
+#intro .callcard img{width:min(160px,38vw); height:auto; border-radius:28%; box-shadow:0 10px 30px rgba(59,42,82,.15); animation:callfloat 2.6s ease-in-out infinite;}
+#intro .callcard h1{font-family:var(--font-disp); font-size:clamp(26px,7vw,40px); margin:14px 0 0; color:var(--ink);}
+@keyframes callfloat{50%{transform:translateY(-10px)}}
 #intro.fade{opacity:0; pointer-events:none;}
 #introHost{position:absolute; inset:0;}
 #intro .introhint{position:absolute; bottom:max(18px, env(safe-area-inset-bottom,0px)); left:0; right:0; text-align:center; color:rgba(59,42,82,.55); font-weight:700; font-size:13px; pointer-events:none;}
+#intro .callbtn{position:absolute; left:50%; top:60%; white-space:nowrap; transform:translateX(-50%); background:var(--accent); color:#fff; font-family:var(--font-disp); font-weight:700; font-size:28px; border-radius:26px; padding:18px 36px; box-shadow:0 6px 0 #5C36A0; animation:callpulse 1.4s ease-in-out infinite;}
+#intro .callbtn:active{transform:translateX(-50%) translateY(3px); box-shadow:0 3px 0 #5C36A0;}
+@keyframes callpulse{50%{transform:translateX(-50%) scale(1.06)}}
 /* Glitzer um das Start-Einhorn */
 #unicornHome{position:relative;}
 #unicornHome .gl{position:absolute; color:#FFD98A; font-size:14px; pointer-events:none; animation:glint 1.8s ease-in-out infinite; text-shadow:0 0 6px rgba(255,217,138,.9);}
@@ -469,12 +476,12 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
   </section>
 
 </div>
-<div id="intro" hidden><div id="introHost"></div><div class="introhint">Tippen zum Überspringen</div></div>
+<div id="intro" hidden><div id="introHost"></div><div class="callcard" id="introCard"><img src="icon-512.png?v=1" alt="" width="160" height="160"><h1>Einhorn-Einmaleins</h1></div><button class="callbtn" id="introCall">✨ Lumi rufen!</button><div class="introhint" id="introHint" hidden>Tippen zum Überspringen</div></div>
 <div id="overlay"><div class="box" id="overlayBox"></div></div>
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="game.js?v=22"></script>
+<script src="game.js?v=23"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -726,6 +733,34 @@ function tone(freq,dur,when,type,gain){
   }catch(e){}
 }
 const PENTA=[523,587,659,784,880,1047,1175,1319];
+/* Tipp-Geräusche: weicher Pop für jede Berührung */
+function sndClick(kind){
+  if(!S.sound) return;
+  if(kind==='pad'){ tone(880,.05,0,'sine',.08); tone(1320,.04,.02,'sine',.05); }
+  else if(kind==='big'){ tone(520,.06,0,'triangle',.1); tone(780,.08,.04,'sine',.08); }
+  else if(kind==='gate'){ tone(660,.07,0,'sine',.1); tone(990,.1,.05,'sine',.08); tone(1320,.12,.1,'sine',.05); }
+  else { tone(700,.05,0,'sine',.07); }
+}
+document.addEventListener('pointerdown',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  if(b.closest('.pad')) sndClick('pad');
+  else if(b.classList.contains('bigbtn')||b.classList.contains('cta')||b.classList.contains('rowbtn')||b.classList.contains('callbtn')) sndClick('big');
+  else sndClick('small');
+},{passive:true});
+/* Intro-Musik: Harfen-Arpeggio, Melodie, Bass (ca. 4 Sekunden) */
+const NOTE={C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+function nf(n){ const m=n.match(/^([A-G])(#?)(\d)$/); const semi=NOTE[m[1]]+(m[2]?1:0)+(parseInt(m[3],10)-4)*12; return 440*Math.pow(2,(semi-9)/12); }
+function playIntroMusic(){
+  if(!S.sound) return;
+  try{ AC=AC||new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended') AC.resume(); }catch(e){ return; }
+  const beat=0.62;
+  const harp=[[0,'C5'],[.25,'E5'],[.5,'G5'],[.75,'C6'],[1,'A4'],[1.25,'C5'],[1.5,'E5'],[1.75,'A5'],[2,'F4'],[2.25,'A4'],[2.5,'C5'],[2.75,'F5'],[3,'G4'],[3.25,'B4'],[3.5,'D5'],[3.75,'G5'],[4,'C5'],[4.25,'E5'],[4.5,'G5'],[4.75,'C6'],[5,'E6'],[5.25,'G6'],[5.5,'C7']];
+  const lead=[[0,'E5',.5],[.5,'G5',.5],[1,'A5',.9],[2,'C6',.5],[2.5,'B5',.5],[3,'G5',.9],[4,'C6',.45],[4.5,'D6',.45],[5,'E6',1.4]];
+  const bass=[[0,'C3',.9],[1,'A2',.9],[2,'F2',.9],[3,'G2',.9],[4,'C3',1.8]];
+  harp.forEach(([b,n])=>tone(nf(n),.28,b*beat,'triangle',.06));
+  lead.forEach(([b,n,d])=>{ tone(nf(n),d*beat,b*beat,'sine',.09); tone(nf(n)*2,d*beat*.6,b*beat+.01,'sine',.025); });
+  bass.forEach(([b,n,d])=>tone(nf(n),d*beat,b*beat,'sine',.07));
+}
 function sndGoodN(n){ const i=Math.min(PENTA.length-2,(n-1)%7); tone(PENTA[i],.1,0); tone(PENTA[i+1],.14,.08); if(n>0&&n%4===0){ tone(PENTA[Math.min(7,i+3)],.2,.18); } }
 function sndGood(){ sndGoodN(1); }
 function sndAgain(){ tone(330,.2,0,'triangle',.1); }
@@ -1702,10 +1737,13 @@ async function playIntroOnce(){
   if(!eng || !('ResizeObserver' in window)) return;
   const box=$('intro'); box.hidden=false;
   try{
+    // erst der Ruf-Knopf: schaltet den Ton frei (Browser spielen vor der ersten Berührung nichts)
+    await new Promise(res=>{ const b=$('introCall'); b.hidden=false; b.onclick=()=>{ b.hidden=true; $('introCard').hidden=true; res(); }; });
+    $('introHint').hidden=false;
     await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
     const u=$('unicornHome').getBoundingClientRect();
     const target={x:u.left+u.width/2, y:u.top+u.height*0.52, w:u.width*0.95};
-    sndWhoosh();
+    playIntroMusic();
     await eng.playIntro($('introHost'), {target, onLand:()=>{ sndFanfare(); }});
   }catch(e){}
   box.classList.add('fade'); setTimeout(()=>{ box.hidden=true; box.classList.remove('fade'); $('introHost').innerHTML=''; },650);
