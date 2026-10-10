@@ -257,17 +257,19 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
   box-shadow:0 5px 0 rgba(170,195,230,.5); transition:transform .5s ease, opacity .5s; pointer-events:none; white-space:nowrap;}
 #worldBanner.show{opacity:1; transform:translateX(-50%) translateY(0);}
 /* Freund auf Wölkchen, Blase hängt an ihm */
-#friendRig{position:absolute; left:50%; top:-170px; transform:translateX(-50%); z-index:4; text-align:center; transition:top .8s cubic-bezier(.3,.9,.4,1.1), opacity .5s; pointer-events:none; width:min(86%,420px);}
+#friendRig{position:absolute; left:50%; top:-190px; transform:translateX(-50%); z-index:4; text-align:center; transition:top .8s cubic-bezier(.3,.9,.4,1.1), opacity .5s; pointer-events:none; width:min(86%,420px);}
 #friendRig .fig{display:inline-block; animation:friendbob 2.2s ease-in-out infinite;}
 @keyframes friendbob{50%{transform:translateY(-7px)}}
-#friendRig .fav{font-size:46px; line-height:1;}
+#friendRig .fav{font-size:64px; line-height:1;}
 #friendRig .fcloud{width:78px; height:20px; background:#fff; border-radius:999px; margin:-8px auto 0; box-shadow:18px 2px 0 -4px #fff,-16px 3px 0 -5px #fff;}
 #friendRig .fbubble{margin-top:10px; background:#fff; border:3px solid #E3D6F6; border-radius:20px; padding:8px 14px;
-  font-family:var(--font-disp); font-weight:700; font-size:18px; color:var(--ink); position:relative;
+  font-family:var(--font-disp); font-weight:700; font-size:21px; color:var(--ink); position:relative;
   box-shadow:0 5px 0 rgba(170,195,230,.5); transform:scale(0); transition:transform .3s cubic-bezier(.3,1.4,.5,1);}
 #friendRig .fbubble::before{content:''; position:absolute; top:-13px; left:50%; margin-left:-9px; border:9px solid transparent; border-bottom-color:#E3D6F6;}
 #friendRig .fbubble::after{content:''; position:absolute; top:-9px; left:50%; margin-left:-7px; border:7px solid transparent; border-bottom-color:#fff;}
 #friendRig.talk .fbubble{transform:scale(1);}
+#friendRig .fpic{display:flex; flex-direction:column; gap:2px; margin-top:8px; font-size:22px; line-height:1.15; letter-spacing:1px;}
+#friendRig .fpic .g{margin-right:8px; opacity:.85;}
 #friendRig.hop .fig{animation:friendhop .6s ease;}
 @keyframes friendhop{40%{transform:translateY(-20px) rotate(-8deg)}}
 20%{opacity:1}100%{opacity:0; transform:translate(var(--cx,-40px),var(--cy,260px)) scale(1.4)}}
@@ -278,6 +280,10 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
 }
 .combochip .m{width:72px;height:10px;border-radius:5px;background:var(--line);overflow:hidden;}
 .combochip .m i{display:block;height:100%;background:linear-gradient(90deg,#F96D6D,#F2B83C,#4FC47F,#58A6F0,#9A6AE8);width:0;transition:width .25s;}
+.combochip .flame{font-size:20px; filter:grayscale(1); opacity:.5; transition:all .3s;}
+.combochip.hot{border-color:#F2B83C; background:#FFF4D6;}
+.combochip.hot .flame{filter:none; opacity:1; animation:flamepop .5s ease infinite alternate;}
+@keyframes flamepop{to{transform:scale(1.25) rotate(-6deg)}}
 /* fliegender Stern */
 .starfly{position:fixed; z-index:60; width:30px; height:30px; pointer-events:none; transition:transform .55s cubic-bezier(.4,-0.2,.6,1), opacity .55s;}
 /* Mini-Lumi in der Aufgabenkarte */
@@ -399,7 +405,7 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
       <button class="iconbtn" data-home aria-label="Zurück">←</button>
       <div class="starchip"><svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 16.9 5.9 20.4l1.5-6.8L2.2 9l6.9-.7z" fill="#F2B83C"/></svg><span id="runStars">0</span></div>
       <div class="spacer"></div>
-      <div class="combochip">Combo <span id="comboN">0</span><span class="m"><i id="comboBar"></i></span></div>
+      <div class="combochip" id="comboChip"><span class="flame">🔥</span><span id="comboN">0</span><span class="m"><i id="comboBar"></i></span></div>
     </div>
     <div class="sky">
       <div class="runQ" id="runQ"><div class="qchip"></div><div id="runDots"></div></div>
@@ -590,13 +596,25 @@ function extractNumbers(text){
   }
   return out;
 }
-/* Drei Antwort-Tore: richtige Zahl plus zwei schlaue Nachbar-Fallen */
+/* Drei Antwort-Tore: richtige Zahl plus zwei Fallen aus derselben Reihe.
+   Reihenfolge der Fallen: Nachbarn in der Reihe (a±1)·b, a·(b±1), dann Reihen-Verwechsler,
+   erst zuletzt Zahlenstrahl-Nachbarn. So hilft Gerade/Ungerade-Raten nicht. */
 function makeOptions(answer,a,b,rng){
   rng=rng||Math.random;
-  const pool=[(a+1)*b,(a-1)*b,a*(b+1),a*(b-1),answer+10,answer-10,answer+1,answer-1,a+b,answer+2,answer-2];
+  const tiers=[
+    [(a+1)*b,(a-1)*b,a*(b+1),a*(b-1)],
+    [(a+2)*b,(a-2)*b,a*(b+2),a*(b-2),(a+1)*(b-1),(a-1)*(b+1)],
+    [answer+a,answer-a,answer+b,answer-b,answer+10,answer-10],
+    [answer+1,answer-1,answer+2,answer-2]
+  ];
   const opts=[answer], seen=new Set([answer]);
-  const shuffled=pool.slice().sort(()=>rng()-0.5);
-  for(const n of shuffled){ if(opts.length>=3) break; if(Number.isInteger(n)&&n>=1&&n<=110&&!seen.has(n)){ seen.add(n); opts.push(n);} }
+  const ok=n=>Number.isInteger(n)&&n>=1&&n<=120&&!seen.has(n);
+  // Reihenfolge: Stufe 1 und 2 zuerst mit gleicher Parität wie die Antwort (bei ungeraden
+  // Antworten sind das die Zwei-Schritte-Nachbarn), dann der Rest der Stufen
+  const sh=tiers.map(t=>t.slice().sort(()=>rng()-0.5));
+  const same=n=>n%2===answer%2;
+  const ordered=[...sh[0].filter(same), ...sh[1].filter(same), ...sh[0].filter(n=>!same(n)), ...sh[1].filter(n=>!same(n)), ...sh[2].filter(same), ...sh[2].filter(n=>!same(n)), ...sh[3]];
+  for(const n of ordered){ if(opts.length>=3) break; if(ok(n)){ seen.add(n); opts.push(n);} }
   let bump=3;
   while(opts.length<3){ const n=answer+bump; if(!seen.has(n)&&n>=1){seen.add(n);opts.push(n);} bump=bump>0?-bump:(-bump+1); }
   return opts.sort(()=>rng()-0.5);
@@ -608,20 +626,23 @@ function seqQuestion(state,rng){
   const row=open.length?open[Math.min(open.length-1,Math.floor(rng()*open.length))]:2;
   const k=3+Math.floor(rng()*8);              // Position 3..10
   const answer=k*row, shown=[(k-2)*row,(k-1)*row];
-  const pool=[answer+1,answer-1,(k+1)*row,answer+2,answer-2,answer+row+1];
+  // Fallen: nächster Sprung, gleicher Sprung in der Nachbar-Reihe, übernächster Sprung
+  // erste Falle: der übernächste Sprung (bleibt in der Reihe); zweite: Sprung der Nachbar-Reihe oder noch ein Sprung weiter
+  const first=[(k+1)*row,(k+2)*row], rest=[k*(row+1), k*(row-1), (k-1)*(row+1), (k+1)*(row-1), (k+3)*row];
   const opts=[answer], seen=new Set([answer,...shown]);
-  for(const n of pool.sort(()=>rng()-0.5)){ if(opts.length>=3) break; if(n>=1&&n<=120&&!seen.has(n)){seen.add(n);opts.push(n);} }
+  for(const n of first){ if(opts.length>=2) break; if(n>=1&&n<=120&&!seen.has(n)){seen.add(n);opts.push(n);} }
+  for(const n of rest.sort(()=>rng()-0.5)){ if(opts.length>=3) break; if(n>=1&&n<=120&&!seen.has(n)){seen.add(n);opts.push(n);} }
   let bump=3; while(opts.length<3){ const n=answer+bump; if(!seen.has(n)&&n>=1){seen.add(n);opts.push(n);} bump=bump>0?-bump:(-bump+1); }
   return {kind:'seq', row, k, shown, answer, key:factKey(row,k), opts:opts.sort(()=>rng()-0.5)};
 }
 /* Freund-Rätsel: kleine Sachaufgabe, gestellt von einem Tierfreund.
    Jede Vorlage kennt Einzahl und Mehrzahl, damit die Sätze bei 1 stimmen. */
 const RIDDLE_MUL=[
-  {vS:'Ich habe', vP:'Ich habe', gS:'einen Korb', gP:'Körbe', iS:'einem Apfel', iP:'Äpfeln', q:'Äpfel'},
-  {vS:'Ich sehe', vP:'Ich sehe', gS:'ein Nest', gP:'Nester', iS:'einem Ei', iP:'Eiern', q:'Eier'},
-  {vS:'Ich packe', vP:'Ich packe', gS:'eine Tüte', gP:'Tüten', iS:'einem Keks', iP:'Keksen', q:'Kekse'},
-  {vS:'Hier blüht', vP:'Hier blühen', gS:'eine Blume', gP:'Blumen', iS:'einer Blüte', iP:'Blüten', q:'Blüten'},
-  {vS:'Da zieht', vP:'Da ziehen', gS:'eine Wolke', gP:'Wolken', iS:'einem Stern', iP:'Sternen', q:'Sterne'}
+  {vS:'Ich habe', vP:'Ich habe', gS:'einen Korb', gP:'Körbe', iS:'einem Apfel', iP:'Äpfeln', q:'Äpfel', g:'🧺', i:'🍎'},
+  {vS:'Ich sehe', vP:'Ich sehe', gS:'ein Nest', gP:'Nester', iS:'einem Ei', iP:'Eiern', q:'Eier', g:'🪹', i:'🥚'},
+  {vS:'Ich packe', vP:'Ich packe', gS:'eine Tüte', gP:'Tüten', iS:'einem Keks', iP:'Keksen', q:'Kekse', g:'🛍️', i:'🍪'},
+  {vS:'Hier blüht', vP:'Hier blühen', gS:'eine Blume', gP:'Blumen', iS:'einer Blüte', iP:'Blüten', q:'Blüten', g:'🌱', i:'🌸'},
+  {vS:'Da zieht', vP:'Da ziehen', gS:'eine Wolke', gP:'Wolken', iS:'einem Stern', iP:'Sternen', q:'Sterne', g:'☁️', i:'⭐'}
 ];
 function riddleMulText(t,n,m){
   const group = n===1 ? t.vS+' '+t.gS : t.vP+' '+n+' '+t.gP;
@@ -647,8 +668,9 @@ function friendRiddle(state, rng, friends){
     const txt=RIDDLE_DIV[Math.floor(rng()*RIDDLE_DIV.length)](prod,m);
     return {kind:'riddle', icon:f[0], name:f[1], key, answer:ans, text:f[1]+': „'+txt+'“', opts:makeOptions(ans,ans,m,rng)};
   }
-  const txt=riddleMulText(RIDDLE_MUL[Math.floor(rng()*RIDDLE_MUL.length)],a,b);
-  return {kind:'riddle', icon:f[0], name:f[1], key, answer:a*b, text:f[1]+': „'+txt+'“', opts:makeOptions(a*b,a,b,rng)};
+  const tpl=RIDDLE_MUL[Math.floor(rng()*RIDDLE_MUL.length)];
+  const txt=riddleMulText(tpl,a,b);
+  return {kind:'riddle', icon:f[0], name:f[1], key, answer:a*b, text:f[1]+': „'+txt+'“', opts:makeOptions(a*b,a,b,rng), pic:{n:a,m:b,g:tpl.g,i:tpl.i}};
 }
 /* ================= LOGIC-END ================= */
 
@@ -1360,7 +1382,7 @@ async function startRun(){
     try{ await eng.init($('world')); }catch(e){ showOverlay('<h2>Hoppla</h2><p>Der Wolkenritt konnte nicht starten. Bitte die App einmal neu öffnen.</p>','Okay'); show('home'); return; }
     if(current!=='run') return;
   }
-  RN={gate:0, n:RUN_GATES, ok:0, combo:0, bestCombo:0, stars:0, task:null, locked:false, recent:[],
+  RN={gate:0, n:RUN_GATES, ok:0, combo:0, bestCombo:0, stars:0, task:null, locked:false, recent:[], redo:[], metFriends:[],
       first:(S.flights||0)===0, friends:masteredFriends(), worlds:shuffleArr(WORLD_KEYS).slice(0,3), wIdx:0};
   bumpStreak(S,Date.now());
   $('runStars').textContent='0'; $('comboN').textContent='0'; $('comboBar').style.width='0%';
@@ -1386,19 +1408,23 @@ function renderRunDots(){
     d.appendChild(b);
   }
 }
-function approachMs(){ if(RN.first) return 15000; return Math.max(5200, 9500-RN.combo*450); }
-function setQ(small,big){ $('runQ').querySelector('.qchip').innerHTML='<small>'+small+'</small>'+(big||''); }
+function approachMs(){ return RN.first ? 15000 : 9500; }
+function setQ(small,big){ const q=$('runQ').querySelector('.qchip'); q.style.display=''; q.innerHTML='<small>'+small+'</small>'+(big||''); }
 
 /* Freund-Auftritt (DOM über der Szene) */
-function showFriend(icon,text){
+function showFriend(icon,text,pic){
   const r=$('friendRig');
-  r.innerHTML='<div class="fig"><div class="fav">'+icon+'</div><div class="fcloud"></div></div><div class="fbubble">'+text+'</div>';
+  let picHtml='';
+  if(pic && pic.n<=5 && pic.m<=5){
+    picHtml='<div class="fpic">'+Array.from({length:pic.n},()=>'<div><span class="g">'+pic.g+'</span>'+pic.i.repeat(pic.m)+'</div>').join('')+'</div>';
+  }
+  r.innerHTML='<div class="fig"><div class="fav">'+icon+'</div><div class="fcloud"></div></div><div class="fbubble"><div class="ftext">'+text+'</div>'+picHtml+'</div>';
   r.hidden=false; r.style.opacity='1'; r.classList.remove('talk','hop');
   r.style.top='-170px'; void r.offsetWidth;
-  r.style.top='7%';
+  r.style.top='3%';
   setTimeout(()=>{ r.classList.add('talk'); },750);
 }
-function friendSay(text){ const b=$('friendRig').querySelector('.fbubble'); if(b) b.textContent=text; }
+function friendSay(text){ const b=$('friendRig').querySelector('.fbubble'); if(b) b.innerHTML='<div class="ftext">'+text+'</div>'; }
 function friendHop(){ const r=$('friendRig'); r.classList.remove('hop'); void r.offsetWidth; r.classList.add('hop'); }
 function hideFriend(instant){
   const r=$('friendRig');
@@ -1425,9 +1451,15 @@ function nextGate(){
   const roll=Math.random();
   const isWorldGate = (RN.gate%4===3) && RN.gate<RN.n-1;
   let t, riddle=false;
-  if(!isWorldGate && RN.gate>=2 && roll<0.22){
+  const redoIdx=RN.redo.findIndex(x=>x.after<=RN.gate);
+  if(redoIdx>=0 && !isWorldGate){
+    // dieselbe Aufgabe noch einmal, kurz nach dem Fehler
+    const r=RN.redo.splice(redoIdx,1)[0];
+    t={kind:'fact', key:r.key, answer:r.answer, opts:makeOptions(r.answer,r.a,r.b), show:r.show, a:r.a, b:r.b};
+    setQ('Nochmal! Du schaffst das:', r.show+' = ?');
+  }else if(!isWorldGate && RN.gate>=2 && roll<0.22){
     t=friendRiddle(S, Math.random, RN.friends); riddle=true;
-    setQ('Der Ritt hält an …','');
+    setQ('Der Ritt hält an …',''); $('runQ').querySelector('.qchip').style.display='none';
   }else if(roll<0.45){
     t=seqQuestion(S);
     setQ('Lumi springt in '+t.row+'er-Sprüngen!','… '+t.shown[0]+' … '+t.shown[1]+' … <b style="color:var(--accent)">?</b>');
@@ -1435,7 +1467,7 @@ function nextGate(){
     let p=null;
     for(let i=0;i<10;i++){ p=pickTask(S,RN.recent,Date.now()); if(p.type==='mul') break; }
     if(p.type!=='mul'){ const pr=p.key.split('x').map(Number); p={key:p.key,a:pr[0],b:pr[1],show:pr[0]+' · '+pr[1],answer:pr[0]*pr[1]}; }
-    t={kind:'fact', key:p.key, answer:p.answer, opts:makeOptions(p.answer,p.a,p.b)};
+    t={kind:'fact', key:p.key, answer:p.answer, opts:makeOptions(p.answer,p.a,p.b), show:p.show, a:p.a, b:p.b};
     RN.recent.push(p.key); if(RN.recent.length>4) RN.recent.shift();
     setQ(isWorldGate?'Das Weltentor! Dahinter wartet '+WORLD_INFO[RN.worlds[RN.wIdx+1]].name+'!':'Durch welches Tor, Lumi?', p.show+' = ?');
   }
@@ -1445,7 +1477,7 @@ function nextGate(){
     eng.brake(); sndBrake();
     eng.spawnGates(t.opts,{hold:true});
     setTimeout(()=>{ if(!RN||!RN.riddle) return;
-      showFriend(t.icon, t.text);
+      showFriend(t.icon, t.text, t.pic);
       speak(t.text.replace(/[„“]/g,''));
       RN.t0=performance.now();
     },700);
@@ -1470,14 +1502,22 @@ async function chooseGate(val, lane){
     RN.stars+=gained; S.stars+=gained;
     $('runStars').textContent=RN.stars;
     $('comboN').textContent=RN.combo; $('comboBar').style.width=Math.min(100,RN.combo*12.5)+'%';
+    $('comboChip').classList.toggle('hot',RN.combo>=3);
     sndGoodN(RN.combo);
-    if(wasRiddle){ friendSay('Juhu! Genau richtig! 🎉'); friendHop(); }
+    if(wasRiddle){
+      friendSay('Juhu! Genau richtig! 🎉'); friendHop();
+      S.friendsMet=S.friendsMet||{}; S.friendsMet[t.name]=(S.friendsMet[t.name]||0)+1;
+      if(!RN.metFriends.some(f=>f[1]===t.name)) RN.metFriends.push([t.icon,t.name]);
+    }
   }else{
-    RN.combo=0; $('comboN').textContent='0'; $('comboBar').style.width='0%';
+    RN.combo=0; $('comboN').textContent='0'; $('comboBar').style.width='0%'; $('comboChip').classList.remove('hot');
     sndAgain();
-    const msg = val===null ? 'Hui, vorbeigeritten! Es war '+t.answer : 'Fast! Es war '+t.answer;
-    if(wasRiddle){ friendSay('Macht nix! Es war '+t.answer+'.'); }
+    const sayIt = t.kind==='seq' ? 'Nach '+t.shown[1]+' kommt '+t.answer : (t.show? t.show.replace('·','mal')+' ist '+t.answer : 'Es sind '+t.answer);
+    const msg = (val===null ? 'Hui, vorbeigeritten! ' : 'Fast! ')+(t.show? t.show+' = '+t.answer : 'Es war '+t.answer);
+    if(wasRiddle){ friendSay('Macht nix! Es sind '+t.answer+'.'); }
     else setQ(msg,'');
+    speak(sayIt);
+    if(t.kind==='fact' && t.show) RN.redo.push({key:t.key, answer:t.answer, a:t.a, b:t.b, show:t.show, after:RN.gate+3});
   }
   eng.setCombo(RN.combo);
   save();
@@ -1513,12 +1553,13 @@ function finishRun(){
   const comboRecord = best>(S.best.combo||0);
   if(comboRecord) S.best.combo=best;
   const unlockedItem=checkItemUnlock();
+  const met=RN.metFriends.map(f=>f[0]).join(' ');
   save();
   RN=null; eng.stop();
   $('unicornEnd').innerHTML=unicornSVG(S.items,170);
   $('endTitle').textContent= comboRecord?'Combo-Rekord! 🌟': ok===n?'Perfekter Ritt! 🦄':'Angekommen!';
   $('endStars').textContent='+ '+plural(stars,'Stern','Sterne');
-  $('endDetail').textContent=ok+' von '+n+' Toren · längste Combo: '+best;
+  $('endDetail').textContent=ok+' von '+n+' Toren · längste Combo: '+best+(met?' · neue Freunde: '+met:'');
   $('btnAgain').textContent='Nochmal reiten!';
   $('btnAgain').onclick=()=>startRun();
   show('end');

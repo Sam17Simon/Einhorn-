@@ -140,8 +140,8 @@ function buildLumi(){
   L.earL=mk(T.ear,-40,-98,0.5,0.92); L.earL.rotation=-0.25; inner.addChild(L.earL);
   L.earR=mk(T.ear,40,-98,0.5,0.92); L.earR.rotation=0.25; L.earR.scale.x=-1; inner.addChild(L.earR);
   L.horn=mk(T.horn,0,-104,0.5,1); inner.addChild(L.horn);
-  L.handL=mk(T.hand,-84,4,0.3,1); inner.addChild(L.handL);
-  L.handR=mk(T.hand,84,4,0.3,1); L.handR.scale.x=-1; inner.addChild(L.handR);
+  L.handL=mk(T.hand,-86,-36,0.3,1); inner.addChild(L.handL);
+  L.handR=mk(T.hand,86,-36,0.3,1); L.handR.scale.x=-1; inner.addChild(L.handR);
   L.funkel=mk(T.spark,-70,-120,0.5,0.5); L.funkel.tint=0xFFE066; L.funkel.scale.set(0.9); inner.addChild(L.funkel);
   L.body=L;
 }
@@ -149,7 +149,7 @@ function placeLumi(){
   const L=G.lumi; if(!L) return;
   L.baseScale=clamp(Math.min(300,G.W*0.58)/168,0.6,1.8);
   L.scale.set(L.baseScale);
-  L.position.set(G.W/2+G.laneX, G.H+38*L.baseScale);
+  L.position.set(G.W/2+G.laneX, G.H+26*L.baseScale);
 }
 G.setLane=function(lane){ G.lane=lane; };
 G.setLumiState=function(s){ if(G.lumiState===s) return; G.lumiState=s; G.stateT=0; };
@@ -186,7 +186,7 @@ function animLumi(dt){
   }
   // Lean in die Spur
   rot += (G.laneX/(G.W*0.1||1))*0.06;
-  L.position.set(G.W/2+G.laneX, G.H+38*L.baseScale+y*L.baseScale);
+  L.position.set(G.W/2+G.laneX, G.H+26*L.baseScale+y*L.baseScale);
   L.rotation=rot; L.scale.set(L.baseScale*sc);
   L.earL.rotation=-0.25-earK; L.earR.rotation=0.25+earK;
   L.maneL.forEach((s,i)=>{ s.skew.x= Math.sin(G.phase-0.5*i)*0.07+maneK*0.6; });
@@ -238,7 +238,7 @@ function makePortal(value,lane,worldgate){
   c.puffs=puffs;
   const star=new P.Sprite(T.star); star.anchor.set(0.5); star.scale.set(0.6); inner.addChild(star); c.star=star; c.orb=Math.random()*6;
   const sign=new P.Container(); const sb=new P.Sprite(T.sign); sb.anchor.set(0.5); sign.addChild(sb);
-  const txt=new P.Text({text:String(value), style:{fontFamily:'"Baloo 2", Nunito, sans-serif', fontSize:72, fontWeight:'700', fill:0x3B2A52}}); txt.anchor.set(0.5); txt.position.set(0,-4); sign.addChild(txt);
+  const txt=new P.Text({text:String(value), style:{fontFamily:'"Baloo 2", Nunito, sans-serif', fontSize:84, fontWeight:'700', fill:0x3B2A52}}); txt.anchor.set(0.5); txt.position.set(0,-4); sign.addChild(txt);
   sign.position.set(0,262); inner.addChild(sign); c.sign=sign; c.txt=txt; c.sb=sb;
   c.worldgate=!!worldgate; c.base=Math.min(G.W*0.34,170)/208*(worldgate?1.18:1);
   c.eventMode='static'; c.cursor='pointer';
@@ -251,8 +251,8 @@ G.spawnGates=function(values,opts){
   G.gateMode=opts||{};
   G.gatesActive=true; G.held=false; G.resolved=false;
   G.gateDur=(opts.approachMs||9000)/1000;
-  G.holdAt=opts.hold? 0.74 : null;
-  values.forEach((v,i)=>{ const p=makePortal(v,i,!!opts.worldgate); if(opts.hold) p.t=G.holdAt; G.portals.push(p); });
+  G.holdAt=opts.hold? 0.9 : null;
+  values.forEach((v,i)=>{ const p=makePortal(v,i,!!opts.worldgate); if(opts.hold){ p.t=G.holdAt; p.ly=0.16; } G.portals.push(p); });
   if(opts.hold){ G.held=true; G.targetSpeed=0; }
   else G.targetSpeed = 1/G.gateDur;
 };
@@ -265,12 +265,13 @@ function onTap(e){
   let best=null,bd=1e9; G.portals.forEach(p=>{ const d=Math.abs(p.x-x); if(d<bd){bd=d;best=p;} });
   if(best) pick(best.lane);
 }
-G.resumeGates=function(ms){ G.held=false; G.holdAt=null; const rest=1-(G.portals[0]?G.portals[0].t:0); G.gateDur=(ms||1200)/1000; G.targetSpeed=rest/G.gateDur; };
+G.resumeGates=function(ms){ G.hideGroups(); G.held=false; G.holdAt=null; const rest=1-(G.portals[0]?G.portals[0].t:0); G.gateDur=(ms||1200)/1000; G.targetSpeed=rest/G.gateDur; };
 function updPortals(dt){
   const pal=curPalette();
   for(const p of G.portals){
     if(!G.resolved){
-      p.t+=G.speed*dt;
+      const boost = p.t<0.45 ? (G.boost||1) : 1;
+      p.t+=G.speed*dt*boost;
       if(G.held && G.holdAt!==null) p.t=G.holdAt;
       if(p.t>=1 && G.gatesActive && !G.resolved){ G.resolved=true; G.gatesActive=false; G.onArrive&&G.onArrive(); }
     }else if(p.fly){
@@ -278,7 +279,7 @@ function updPortals(dt){
       const k=clamp(p.flyT/p.flyDur,0,1);
       p.t = p.good ? lerp(p.t0,1.3,easeInOut(k)) : lerp(p.t0,1.04,k);
       p.alpha = p.good ? (k<0.85?1:1-(k-0.85)/0.15) : 1-k;
-      if(p.good){ p.lx=lerp(p.lx0, LANE_X[p.lane]*0.25, k); p.ly=lerp(0,0.35,k); }
+      if(p.good){ p.lx=lerp(p.lx0, LANE_X[p.lane]*0.25, k); p.ly=lerp(p.ly0||0,0.35,k); }
     }
     const q=proj(p.lx,p.ly,p.t);
     const sway= G.held? Math.sin(G.time*3+p.lane)*0.03 : Math.sin(G.time*1.4+p.lane*2)*0.02;
@@ -288,7 +289,7 @@ function updPortals(dt){
     p.orb+=dt*2.2; p.star.position.set(Math.cos(p.orb)*184, Math.sin(p.orb)*232); p.star.rotation=p.orb;
     p.fill.alpha=0.3+Math.sin(G.time*2.5+p.lane)*0.1+(pal?pal.glow*0.25:0);
     // Schild lesbar halten: in der Ferne größer relativ zum Ring
-    const ss=clamp(0.42/Math.max(q.s*p.base,0.2),1,2.6); p.sign.scale.set(ss);
+    const ss=clamp(0.5/Math.max(q.s*p.base,0.2),1,3.2); p.sign.scale.set(ss);
     p.puffs.forEach((pf,i)=>{ pf.scale.set((0.7+i*0.1)+Math.sin(G.time*1.5+i)*0.05); });
   }
 }
@@ -306,13 +307,17 @@ G.resolve=function(o){
   const delay=o.good?0.2:0.8;
   return new Promise(res=>{
     G.after(delay,()=>{
-      G.portals.forEach(p=>{ p.fly=true; p.flyT=0; p.flyDur=o.good?0.95:0.8; p.t0=p.t; p.lx0=p.lx; });
+      G.portals.forEach(p=>{ p.fly=true; p.flyT=0; p.flyDur=o.good?0.95:0.8; p.t0=p.t; p.lx0=p.lx; p.ly0=p.ly; });
       G.targetSpeed=1/Math.max(4,G.gateDur*0.8);
       G.after(0.66,()=>{
-        G.flash(o.worldgate?0.95:0.7); G.shake(o.worldgate?1.4:0.8);
         const q=proj(LANE_X[o.goodLane]*0.25,0.2,1.05);
-        G.burst(q.x,q.y,o.worldgate?60:34, o.worldgate);
-        if(o.good) G.setLumiState('cheer');
+        if(o.good){
+          G.flash(o.worldgate?0.95:0.7); G.shake(o.worldgate?1.4:0.8);
+          G.burst(q.x,q.y,o.worldgate?60:34, o.worldgate);
+          G.setLumiState('cheer');
+        }else{
+          G.fog(); G.shake(0.4);
+        }
       });
       G.after(1.0,()=>{ clearPortals(); res(); });
     });
@@ -334,6 +339,10 @@ G.burst=function(x,y,n,big){
     G.layers.fx.addChild(s); G.parts.push(s);
   }
 };
+G.fog=function(){
+  for(let i=0;i<9;i++){ const s=new P.Sprite(G.tex.puff); s.anchor.set(0.5); s.tint=0xB9B3C7; s.position.set(G.W*(0.2+Math.random()*0.6), G.H*(0.5+Math.random()*0.35)); s.vx=(Math.random()-0.5)*60; s.vy=-30-Math.random()*30; s.life=1.1; s.age=0; s.scale.set(0.8+Math.random()*0.8); s.grow=1; s.alpha=0.5; G.layers.fx.addChild(s); G.parts.push(s); }
+};
+G.hideGroups=function(){};
 G.brakePuffs=function(){
   for(let i=0;i<5;i++){ const s=new P.Sprite(G.tex.puff); s.anchor.set(0.5); s.position.set(G.W/2+(i-2)*G.W*0.11, G.H*0.8); s.vx=(i-2)*50; s.vy=-50-Math.random()*40; s.life=0.7; s.age=0; s.scale.set(0.15); s.grow=1; s.alpha=0.6; G.layers.fx.addChild(s); G.parts.push(s); }
 };
@@ -411,9 +420,9 @@ G.start=function(opts){
   G.app.ticker.start();
 };
 G.changeWorld=function(name){ G.worldName=name; G.setWorld(name,false); };
-G.setCombo=function(n){ G.combo=n; };
+G.setCombo=function(n){ G.combo=n; G.boost=Math.min(1.9, 1+n*0.15); };
 G.setSpeedFactor=function(f){ G.targetSpeed = f; };
-G.stop=function(){ clearPortals(); G.tweens=[]; G.app.ticker.stop(); };
+G.stop=function(){ clearPortals(); G.hideGroups(); G.tweens=[]; G.app.ticker.stop(); };
 G.brake=function(){ G.setLumiState('brake'); G.brakePuffs(); G.targetSpeed=0; G.after(0.65,()=>{ if(G.lumiState==='brake') G.setLumiState('stand'); }); };
 G.launch=function(){ G.setLumiState('launch'); G.held=false; };
 })();
