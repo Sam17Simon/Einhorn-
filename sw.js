@@ -1,5 +1,5 @@
 // Cache-Version bei jedem Release hochzählen
-const CACHE='einhorn-v17';
+const CACHE='einhorn-v18';
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./apple-touch-icon.png','./game.js','./vendor/pixi.min.js','./assets/cloud.png','./assets/ear.png','./assets/hand.png','./assets/head.png','./assets/horn.png','./assets/mane1.png','./assets/mane2.png','./assets/mane3.png','./assets/puff.png','./assets/ring.png','./assets/ringfill.png','./assets/sign.png','./assets/spark.png','./assets/star.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)));self.skipWaiting();});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim();});

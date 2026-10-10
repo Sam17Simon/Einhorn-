@@ -4,7 +4,7 @@
 (function(){
 'use strict';
 const P = window.PIXI;
-const VERSION='17';   // wird vom Release-Skript hochgezählt (Cache-Buster)
+const VERSION='18';   // wird vom Release-Skript hochgezählt (Cache-Buster)
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*t;
 const easeOut=t=>1-Math.pow(1-t,3);
@@ -71,7 +71,8 @@ function proj(lx,ly,t){
   // weiche Tiefenkurve: früh sichtbar, am Ende explosiv groß
   const p = t<=1 ? 0.1+0.9*Math.pow(Math.max(0,t),1.6) : 1+(t-1)*8;
   const spread = LANE_SPREAD*p + 0.22*(1-Math.min(p,1));   // in der Ferne etwas auseinanderziehen, damit die Schilder lesbar bleiben
-  return {x:G.vp.x+lx*G.W*spread, y:G.vp.y+(G.H*0.62-G.vp.y)*p+ly*G.H*0.5*p, s:p};
+  const ground = G.W>G.H ? 0.56 : 0.62;   // Querformat: Tore etwas höher, damit Lumi nichts verdeckt
+  return {x:G.vp.x+lx*G.W*spread, y:G.vp.y+(G.H*ground-G.vp.y)*p+ly*G.H*0.5*p, s:p};
 }
 
 /* ---------- Himmel und Welt ---------- */
@@ -151,7 +152,7 @@ function buildLumi(){
 }
 function placeLumi(){
   const L=G.lumi; if(!L) return;
-  L.baseScale=clamp(Math.min(300,G.W*0.58)/168,0.6,1.8);
+  L.baseScale=clamp(Math.min(300,G.W*0.58,G.H*0.36)/168,0.6,1.8);
   L.scale.set(L.baseScale);
   L.position.set(G.W/2+G.laneX, G.H+26*L.baseScale);
 }
