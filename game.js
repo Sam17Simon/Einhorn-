@@ -4,7 +4,7 @@
 (function(){
 'use strict';
 const P = window.PIXI;
-const VERSION='27';   // wird vom Release-Skript hochgezählt (Cache-Buster)
+const VERSION='28';   // wird vom Release-Skript hochgezählt (Cache-Buster)
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*t;
 const easeOut=t=>1-Math.pow(1-t,3);
@@ -42,7 +42,7 @@ G.init=async function(host){
   host.appendChild(app.canvas);
   app.canvas.style.position='absolute'; app.canvas.style.inset='0'; app.canvas.style.touchAction='none';
   G.app=app;
-  const names=['cloud','star','spark','puff','ring','ringfill','sign','glint','body_side','leg','tail1','tail2','tail3','wing','neck','poll','earL2','earR2','horn2','hand2','mane0','mane1','mane2','mane3','mane4','mane5','mane6','mane7'];
+  const names=['cloud','star','spark','puff','ring','ringfill','sign','glint'];
   await P.Assets.load(names.map(n=>({alias:n, src:'assets/'+n+'.png?v='+VERSION})));
   names.forEach(n=>G.tex[n]=P.Assets.get(n));
   // Ebenen von hinten nach vorn
@@ -50,7 +50,7 @@ G.init=async function(host){
   for(const n of ['sky','deco','far','mid','portals','near','fx']){ const c=new P.Container(); G.layers[n]=c; G.cam.addChild(c); }
   for(const n of ['lumi','flash']){ const c=new P.Container(); G.layers[n]=c; app.stage.addChild(c); }
   G.layers.flash.addChild(G.flashRect=new P.Graphics());
-  buildLumi();
+  await buildLumi();
   app.stage.eventMode='static';
   app.stage.on('pointertap',onTap);
   app.ticker.add(tick);
@@ -134,29 +134,42 @@ function curPaletteAsWorld(){
 }
 
 /* ---------- Lumi-Rig (Reiter-Sicht v2: Hals, Mähnenkamm, Hinterkopf, Ohren, Horn) ---------- */
-function buildLumi(){
-  const T=G.tex, L=new P.Container(); G.lumi=L; G.layers.lumi.addChild(L);
-  const inner=new P.Container(); inner.scale.set(0.5); L.addChild(inner); L.inner=inner;
-  // Alle Rig-Teile liegen im selben 600x680-Pixelraum (Ursprung oben links, y-Offset 120 für das Horn)
-  const part=(t,px,py)=>{ const sp=new P.Sprite(T[t]); sp.anchor.set(0); sp.position.set(-300,-680); if(px!==undefined){ sp.pivot.set(px,py); sp.position.set(px-300,py-680); } return sp; };
-  L.neck=part('neck'); inner.addChild(L.neck);
-  // Mähne liegt auf dem Hals: Strähnen wurzeln auf der Mittellinie, Pivot an der Wurzel
-  L.mane=[]; for(let i=7;i>=0;i--){ const m=part('mane'+i, 300, (98+i*24+60)*2); m.idx=i; inner.addChild(m); L.mane.push(m); }
-  L.head=part('poll'); inner.addChild(L.head);
-  L.earL=part('earL2', 266, 284); inner.addChild(L.earL);
-  L.earR=part('earR2', 334, 284); inner.addChild(L.earR);
-  L.horn=part('horn2', 300, 280); inner.addChild(L.horn);
-  const hl=new P.Sprite(T.hand2); hl.anchor.set(0.5,0.5); hl.position.set(-120,-70); inner.addChild(hl); L.handL=hl;
-  const hr=new P.Sprite(T.hand2); hr.anchor.set(0.5,0.5); hr.scale.x=-1; hr.position.set(120,-76); inner.addChild(hr); L.handR=hr;
-  L.funkel=new P.Sprite(T.spark); L.funkel.anchor.set(0.5); L.funkel.tint=0xFFE066; L.funkel.scale.set(0.9); inner.addChild(L.funkel);
-  L.glints=[]; L.glintT=0;
+/* Lumi aus einem Stück: die Reiter-Sicht wird aus dem SVG in index.html (unicornHeadSVG) gerastert.
+   Keine Einzelteile mehr, bewegt wird nur das Ganze. */
+const POV={vb:[-30,-10,420,490], ax:180, ay:300, unit:360, k:2};   // SVG-Einheiten, Ankerpunkt = Bildmitte unten
+function svgToTexture(svg, vb, k){
+  const w=Math.round(vb[2]*k), h=Math.round(vb[3]*k);
+  svg=svg.replace(/<svg[^>]*>/, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+vb.join(' ')+'" width="'+w+'" height="'+h+'">');
+  return new Promise((res,rej)=>{
+    const img=new Image(); img.decoding='async';
+    img.onload=()=>{ try{ const cv=document.createElement('canvas'); cv.width=w; cv.height=h; cv.getContext('2d').drawImage(img,0,0,w,h); res(P.Texture.from(cv)); }catch(e){ rej(e); } };
+    img.onerror=rej;
+    img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+  });
 }
+async function lumiTexture(items){
+  if(typeof window.unicornHeadSVG!=='function') return null;
+  return svgToTexture(window.unicornHeadSVG(items||0,'100%'), POV.vb, POV.k);
+}
+async function buildLumi(){
+  const L=new P.Container(); G.lumi=L; G.layers.lumi.addChild(L);
+  const body=new P.Sprite(P.Texture.EMPTY); body.anchor.set((POV.ax-POV.vb[0])/POV.vb[2], (POV.ay-POV.vb[1])/POV.vb[3]); body.scale.set(1/POV.k);
+  L.addChild(body); L.body=body; L.inner=L;
+  L.funkel=new P.Sprite(G.tex.spark); L.funkel.anchor.set(0.5); L.funkel.tint=0xFFE066; L.funkel.scale.set(0.55); L.addChild(L.funkel);
+  L.glints=[]; L.glintT=0;
+  await G.setLumiItems(G.items||0);
+}
+G.setLumiItems=async function(items){
+  G.items=items||0;
+  if(!G.lumi || G.lumi.itemsKey===G.items) return;
+  try{ const tx=await lumiTexture(G.items); if(tx){ const old=G.lumi.body.texture; G.lumi.body.texture=tx; G.lumi.itemsKey=G.items; if(old&&old!==P.Texture.EMPTY) old.destroy(true); } }catch(e){}
+};
 function placeLumi(){
   const L=G.lumi; if(!L) return;
-  // Hals füllt das untere Drittel, Kopf endet bei etwa 62 % der Höhe
-  L.baseScale=clamp(Math.min(G.W*0.95, G.H*0.42)/300, 0.5, 2.6);
+  // Breite wie in der Reiter-Sicht: fast volle Breite, im Querformat durch die Höhe begrenzt (Kopf bis knapp über die Mitte)
+  L.baseScale=Math.min(G.W*0.94, 380, G.H*0.5*POV.unit/296)/POV.unit;
   L.scale.set(L.baseScale);
-  L.position.set(G.W/2+G.laneX, G.H+8);
+  L.position.set(G.W/2+G.laneX, G.H+16);
 }
 G.setLane=function(lane){ G.lane=lane; };
 G.setLumiState=function(s){ if(G.lumiState===s) return; G.lumiState=s; G.stateT=0; };
@@ -193,16 +206,9 @@ function animLumi(dt){
   }
   const lean=(G.laneX/(G.W*0.1||1));
   rot += lean*0.05;
-  L.position.set(G.W/2+G.laneX, G.H+8+y*L.baseScale);
+  L.position.set(G.W/2+G.laneX, G.H+16+y*L.baseScale*0.75);
   L.rotation=rot; L.scale.set(L.baseScale*sc);
-  // Kopf nickt im Galopp, Ohren zucken, Horn und Ohren wandern mit dem Kopf
-  const ny=headNod*2;
-  L.head.position.y=-680+ny; L.earL.position.y=284-680+ny; L.earR.position.y=284-680+ny; L.horn.position.y=280-680+ny;
-  L.earL.rotation=-earK*0.8; L.earR.rotation=earK*0.8;
-  L.horn.rotation=lean*0.04;
-  // Mähnenkamm weht nach hinten (zum Reiter) und flattert mit Phasenversatz
-  L.mane.forEach((m)=>{ const i=m.idx; m.rotation = 0.12*maneK + Math.sin(G.phase*1.1 - i*0.55)*0.09*(0.4+sp*0.4); m.scale.y = 1+Math.sin(G.phase*1.1-i*0.55)*0.06; });
-  L.funkel.position.set(-130+Math.sin(G.stateT*2.1)*16, -520+Math.cos(G.stateT*1.7)*14);
+  L.funkel.position.set(-80+Math.sin(G.stateT*2.1)*10, -250+Math.cos(G.stateT*1.7)*9);
   L.funkel.alpha=0.8+Math.sin(G.stateT*9)*0.2;
   // Kamera: wippt gegen den Galopp, legt sich in die Kurve
   if(G.cam){
@@ -214,8 +220,8 @@ function animLumi(dt){
   if(L.glintT>0.09 && !G.reduce){ L.glintT=0;
     const g=new P.Sprite(G.tex.glint); g.anchor.set(0.5);
     const onHorn=Math.random()<0.3;
-    g.position.set(onHorn? (Math.random()-0.5)*20 : 10+Math.random()*170, onHorn? -420-Math.random()*200 : -360+Math.random()*300);
-    g.scale.set(0); g.age=0; g.life=0.5+Math.random()*0.4; g.rot=(Math.random()-0.5)*4; g.big=0.4+Math.random()*0.5;
+    g.position.set(onHorn? (Math.random()-0.5)*14 : -6+Math.random()*60, onHorn? -180-Math.random()*80 : -170+Math.random()*170);
+    g.scale.set(0); g.age=0; g.life=0.5+Math.random()*0.4; g.rot=(Math.random()-0.5)*4; g.big=0.25+Math.random()*0.3;
     g.tint=[0xFFFFFF,0xFFF3C9,0xFFE9F5,0xE9F5FF][Math.floor(Math.random()*4)];
     L.inner.addChild(g); L.glints.push(g);
   }
@@ -285,10 +291,19 @@ G.spawnGates=function(values,opts){
 };
 function clearPortals(){ G.portals.forEach(p=>p.destroy({children:true})); G.portals=[]; }
 function pick(lane){ if(!G.gatesActive||G.resolved) return; if(window.sndClick) window.sndClick('gate'); G.onPick&&G.onPick(lane); }
+/* Tap-Auswertung über die Position. Pixi trifft die Tor-Objekte selbst nicht zuverlässig,
+   darum entscheidet hier immer der Abstand zum Tor bzw. zum Schild am Weltentor. */
 function onTap(e){
-  if(!G.gatesActive||G.resolved||!G.portals.length) return;
+  if(!G.gatesActive||G.resolved) return;
   const x=e.global.x, y=e.global.y;
-  if(y<G.vp.y-20) return;
+  if(G.gate && G.gate.signs){
+    let best=-1,bd=1e9;
+    G.gate.signs.forEach((sg,i)=>{ const g=sg.getGlobalPosition(); const d=Math.hypot(g.x-x,g.y-y); if(d<bd){bd=d;best=i;} });
+    if(best>=0 && bd<Math.max(90,G.W*0.28)) pick(best);
+    return;
+  }
+  if(!G.portals.length) return;
+  if(y<G.vp.y-60) return;
   let best=null,bd=1e9; G.portals.forEach(p=>{ const d=Math.abs(p.x-x); if(d<bd){bd=d;best=p;} });
   if(best) pick(best.lane);
 }
@@ -395,7 +410,7 @@ G.worldGate=function(values, nextWorld){
     const sg=new P.Container(); sg.position.set(x,y);
     const sb=new P.Sprite(G.tex.sign); sb.anchor.set(0.5); sb.scale.set(0.62); sg.addChild(sb);
     const tx=new P.Text({text:String(values[lane]), style:{fontFamily:'"Baloo 2", Nunito, sans-serif', fontSize:42, fontWeight:'700', fill:ink}}); tx.anchor.set(0.5); tx.position.set(0,-2); sg.addChild(tx);
-    sg.eventMode='static'; sg.cursor='pointer'; sg.on('pointertap',e=>{ e.stopPropagation(); if(window.sndClick) window.sndClick('gate'); G.onPick&&G.onPick(lane); });
+    sg.eventMode='static'; sg.cursor='pointer'; sg.on('pointertap',e=>{ e.stopPropagation(); pick(lane); });
     sg.sb=sb; sg.tx=tx; inner.addChild(sg); return sg; });
   c.open=0; c.held=true;
   G.held=true; G.targetSpeed=0; G.gatesActive=true; G.resolved=false;
@@ -530,6 +545,7 @@ G.start=function(opts){
   // opts: {world, items}
   if(G.fit) G.fit();
   G.worldName=opts.world||'wolken'; G.setWorld(G.worldName,true);
+  if(opts.items!==undefined) G.setLumiItems(opts.items);
   G.combo=0; G.speed=0; G.targetSpeed=0.1; G.held=false; G.gatesActive=false; G.resolved=false; G.lane=1; G.laneX=0;
   clearPortals(); G.clearGate(); G.clouds.forEach(c=>c.destroy()); G.clouds=[]; G.sparks.forEach(c=>c.destroy()); G.sparks=[]; G.amb.forEach(c=>c.destroy()); G.amb=[];
   G.setLumiState('ride'); G.tweens=[]; G.lastAmb=4;
@@ -550,7 +566,7 @@ G.playIntro=async function(host, opts){
   const app=new P.Application();
   await app.init({width:Math.max(2,host.clientWidth), height:Math.max(2,host.clientHeight), backgroundAlpha:0, antialias:true, resolution:Math.min(2,devicePixelRatio||1), autoDensity:true});
   host.appendChild(app.canvas); app.canvas.style.position='absolute'; app.canvas.style.inset='0';
-  const names=['body_side','leg','tail1','tail2','tail3','wing','cloud','star','spark','glint'];
+  const names=['cloud','star','spark','glint'];
   await P.Assets.load(names.map(n=>({alias:n, src:'assets/'+n+'.png?v='+VERSION})));
   const T=n=>P.Assets.get(n);
   const W=app.screen.width, H=app.screen.height;
@@ -565,17 +581,11 @@ G.playIntro=async function(host, opts){
   // Regenbogen-Spur (wird beim Looping gezeichnet)
   const trail=new P.Graphics(); stage.addChild(trail);
   const fx=new P.Container(); stage.addChild(fx);
-  // Lumi-Rig (Seitenansicht), Koordinaten in 1x-Einheiten, Texturen 2x
-  const L=new P.Container(); const inner=new P.Container(); inner.scale.set(0.5); L.addChild(inner);
-  const mk=(t,x,y,ax,ay)=>{ const s=new P.Sprite(T(t)); s.anchor.set(ax,ay); s.position.set(x,y); return s; };
-  // Koordinaten in Textur-Pixeln (2x): Körper ist 416 x 316
-  const tails=[mk('tail1',124,180,1,0),mk('tail2',124,196,1,0),mk('tail3',124,212,1,0)]; tails.forEach(t=>inner.addChild(t));
-  const wingB=mk('wing',176,184,0.8,1); wingB.scale.set(0.9); wingB.alpha=0.9; inner.addChild(wingB);
-  // zwei Beinpaare unter dem Bauch (hinten, vorn); das hintere Bein jedes Paars leicht versetzt und etwas dunkler
-  const legs=[[144,236,1],[162,240,0],[236,240,1],[254,236,0]].map(([x,y,back])=>{ const l=mk('leg',x,y,0.5,0.05); if(back) l.tint=0xE6E0F2; inner.addChild(l); return l; });
-  const body=mk('body_side',0,0,0,0); inner.addChild(body);
-  const wingF=mk('wing',190,196,0.8,1); inner.addChild(wingF);
-  inner.pivot.set(208,200);
+  // Lumi aus einem Stück: dieselbe Seitenansicht wie auf der Startseite (unicornSVG in index.html), 2x gerastert
+  const SIDE={vb:[-12,-12,224,184], ax:100, ay:95, k:2};
+  const L=new P.Container(); const inner=new P.Container(); inner.scale.set(1/SIDE.k); L.addChild(inner);
+  const bodyS=new P.Sprite(P.Texture.EMPTY); bodyS.anchor.set((SIDE.ax-SIDE.vb[0])/SIDE.vb[2], (SIDE.ay-SIDE.vb[1])/SIDE.vb[3]); inner.addChild(bodyS);
+  try{ if(typeof window.unicornSVG==='function') bodyS.texture=await svgToTexture(window.unicornSVG(opts.items||0,200), SIDE.vb, SIDE.k); }catch(e){}
   stage.addChild(L);
   // Ziel: dort, wo auf der Startseite das Einhorn sitzt
   const tgt=opts.target||{x:W/2,y:H*0.3,w:200};
@@ -615,12 +625,11 @@ G.playIntro=async function(host, opts){
     rot=-vy*0.25*face;
     L.position.set(x,y); L.scale.set(sc*face, sc); L.rotation=rot;
     const ph=t*9;
-    legs.forEach((l,i)=>{ const pair=i<2?0:1, back=i%2===0; l.rotation= gallop? Math.sin(ph+pair*Math.PI+(back?0.6:0))*0.16 : Math.sin(t*2+i)*0.03; });
-    tails.forEach((tl,i)=>{ tl.skew.y=Math.sin(ph*0.5+i)*0.18; });
-    wingF.rotation=Math.sin(ph*0.6)*0.35-0.1; wingB.rotation=Math.sin(ph*0.6+0.4)*0.3-0.1;
+    // ganzer Körper wippt im Galopp, keine Einzelteile
+    inner.y = gallop? -Math.abs(Math.sin(ph))*10 : 0; inner.rotation = gallop? Math.sin(ph)*0.04 : 0;
     if(t>4.4 && !L.landed){ L.landed=true; for(let i=0;i<90;i++) spawnSpark(x+(Math.random()-0.5)*tgt.w*1.6, y+(Math.random()-0.5)*tgt.w); if(opts.onLand) opts.onLand(); }
     if(t<4.4){ const n=Math.min(6,Math.floor(dt*120)+1); for(let i=0;i<n;i++) spawnSpark(x-face*sc*(60+Math.random()*60), y+sc*(Math.random()*60-10)); }
-    bgT+=dt; if(bgT>0.05){ bgT=0; const g=new P.Sprite(T('glint')); g.anchor.set(0.5); g.position.set((Math.random()*2-1)*140,(Math.random()*2-1)*110); g.scale.set(0); g.age=0; g.life=0.45; g.big=0.8+Math.random()*0.9; g.tint=[0xFFFFFF,0xFFF3C9,0xFFE9F5][Math.floor(Math.random()*3)]; inner.addChild(g); bodyGlints.push(g); }
+    bgT+=dt; if(bgT>0.05){ bgT=0; const g=new P.Sprite(T('glint')); g.anchor.set(0.5); g.position.set((Math.random()*2-1)*150,(Math.random()*2-1)*120); g.scale.set(0); g.age=0; g.life=0.45; g.big=0.8+Math.random()*0.9; g.tint=[0xFFFFFF,0xFFF3C9,0xFFE9F5][Math.floor(Math.random()*3)]; inner.addChild(g); bodyGlints.push(g); }
     for(let i=bodyGlints.length-1;i>=0;i--){ const g=bodyGlints[i]; g.age+=dt; const k=g.age/g.life; g.scale.set(Math.sin(Math.min(1,k)*Math.PI)*g.big); g.rotation+=dt*4; if(k>=1){ g.destroy(); bodyGlints.splice(i,1); } }
     twinkles.forEach(st=>{ st.alpha=0.35+Math.sin(t*st.sp+st.ph)*0.35; st.scale.set(st.sz*(0.8+Math.sin(t*st.sp*1.3+st.ph)*0.3)); st.rotation+=dt*0.5; });
     for(let i=sparks.length-1;i>=0;i--){ const s=sparks[i]; s.age+=dt; s.x+=s.vx*dt; s.y+=s.vy*dt; s.rotation+=dt*3; s.alpha=1-s.age/s.life; if(s.age>=s.life){ s.destroy(); sparks.splice(i,1); } }
