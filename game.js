@@ -4,7 +4,7 @@
 (function(){
 'use strict';
 const P = window.PIXI;
-const VERSION='19';   // wird vom Release-Skript hochgezählt (Cache-Buster)
+const VERSION='20';   // wird vom Release-Skript hochgezählt (Cache-Buster)
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*t;
 const easeOut=t=>1-Math.pow(1-t,3);
@@ -462,7 +462,7 @@ G.playIntro=async function(host, opts){
   stage.addChild(sky);
   const sun=new P.Sprite(T('spark')); sun.anchor.set(0.5); sun.tint=0xFFE9A8; sun.scale.set(W/260); sun.alpha=0.85; sun.position.set(W*0.15,H*0.12); stage.addChild(sun);
   // Wolken, die seitlich vorbeiziehen (Parallax)
-  const clouds=[]; for(let i=0;i<10;i++){ const c=new P.Sprite(T('cloud')); c.anchor.set(0.5); c.z=0.3+Math.random()*0.7; c.position.set(Math.random()*W, H*(0.1+Math.random()*0.8)); c.scale.set(0.5+c.z*1.2); c.alpha=0.5+c.z*0.4; stage.addChild(c); clouds.push(c); }
+  const clouds=[]; for(let i=0;i<10;i++){ const c=new P.Sprite(T('cloud')); c.anchor.set(0.5); c.z=0.3+Math.random()*0.7; c.position.set(Math.random()*W, H*(0.1+Math.random()*0.8)); c.scale.set(0.25+c.z*0.6); c.alpha=0.5+c.z*0.4; stage.addChild(c); clouds.push(c); }
   // Regenbogen-Spur (wird beim Looping gezeichnet)
   const trail=new P.Graphics(); stage.addChild(trail);
   const fx=new P.Container(); stage.addChild(fx);
