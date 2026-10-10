@@ -4,7 +4,7 @@
 (function(){
 'use strict';
 const P = window.PIXI;
-const VERSION='24';   // wird vom Release-Skript hochgezählt (Cache-Buster)
+const VERSION='25';   // wird vom Release-Skript hochgezählt (Cache-Buster)
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*t;
 const easeOut=t=>1-Math.pow(1-t,3);
@@ -497,31 +497,46 @@ G.playIntro=async function(host, opts){
   const resolveP=new Promise(res=>{ G._introDone=res; });
   const finish=()=>{ if(done) return; done=true; app.ticker.stop(); try{ app.destroy(true,{children:true}); }catch(e){} G._introDone(); };
   host.addEventListener('pointerdown',()=>{ skipped=true; finish(); },{once:true});
-  const total=4.6;
+  const total=5.2;
+  // Glitzer-Schichten: funkelnde Sterne im Himmel, Glitzer auf Lumi, dichter Funkenschweif
+  const twinkles=[]; for(let i=0;i<70;i++){ const st=new P.Sprite(T('glint')); st.anchor.set(0.5); st.position.set(Math.random()*W, Math.random()*H); st.ph=Math.random()*6; st.sp=1.5+Math.random()*2.5; st.sz=0.15+Math.random()*0.35; st.tint=[0xFFFFFF,0xFFF3C9,0xFFE9F5][i%3]; stage.addChildAt(st,2); twinkles.push(st); }
+  const bodyGlints=[]; let bgT=0;
   G._introApp=app;
   app.ticker.add(tk=>{
     const dt=Math.min(0.1,tk.deltaMS/1000); t+=dt; G._introT=t;
-    // Flugbahn
-    let x,y,sc,rot, gallop=true;
-    // Lumi bleibt aufrecht wie ein Pferd: Neigung nur aus der Flugrichtung (Nase hoch beim Steigen)
-    let vy=0;
-    if(t<1.7){ const k=easeInOut(t/1.7); x=lerp(W*0.15,W*0.5,k); y=lerp(H*0.42,H*0.45,k)+Math.sin(t*5)*8*k; sc=lerp(0.08,endScale*0.9,k); vy=Math.cos(t*5)*0.3; }
-    else if(t<2.7){ const k=(t-1.7)/1.0; const a=-Math.PI/2+k*Math.PI*2; const r=H*0.13; x=W*0.5+Math.cos(a)*r; y=H*0.45+r+Math.sin(a)*r; sc=endScale*0.9; vy=Math.cos(a);
-      if(k>0.05){ const cols=[0xF96D6D,0xF2CE4B,0x4FC47F,0x58A6F0,0x9A6AE8]; const tang=a+Math.PI/2; for(let i=0;i<5;i++){ trail.circle(x-Math.cos(tang)*(i*5-10)-Math.cos(a)*sc*60, y-Math.sin(tang)*(i*5-10)-Math.sin(a)*sc*60, 4).fill({color:cols[i],alpha:0.9}); } } }
-    else if(t<3.8){ const k=easeInOut((t-2.7)/1.1); x=lerp(W*0.5,tgt.x,k); y=lerp(H*0.45+H*0.13*2,tgt.y,k)-Math.sin(k*Math.PI)*H*0.08; sc=lerp(endScale*0.9,endScale,k); vy=-Math.cos(k*Math.PI)*0.6; gallop=k<0.8; }
-    else { x=tgt.x; y=tgt.y+Math.sin((t-3.8)*3)*3; sc=endScale; vy=0; gallop=false; }
-    rot = -vy*0.28;   // steigen: Nase hoch (negativ = gegen den Uhrzeigersinn, Kopf ist rechts)
-    L.position.set(x,y); L.scale.set(sc); L.rotation=rot;
+    let x,y,sc,rot=0,face=1,gallop=true,vy=0;
+    if(t<1.9){
+      // 1) Lumi kommt aus der Ferne direkt auf dich zu, leichtes Schlängeln, wird groß
+      const k=easeInOut(t/1.9);
+      x=W*0.5+Math.sin(t*3.2)*W*0.08*(1-k*0.5); y=lerp(H*0.30,H*0.52,k); sc=lerp(0.06,endScale*1.25,k*k);
+      vy=Math.cos(t*3.2)*0.2; face=1;
+    }else if(t<3.4){
+      // 2) Drehung mit Tiefe: flache Ellipse, hinten klein und nach links schauend, vorne groß und nach rechts
+      const k=(t-1.9)/1.5; const a=Math.PI*0.5+k*Math.PI*2;
+      const rx=W*0.30, ry=H*0.07, cx=W*0.5, cy=H*0.46;
+      const depth=(Math.sin(a)+1)/2;
+      x=cx+Math.cos(a)*rx; y=cy+Math.sin(a)*ry-(1-depth)*H*0.02; sc=endScale*lerp(0.55,1.25,depth);
+      face = -Math.sin(a)>=0 ? 1 : -1;
+      vy=Math.cos(a)*0.35;
+      if(k>0.03){ const cols=[0xF96D6D,0xF2CE4B,0x4FC47F,0x58A6F0,0x9A6AE8]; for(let i=0;i<5;i++){ trail.circle(x-face*sc*70, y+sc*(i*7-14), 3.5*lerp(0.6,1.2,depth)).fill({color:cols[i],alpha:0.85}); } }
+    }else if(t<4.4){
+      // 3) Gleitflug zur Landung
+      const k=easeInOut((t-3.4)/1.0); x=lerp(W*0.5,tgt.x,k); y=lerp(H*0.53,tgt.y,k)-Math.sin(k*Math.PI)*H*0.07; sc=lerp(endScale*1.25,endScale,k); vy=-Math.cos(k*Math.PI)*0.5; gallop=k<0.8; face=1;
+    }else{ x=tgt.x; y=tgt.y+Math.sin((t-4.4)*3)*3; sc=endScale; gallop=false; face=1; }
+    rot=-vy*0.25*face;
+    L.position.set(x,y); L.scale.set(sc*face, sc); L.rotation=rot;
     const ph=t*9;
-    // Beine hängen nach unten und paddeln sanft; beim Landen ruhig
     legs.forEach((l,i)=>{ const pair=i<2?0:1, back=i%2===0; l.rotation= gallop? Math.sin(ph+pair*Math.PI+(back?0.6:0))*0.16 : Math.sin(t*2+i)*0.03; });
     tails.forEach((tl,i)=>{ tl.skew.y=Math.sin(ph*0.5+i)*0.18; });
     wingF.rotation=Math.sin(ph*0.6)*0.35-0.1; wingB.rotation=Math.sin(ph*0.6+0.4)*0.3-0.1;
-    if(t>3.8 && !L.landed){ L.landed=true; for(let i=0;i<40;i++) spawnSpark(x+(Math.random()-0.5)*tgt.w, y+(Math.random()-0.5)*tgt.w*0.7); if(opts.onLand) opts.onLand(); }
-    if(t<3.8 && Math.random()<dt*40) spawnSpark(x-Math.cos(rot)*sc*70, y-Math.sin(rot)*sc*70+sc*20);
+    if(t>4.4 && !L.landed){ L.landed=true; for(let i=0;i<90;i++) spawnSpark(x+(Math.random()-0.5)*tgt.w*1.6, y+(Math.random()-0.5)*tgt.w); if(opts.onLand) opts.onLand(); }
+    if(t<4.4){ const n=Math.min(6,Math.floor(dt*120)+1); for(let i=0;i<n;i++) spawnSpark(x-face*sc*(60+Math.random()*60), y+sc*(Math.random()*60-10)); }
+    bgT+=dt; if(bgT>0.05){ bgT=0; const g=new P.Sprite(T('glint')); g.anchor.set(0.5); g.position.set((Math.random()*2-1)*140,(Math.random()*2-1)*110); g.scale.set(0); g.age=0; g.life=0.45; g.big=0.8+Math.random()*0.9; g.tint=[0xFFFFFF,0xFFF3C9,0xFFE9F5][Math.floor(Math.random()*3)]; inner.addChild(g); bodyGlints.push(g); }
+    for(let i=bodyGlints.length-1;i>=0;i--){ const g=bodyGlints[i]; g.age+=dt; const k=g.age/g.life; g.scale.set(Math.sin(Math.min(1,k)*Math.PI)*g.big); g.rotation+=dt*4; if(k>=1){ g.destroy(); bodyGlints.splice(i,1); } }
+    twinkles.forEach(st=>{ st.alpha=0.35+Math.sin(t*st.sp+st.ph)*0.35; st.scale.set(st.sz*(0.8+Math.sin(t*st.sp*1.3+st.ph)*0.3)); st.rotation+=dt*0.5; });
     for(let i=sparks.length-1;i>=0;i--){ const s=sparks[i]; s.age+=dt; s.x+=s.vx*dt; s.y+=s.vy*dt; s.rotation+=dt*3; s.alpha=1-s.age/s.life; if(s.age>=s.life){ s.destroy(); sparks.splice(i,1); } }
-    clouds.forEach(c=>{ c.x-= (t<3.8? 60:10)*c.z*dt; if(c.x<-120) c.x=W+120; });
-    trail.alpha=Math.max(0, 1-(t-2.7)/1.2);
+    clouds.forEach(c=>{ c.x-= (t<4.4? 60:10)*c.z*dt; if(c.x<-120) c.x=W+120; });
+    trail.alpha=Math.max(0, 1-Math.max(0,t-3.4)/1.2);
     if(t>=total) finish();
   });
   return resolveP;

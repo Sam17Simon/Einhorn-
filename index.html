@@ -481,7 +481,7 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="game.js?v=24"></script>
+<script src="game.js?v=25"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -1186,7 +1186,7 @@ function maybeRowParty(){
         +'<div class="pill">'+fr[1]+' ist frei und fliegt jetzt mit!</div>'
         +'<p style="margin:0;font-weight:600;color:var(--muted)">Nächstes Abenteuer: die '+row+'er-Insel</p>','Weiter zur '+row+'er-Insel!');
       bigKnall(); sndFanfare();
-      speak('Juhu! Die '+done+'er Insel leuchtet wieder! '+fr[1]+' ist frei! Weiter zur '+row+'er Insel!');
+      speak('Juhu! Die '+done+'er-Insel leuchtet wieder! '+fr[1]+' ist frei! Weiter zur '+row+'er-Insel!');
     },2000);
   }
 }
@@ -1255,7 +1255,7 @@ function startRide(row){
     : 'Sag das Ergebnis laut – oder tippe es ein.';
   clearInterval(rideTick);
   rideTick=setInterval(()=>{ if(RD&&!RD.done) $('rideTimer').textContent=((performance.now()-RD.t0)/1000).toFixed(1).replace('.',',')+' s'; },100);
-  speak('Los geht der Ritt durch die '+row+'er Reihe! Sag die Ergebnisse laut.',
+  speak('Los geht der Ritt durch die '+row+'er-Reihe! Sag die Ergebnisse laut.',
     ()=>{ if(!RD) return; RD.t0=performance.now(); if(!srBlocked) startRideRec(); });
 }
 function rideKey(k){
@@ -1345,7 +1345,7 @@ function finishRide(){
   $('btnAgain').onclick=()=>startRide(row);
   show('end');
   bigKnall(); sndFanfare();
-  speak(record?'Neuer Rekord! Dein Einhorn galoppiert wie der Wind!':'Geschafft! Die ganze '+row+'er Reihe!');
+  speak(record?'Neuer Rekord! Dein Einhorn galoppiert wie der Wind!':'Geschafft! Die ganze '+row+'er-Reihe!');
   if(unlockedItem) setTimeout(()=>showItemOverlay(unlockedItem),1400);
   maybeRowParty();
 }
@@ -1413,7 +1413,12 @@ function finishBlitz(){
 /* ---------- Wolkenritt v4: PixiJS-Szene, Welten, Weltentore, Rätsel-Stopp ---------- */
 let RN=null;
 const RUN_GATES=12;
-const WORLD_INFO={wolken:{name:'Wolkenhimmel',em:'☁️'}, meer:{name:'Abendrot-Meer',em:'🌅'}, nacht:{name:'Sternennacht',em:'🌙'}, zucker:{name:'Zuckerwatte-Land',em:'🍭'}};
+const WORLD_INFO={
+  wolken:{name:'Wolkenhimmel',   em:'☁️', auf:'Auf in den Wolkenhimmel!',     willk:'Willkommen im Wolkenhimmel!',     der:'der Wolkenhimmel'},
+  meer:  {name:'Abendrot-Meer',  em:'🌅', auf:'Auf zum Abendrot-Meer!',       willk:'Willkommen am Abendrot-Meer!',    der:'das Abendrot-Meer'},
+  nacht: {name:'Sternennacht',   em:'🌙', auf:'Auf in die Sternennacht!',     willk:'Willkommen in der Sternennacht!', der:'die Sternennacht'},
+  zucker:{name:'Zuckerwatte-Land',em:'🍭', auf:'Auf ins Zuckerwatte-Land!',   willk:'Willkommen im Zuckerwatte-Land!', der:'das Zuckerwatte-Land'}
+};
 const WORLD_KEYS=Object.keys(WORLD_INFO);
 function masteredFriends(){ return ROW_ORDER.filter(r=>rowMastery(S,r)>=ROW_UNLOCK_SHARE).map(r=>FRIENDS[r]); }
 function shuffleArr(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
@@ -1441,7 +1446,7 @@ async function startRun(){
     showFriend('✨','Tipp das Tor mit der richtigen Zahl – Lumi reitet hindurch!');
     speak('Steig auf, '+S.name+'! Tippe das Tor mit der richtigen Zahl, dann reitet Lumi hindurch. Lass dir Zeit!');
   }else{
-    speak('Steig auf, '+S.name+'! Auf in den '+WORLD_INFO[RN.worlds[0]].name+'!');
+    speak('Steig auf, '+S.name+'! '+WORLD_INFO[RN.worlds[0]].auf);
   }
   setTimeout(()=>{ if(RN) nextGate(); }, 900);
 }
@@ -1515,7 +1520,7 @@ function nextGate(){
     if(p.type!=='mul'){ const pr=p.key.split('x').map(Number); p={key:p.key,a:pr[0],b:pr[1],show:pr[0]+' · '+pr[1],answer:pr[0]*pr[1]}; }
     t={kind:'fact', key:p.key, answer:p.answer, opts:makeOptions(p.answer,p.a,p.b), show:p.show, a:p.a, b:p.b};
     RN.recent.push(p.key); if(RN.recent.length>4) RN.recent.shift();
-    setQ(isWorldGate?'Das Weltentor! Dahinter wartet '+WORLD_INFO[RN.worlds[RN.wIdx+1]].name+'!':'Durch welches Tor, Lumi?', p.show+' = ?');
+    setQ(isWorldGate?'Das Weltentor! Dahinter wartet '+WORLD_INFO[RN.worlds[RN.wIdx+1]].der+'!':'Durch welches Tor, Lumi?', p.show+' = ?');
   }
   RN.task=t; RN.locked=false; RN.riddle=riddle; RN.isWorldGate=isWorldGate; RN.t0=performance.now();
   if(riddle){
@@ -1524,7 +1529,7 @@ function nextGate(){
     eng.spawnGates(t.opts,{hold:true});
     setTimeout(()=>{ if(!RN||!RN.riddle) return;
       showFriend(t.icon, t.text, t.pic);
-      speak(t.text.replace(/[„“]/g,''));
+      speak(t.name+' fragt: '+t.text.replace(/^[^:]*:\s*/,'').replace(/[„“]/g,''));
       RN.t0=performance.now();
     },700);
   }else{
@@ -1558,7 +1563,7 @@ async function chooseGate(val, lane){
   }else{
     RN.combo=0; $('comboN').textContent='0'; $('comboBar').style.width='0%'; $('comboChip').classList.remove('hot');
     sndAgain();
-    const sayIt = t.kind==='seq' ? 'Nach '+t.shown[1]+' kommt '+t.answer : (t.show? t.show.replace('·','mal')+' ist '+t.answer : 'Es sind '+t.answer);
+    const sayIt = t.kind==='seq' ? 'Nach '+t.shown[1]+' kommt '+t.answer+'.' : (t.show? t.show.replace('·','mal')+' ist '+t.answer+'.' : 'Es sind '+t.answer+'.');
     const msg = (val===null ? 'Hui, vorbeigeritten! ' : 'Fast! ')+(t.show? t.show+' = '+t.answer : 'Es war '+t.answer);
     if(wasRiddle){ friendSay('Macht nix! Es sind '+t.answer+'.'); }
     else setQ(msg,'');
@@ -1581,7 +1586,7 @@ async function chooseGate(val, lane){
     RN.wIdx++;
     const w=RN.worlds[RN.wIdx];
     eng.changeWorld(w); worldBannerShow(w); sndWorld();
-    speak('Willkommen im '+WORLD_INFO[w].name.replace('-',' ')+'!');
+    speak(WORLD_INFO[w].willk.replace('-',' '));
     await wait(1800); if(!RN) return;
   }else{
     await wait(good?350:900); if(!RN) return;
