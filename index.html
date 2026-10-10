@@ -476,12 +476,12 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
   </section>
 
 </div>
-<div id="intro" hidden><div id="introHost"></div><div class="callcard" id="introCard"><img src="icon-512.png?v=1" alt="" width="160" height="160"><h1>Einhorn-Einmaleins</h1></div><button class="callbtn" id="introCall">✨ Lumi rufen!</button><div class="introhint" id="introHint" hidden>Tippen zum Überspringen</div></div>
+<div id="intro" hidden><div id="introHost"></div><div class="callcard" id="introCard"><img src="icon-512.png?v=2" alt="" width="160" height="160"><h1>Einhorn-Einmaleins</h1></div><button class="callbtn" id="introCall">✨ Lumi rufen!</button><div class="introhint" id="introHint" hidden>Tippen zum Überspringen</div></div>
 <div id="overlay"><div class="box" id="overlayBox"></div></div>
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="game.js?v=28"></script>
+<script src="game.js?v=29"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -571,6 +571,26 @@ function applyResult(state, key, correct, rt, now){
   }
 }
 
+/* Tempo-Stufe eines Fakts: 'neu' (noch nie oder gerade erst gesehen), 'uebt', 'sicher'.
+   Daraus entsteht der Zeitplan der Tore: wie lange sie anfliegen, ab wann sie kriechen, ob sie stehen bleiben. */
+function factStage(f){
+  if(!f || f.seen===0 || f.box<=1) return 'neu';
+  if(f.box<=3) return 'uebt';
+  return 'sicher';
+}
+function gatePlan(stage, f){
+  const rt=f&&avgRt(f);
+  if(stage==='neu')  return {stage, approachMs:14000, crawlAt:0.82, crawlMs:4000, stopAt:0.9,  boost:false};
+  if(stage==='uebt') return {stage, approachMs:Math.round(Math.min(14000,Math.max(9000,(rt||5000)*2.2+4000))), crawlAt:0.8, crawlMs:6000, stopAt:null, boost:false};
+  return {stage, approachMs:Math.round(Math.min(9000,Math.max(5500,(rt||3000)*1.8+2500))), crawlAt:0.85, crawlMs:2500, stopAt:null, boost:true};
+}
+/* Nicht rechtzeitig getippt: zählt als Zögern, nicht als Fehler. Eine Box runter statt zurück auf Box 1. */
+function applyTimeout(state, key, budgetMs, now){
+  const f=state.facts[key]; if(!f) return;
+  f.seen++; f.last=now; f.no++;
+  f.rt.push(Math.min(budgetMs,20000)); if(f.rt.length>5) f.rt.shift();
+  f.box=Math.max(0,f.box-1);
+}
 function avgRt(f){ return f.rt.length? Math.round(f.rt.reduce((s,x)=>s+x,0)/f.rt.length) : null; }
 
 function logDay(state, now, addSec, addTasks, addOk){
@@ -1504,7 +1524,11 @@ function renderRunDots(){
     d.appendChild(b);
   }
 }
-function approachMs(){ return RN.first ? 15000 : 9500; }
+function planFor(t){
+  if(RN.first) return gatePlan('neu', S.facts[t.key]);
+  if(t.kind==='seq'){ const m=rowMastery(S,t.row), f=S.facts[t.key]; const order=['neu','uebt','sicher']; const st=order[Math.min(order.indexOf(factStage(f)), m<0.5?0:m<0.8?1:2)]; return gatePlan(st,f); }
+  return gatePlan(factStage(S.facts[t.key]), S.facts[t.key]);
+}
 function setQ(small,big){ const q=$('runQ').querySelector('.qchip'); q.style.display=''; q.innerHTML='<small>'+small+'</small>'+(big||''); }
 
 /* Freund-Auftritt (DOM über der Szene) */
@@ -1588,7 +1612,9 @@ function nextGate(){
       RN.t0=performance.now();
     },700);
   }else{
-    eng.spawnGates(t.opts,{approachMs:approachMs(), worldgate:isWorldGate});
+    const plan=planFor(t); RN.plan=plan;
+    if(plan.stage==='neu' && t.kind==='fact' && S.facts[t.key].seen===0){ setQ('Neue Aufgabe, lass dir Zeit!', t.show+' = ?'); }
+    eng.spawnGates(t.opts,Object.assign({worldgate:isWorldGate, onWaitLong:()=>{ if(RN&&!RN.locked) speak('Die Tore warten auf dich. Schau sie dir in Ruhe an.'); }},plan));
   }
 }
 
@@ -1598,7 +1624,8 @@ async function chooseGate(val, lane){
   const eng=G();
   const t=RN.task, rt=performance.now()-RN.t0, good=val===t.answer;
   const goodLane=t.opts.indexOf(t.answer);
-  applyResult(S, t.key, good, good?rt:Math.max(rt,5000), Date.now());
+  if(val===null) applyTimeout(S, t.key, (RN.plan&&RN.plan.approachMs)||9000, Date.now());
+  else applyResult(S, t.key, good, rt, Date.now());
   logDay(S,Date.now(),0,1,good?1:0);
   if(RN.first && RN.gate===0) hideFriend();
   const wasRiddle=RN.riddle, wasWorldGate=RN.isWorldGate;

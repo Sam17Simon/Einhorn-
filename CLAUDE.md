@@ -22,3 +22,9 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 - Startseite, Intro und Wolkenritt zeigen dieselbe Lumi.
 - Tor-Taps werden in `onTap` (game.js) über die Position ausgewertet. Pixi trifft die Tor-Objekte selbst nicht zuverlässig.
 - Am Weltentor kommt nur eine Malaufgabe, kein Reihen-Sprung und kein Rätsel.
+
+## Tempo im Wolkenritt (seit v29)
+- Das Tempo richtet sich nach dem einzelnen Fakt (`factStage` und `gatePlan` in index.html): neu = Tore fliegen 14 s an und bleiben dann stehen, bis getippt wird. Geübt = 9 bis 14 s je nach gemessener Antwortzeit, dann 6 s Kriechen. Sicher = 5,5 bis 9 s, dann 2,5 s Kriechen.
+- Combo beschleunigt nur sichere Fakten.
+- Nicht rechtzeitig getippt zählt als Zögern (`applyTimeout`): eine Box runter, nicht zurück auf Box 1.
+- Icons (`icon-*.png`, `apple-touch-icon.png`) werden aus `unicornSVG` gerendert. Ändert sich Lumi, Icons neu erzeugen und `?v=` am Intro-Bild hochzählen.

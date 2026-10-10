@@ -4,7 +4,7 @@
 (function(){
 'use strict';
 const P = window.PIXI;
-const VERSION='28';   // wird vom Release-Skript hochgezählt (Cache-Buster)
+const VERSION='29';   // wird vom Release-Skript hochgezählt (Cache-Buster)
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*t;
 const easeOut=t=>1-Math.pow(1-t,3);
@@ -285,9 +285,13 @@ G.spawnGates=function(values,opts){
   G.gatesActive=true; G.held=false; G.resolved=false;
   G.gateDur=(opts.approachMs||9000)/1000;
   G.holdAt=opts.hold? 0.9 : null;
+  // Zeitplan: ab crawlAt kriechen die Tore (Rest-Strecke dauert crawlMs), bei stopAt bleiben sie stehen und warten
+  G.plan={crawlAt:opts.crawlAt!=null?opts.crawlAt:1, crawlMs:opts.crawlMs||0, stopAt:opts.stopAt!=null?opts.stopAt:null, boost:opts.boost!==false};
+  G.planPhase='approach'; G.waitT=0;
   values.forEach((v,i)=>{ const p=makePortal(v,i,!!opts.worldgate); if(opts.hold){ p.t=G.holdAt; p.ly=0.16; } G.portals.push(p); });
   if(opts.hold){ G.held=true; G.targetSpeed=0; }
   else G.targetSpeed = 1/G.gateDur;
+  G.onWaitLong=opts.onWaitLong||null;
 };
 function clearPortals(){ G.portals.forEach(p=>p.destroy({children:true})); G.portals=[]; }
 function pick(lane){ if(!G.gatesActive||G.resolved) return; if(window.sndClick) window.sndClick('gate'); G.onPick&&G.onPick(lane); }
@@ -312,8 +316,19 @@ function updPortals(dt){
   const pal=curPalette();
   for(const p of G.portals){
     if(!G.resolved){
-      const boost = p.t<0.45 ? (G.boost||1) : 1;
-      p.t+=G.speed*dt*boost;
+      const plan=G.plan||{crawlAt:1,crawlMs:0,stopAt:null,boost:true};
+      const boost = (plan.boost && p.t<0.45) ? (G.boost||1) : 1;
+      let sp=G.speed*boost;
+      if(plan.stopAt!==null && p.t>=plan.stopAt){
+        // stehen bleiben und warten: Welt kriecht, Lumi trabt, nichts läuft ab
+        sp=0; if(G.planPhase!=='wait'){ G.planPhase='wait'; G.targetSpeed=0.012; }
+        G.waitT+=dt/G.portals.length;
+      }else if(p.t>plan.crawlAt && plan.crawlMs>0){
+        const crawl=(1-plan.crawlAt)/(plan.crawlMs/1000);
+        if(G.planPhase==='approach'){ G.planPhase='crawl'; G.targetSpeed=Math.max(0.02,crawl); }
+        sp=Math.min(sp,crawl);
+      }
+      p.t+=sp*dt;
       if(G.held && G.holdAt!==null) p.t=G.holdAt;
       if(p.t>=1 && G.gatesActive && !G.resolved){ G.resolved=true; G.gatesActive=false; G.onArrive&&G.onArrive(); }
     }else if(p.fly){
@@ -532,6 +547,7 @@ function tick(tk){
   // Sterne funkeln, Meer glitzert
   if(starsC&&starsC.alpha>0.01) starsC.children.forEach(s=>{ s.alpha=0.55+Math.sin(G.time*2+s.ph)*0.45; });
   if(seaC&&seaC.alpha>0.01) seaC.children.forEach(s=>{ s.alpha=0.3+Math.sin(G.time*3+s.ph)*0.3; s.x=(s.rx*G.W+Math.sin(G.time+s.ph)*6); });
+  if(G.planPhase==='wait' && G.waitT>15 && G.onWaitLong){ const f=G.onWaitLong; G.onWaitLong=null; f(); }
   moveField(dt); updPortals(dt); updGate(dt); updParts(dt); updSpeedLines(dt); updAmb(dt); animLumi(dt);
   // Timer-Callbacks
   for(let i=G.tweens.length-1;i>=0;i--){ const w=G.tweens[i]; w.t-=dt; if(w.t<=0){ G.tweens.splice(i,1); w.fn(); } }
