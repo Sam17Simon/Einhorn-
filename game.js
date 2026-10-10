@@ -4,7 +4,7 @@
 (function(){
 'use strict';
 const P = window.PIXI;
-const VERSION='20';   // wird vom Release-Skript hochgezählt (Cache-Buster)
+const VERSION='21';   // wird vom Release-Skript hochgezählt (Cache-Buster)
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*t;
 const easeOut=t=>1-Math.pow(1-t,3);
@@ -490,14 +490,18 @@ G.playIntro=async function(host, opts){
     const dt=Math.min(0.1,tk.deltaMS/1000); t+=dt;
     // Flugbahn
     let x,y,sc,rot, gallop=true;
-    if(t<1.7){ const k=easeInOut(t/1.7); x=lerp(W*0.15,W*0.5,k); y=lerp(H*0.42,H*0.45,k)+Math.sin(t*5)*8*k; sc=lerp(0.08,endScale*0.9,k); rot=-0.15+Math.sin(t*4)*0.05; }
-    else if(t<2.7){ const k=(t-1.7)/1.0; const a=-Math.PI/2+k*Math.PI*2; const r=H*0.13; x=W*0.5+Math.cos(a)*r; y=H*0.45+r+Math.sin(a)*r; sc=endScale*0.9; rot=a+Math.PI/2; 
-      if(k>0.05){ const cols=[0xF96D6D,0xF2CE4B,0x4FC47F,0x58A6F0,0x9A6AE8]; for(let i=0;i<5;i++){ trail.circle(x-Math.cos(rot)*(i*5-10), y-Math.sin(rot)*(i*5-10), 4).fill({color:cols[i],alpha:0.9}); } } }
-    else if(t<3.8){ const k=easeInOut((t-2.7)/1.1); x=lerp(W*0.5,tgt.x,k); y=lerp(H*0.45+H*0.13*2,tgt.y,k)-Math.sin(k*Math.PI)*H*0.08; sc=lerp(endScale*0.9,endScale,k); rot=lerp(0.2,0,k); gallop=k<0.8; }
-    else { x=tgt.x; y=tgt.y+Math.sin((t-3.8)*3)*3; sc=endScale; rot=0; gallop=false; }
+    // Lumi bleibt aufrecht wie ein Pferd: Neigung nur aus der Flugrichtung (Nase hoch beim Steigen)
+    let vy=0;
+    if(t<1.7){ const k=easeInOut(t/1.7); x=lerp(W*0.15,W*0.5,k); y=lerp(H*0.42,H*0.45,k)+Math.sin(t*5)*8*k; sc=lerp(0.08,endScale*0.9,k); vy=Math.cos(t*5)*0.3; }
+    else if(t<2.7){ const k=(t-1.7)/1.0; const a=-Math.PI/2+k*Math.PI*2; const r=H*0.13; x=W*0.5+Math.cos(a)*r; y=H*0.45+r+Math.sin(a)*r; sc=endScale*0.9; vy=Math.cos(a);
+      if(k>0.05){ const cols=[0xF96D6D,0xF2CE4B,0x4FC47F,0x58A6F0,0x9A6AE8]; const tang=a+Math.PI/2; for(let i=0;i<5;i++){ trail.circle(x-Math.cos(tang)*(i*5-10)-Math.cos(a)*sc*60, y-Math.sin(tang)*(i*5-10)-Math.sin(a)*sc*60, 4).fill({color:cols[i],alpha:0.9}); } } }
+    else if(t<3.8){ const k=easeInOut((t-2.7)/1.1); x=lerp(W*0.5,tgt.x,k); y=lerp(H*0.45+H*0.13*2,tgt.y,k)-Math.sin(k*Math.PI)*H*0.08; sc=lerp(endScale*0.9,endScale,k); vy=-Math.cos(k*Math.PI)*0.6; gallop=k<0.8; }
+    else { x=tgt.x; y=tgt.y+Math.sin((t-3.8)*3)*3; sc=endScale; vy=0; gallop=false; }
+    rot = -vy*0.28;   // steigen: Nase hoch (negativ = gegen den Uhrzeigersinn, Kopf ist rechts)
     L.position.set(x,y); L.scale.set(sc); L.rotation=rot;
-    const ph=t*14;
-    legs.forEach((l,i)=>{ l.rotation= gallop? Math.sin(ph+i*1.6)*0.5 : Math.sin(t*2+i)*0.04; });
+    const ph=t*9;
+    // Beine hängen nach unten und paddeln sanft; beim Landen ruhig
+    legs.forEach((l,i)=>{ l.rotation= gallop? Math.sin(ph+i*1.6)*0.16+0.05 : Math.sin(t*2+i)*0.03; });
     tails.forEach((tl,i)=>{ tl.skew.y=Math.sin(ph*0.5+i)*0.18; });
     wingF.rotation=Math.sin(ph*0.6)*0.35-0.1; wingB.rotation=Math.sin(ph*0.6+0.4)*0.3-0.1;
     if(t>3.8 && !L.landed){ L.landed=true; for(let i=0;i<40;i++) spawnSpark(x+(Math.random()-0.5)*tgt.w, y+(Math.random()-0.5)*tgt.w*0.7); if(opts.onLand) opts.onLand(); }
