@@ -4,7 +4,7 @@
 (function(){
 'use strict';
 const P = window.PIXI;
-const VERSION='18';   // wird vom Release-Skript hochgezählt (Cache-Buster)
+const VERSION='19';   // wird vom Release-Skript hochgezählt (Cache-Buster)
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*t;
 const easeOut=t=>1-Math.pow(1-t,3);
@@ -42,7 +42,7 @@ G.init=async function(host){
   host.appendChild(app.canvas);
   app.canvas.style.position='absolute'; app.canvas.style.inset='0'; app.canvas.style.touchAction='none';
   G.app=app;
-  const names=['head','ear','horn','mane1','mane2','mane3','hand','cloud','star','spark','puff','ring','ringfill','sign'];
+  const names=['head','ear','horn','mane1','mane2','mane3','hand','cloud','star','spark','puff','ring','ringfill','sign','glint','body_side','leg','tail1','tail2','tail3','wing'];
   await P.Assets.load(names.map(n=>({alias:n, src:'assets/'+n+'.png?v='+VERSION})));
   names.forEach(n=>G.tex[n]=P.Assets.get(n));
   // Ebenen von hinten nach vorn
@@ -144,7 +144,8 @@ function buildLumi(){
   L.head=mk(T.head,0,0,0.5,1); inner.addChild(L.head);
   L.earL=mk(T.ear,-40,-98,0.5,0.92); L.earL.rotation=-0.25; inner.addChild(L.earL);
   L.earR=mk(T.ear,40,-98,0.5,0.92); L.earR.rotation=0.25; L.earR.scale.x=-1; inner.addChild(L.earR);
-  L.horn=mk(T.horn,0,-104,0.5,1); inner.addChild(L.horn);
+  L.horn=mk(T.horn,0,-106,0.5,1); L.horn.scale.set(1.35); inner.addChild(L.horn);
+  L.glints=[]; L.glintT=0;
   L.handL=mk(T.hand,-86,-36,0.3,1); inner.addChild(L.handL);
   L.handR=mk(T.hand,86,-36,0.3,1); L.handR.scale.x=-1; inner.addChild(L.handR);
   L.funkel=mk(T.spark,-70,-120,0.5,0.5); L.funkel.tint=0xFFE066; L.funkel.scale.set(0.9); inner.addChild(L.funkel);
@@ -198,6 +199,17 @@ function animLumi(dt){
   L.maneR.forEach((s,i)=>{ s.skew.x=-(Math.sin(G.phase-0.5*i)*0.07+maneK*0.6); });
   L.funkel.position.set(-70+Math.sin(G.stateT*2.1)*16, -120+Math.cos(G.stateT*1.7)*14);
   L.funkel.alpha=0.8+Math.sin(G.stateT*9)*0.2;
+  // Glitzer: alle paar Frames ein Funkelstern auf Mähne oder Horn, blitzt auf und verschwindet
+  L.glintT+=dt;
+  if(L.glintT>0.09 && !G.reduce){ L.glintT=0;
+    const g=new P.Sprite(G.tex.glint); g.anchor.set(0.5);
+    const onHorn=Math.random()<0.3;
+    g.position.set(onHorn? (Math.random()-0.5)*16 : (Math.random()<0.5?-1:1)*(40+Math.random()*60), onHorn? -120-Math.random()*90 : -20-Math.random()*70);
+    g.scale.set(0); g.age=0; g.life=0.5+Math.random()*0.4; g.rot=(Math.random()-0.5)*4; g.big=0.35+Math.random()*0.45;
+    g.tint=[0xFFFFFF,0xFFF3C9,0xFFE9F5,0xE9F5FF][Math.floor(Math.random()*4)];
+    L.inner.addChild(g); L.glints.push(g);
+  }
+  for(let i=L.glints.length-1;i>=0;i--){ const g=L.glints[i]; g.age+=dt; const k=g.age/g.life; g.scale.set(Math.sin(Math.min(1,k)*Math.PI)*g.big); g.rotation+=g.rot*dt; g.alpha=0.95; if(k>=1){ g.destroy(); L.glints.splice(i,1); } }
 }
 
 /* ---------- Wolken, Funken, Tempo ---------- */
@@ -431,4 +443,70 @@ G.setSpeedFactor=function(f){ G.targetSpeed = f; };
 G.stop=function(){ clearPortals(); G.hideGroups(); G.tweens=[]; G.app.ticker.stop(); };
 G.brake=function(){ G.setLumiState('brake'); G.brakePuffs(); G.targetSpeed=0; G.after(0.65,()=>{ if(G.lumiState==='brake') G.setLumiState('stand'); }); };
 G.launch=function(){ G.setLumiState('launch'); G.held=false; };
+
+/* ===================== Intro: Lumi fliegt heran, Looping, Landung ===================== */
+G.playIntro=async function(host, opts){
+  opts=opts||{};
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const app=new P.Application();
+  await app.init({width:Math.max(2,host.clientWidth), height:Math.max(2,host.clientHeight), backgroundAlpha:0, antialias:true, resolution:Math.min(2,devicePixelRatio||1), autoDensity:true});
+  host.appendChild(app.canvas); app.canvas.style.position='absolute'; app.canvas.style.inset='0';
+  const names=['body_side','leg','tail1','tail2','tail3','wing','cloud','star','spark','glint'];
+  await P.Assets.load(names.map(n=>({alias:n, src:'assets/'+n+'.png?v='+VERSION})));
+  const T=n=>P.Assets.get(n);
+  const W=app.screen.width, H=app.screen.height;
+  const stage=app.stage;
+  // Himmel
+  const sky=new P.Graphics(); const n=24;
+  for(let i=0;i<n;i++){ const t=i/(n-1); const col=t<0.55?lerpColor(0xBBDDF8,0xE9E2FA,t/0.55):lerpColor(0xE9E2FA,0xFBEFF7,(t-0.55)/0.45); sky.rect(0,Math.floor(H*t)-1,W,Math.ceil(H/(n-1))+2).fill(col); }
+  stage.addChild(sky);
+  const sun=new P.Sprite(T('spark')); sun.anchor.set(0.5); sun.tint=0xFFE9A8; sun.scale.set(W/260); sun.alpha=0.85; sun.position.set(W*0.15,H*0.12); stage.addChild(sun);
+  // Wolken, die seitlich vorbeiziehen (Parallax)
+  const clouds=[]; for(let i=0;i<10;i++){ const c=new P.Sprite(T('cloud')); c.anchor.set(0.5); c.z=0.3+Math.random()*0.7; c.position.set(Math.random()*W, H*(0.1+Math.random()*0.8)); c.scale.set(0.5+c.z*1.2); c.alpha=0.5+c.z*0.4; stage.addChild(c); clouds.push(c); }
+  // Regenbogen-Spur (wird beim Looping gezeichnet)
+  const trail=new P.Graphics(); stage.addChild(trail);
+  const fx=new P.Container(); stage.addChild(fx);
+  // Lumi-Rig (Seitenansicht), Koordinaten in 1x-Einheiten, Texturen 2x
+  const L=new P.Container(); const inner=new P.Container(); inner.scale.set(0.5); L.addChild(inner);
+  const mk=(t,x,y,ax,ay)=>{ const s=new P.Sprite(T(t)); s.anchor.set(ax,ay); s.position.set(x,y); return s; };
+  const tails=[mk('tail1',58,96,1,0),mk('tail2',58,104,1,0),mk('tail3',58,112,1,0)]; tails.forEach(t=>inner.addChild(t));
+  const wingB=mk('wing',86,86,0.8,1); wingB.scale.set(0.9); wingB.alpha=0.9; inner.addChild(wingB);
+  const legs=[[72,118],[90,122],[108,122],[124,118]].map(([x,y])=>{ const l=mk('leg',x,y,0.5,0.05); inner.addChild(l); return l; });
+  const body=mk('body_side',0,0,0,0); inner.addChild(body);
+  const wingF=mk('wing',92,92,0.8,1); inner.addChild(wingF);
+  inner.pivot.set(100,100);
+  stage.addChild(L);
+  // Ziel: dort, wo auf der Startseite das Einhorn sitzt
+  const tgt=opts.target||{x:W/2,y:H*0.3,w:200};
+  const endScale=tgt.w/200;
+  let t=0, done=false, skipped=false;
+  const sparks=[];
+  const spawnSpark=(x,y)=>{ const s=new P.Sprite(Math.random()<0.4?T('star'):T('glint')); s.anchor.set(0.5); s.position.set(x,y); s.tint=[0xFFD98A,0xF8A0C8,0xB493F0,0x8FD6B0,0xFFFFFF][Math.floor(Math.random()*5)]; s.vx=(Math.random()-0.5)*60; s.vy=(Math.random()-0.5)*60+30; s.age=0; s.life=0.6+Math.random()*0.5; s.scale.set(0.3+Math.random()*0.4); fx.addChild(s); sparks.push(s); };
+  const resolveP=new Promise(res=>{ G._introDone=res; });
+  const finish=()=>{ if(done) return; done=true; app.ticker.stop(); try{ app.destroy(true,{children:true}); }catch(e){} G._introDone(); };
+  host.addEventListener('pointerdown',()=>{ skipped=true; finish(); },{once:true});
+  const total=4.6;
+  app.ticker.add(tk=>{
+    const dt=Math.min(0.1,tk.deltaMS/1000); t+=dt;
+    // Flugbahn
+    let x,y,sc,rot, gallop=true;
+    if(t<1.7){ const k=easeInOut(t/1.7); x=lerp(W*0.15,W*0.5,k); y=lerp(H*0.42,H*0.45,k)+Math.sin(t*5)*8*k; sc=lerp(0.08,endScale*0.9,k); rot=-0.15+Math.sin(t*4)*0.05; }
+    else if(t<2.7){ const k=(t-1.7)/1.0; const a=-Math.PI/2+k*Math.PI*2; const r=H*0.13; x=W*0.5+Math.cos(a)*r; y=H*0.45+r+Math.sin(a)*r; sc=endScale*0.9; rot=a+Math.PI/2; 
+      if(k>0.05){ const cols=[0xF96D6D,0xF2CE4B,0x4FC47F,0x58A6F0,0x9A6AE8]; for(let i=0;i<5;i++){ trail.circle(x-Math.cos(rot)*(i*5-10), y-Math.sin(rot)*(i*5-10), 4).fill({color:cols[i],alpha:0.9}); } } }
+    else if(t<3.8){ const k=easeInOut((t-2.7)/1.1); x=lerp(W*0.5,tgt.x,k); y=lerp(H*0.45+H*0.13*2,tgt.y,k)-Math.sin(k*Math.PI)*H*0.08; sc=lerp(endScale*0.9,endScale,k); rot=lerp(0.2,0,k); gallop=k<0.8; }
+    else { x=tgt.x; y=tgt.y+Math.sin((t-3.8)*3)*3; sc=endScale; rot=0; gallop=false; }
+    L.position.set(x,y); L.scale.set(sc); L.rotation=rot;
+    const ph=t*14;
+    legs.forEach((l,i)=>{ l.rotation= gallop? Math.sin(ph+i*1.6)*0.5 : Math.sin(t*2+i)*0.04; });
+    tails.forEach((tl,i)=>{ tl.skew.y=Math.sin(ph*0.5+i)*0.18; });
+    wingF.rotation=Math.sin(ph*0.6)*0.35-0.1; wingB.rotation=Math.sin(ph*0.6+0.4)*0.3-0.1;
+    if(t>3.8 && !L.landed){ L.landed=true; for(let i=0;i<40;i++) spawnSpark(x+(Math.random()-0.5)*tgt.w, y+(Math.random()-0.5)*tgt.w*0.7); if(opts.onLand) opts.onLand(); }
+    if(t<3.8 && Math.random()<dt*40) spawnSpark(x-Math.cos(rot)*sc*70, y-Math.sin(rot)*sc*70+sc*20);
+    for(let i=sparks.length-1;i>=0;i--){ const s=sparks[i]; s.age+=dt; s.x+=s.vx*dt; s.y+=s.vy*dt; s.rotation+=dt*3; s.alpha=1-s.age/s.life; if(s.age>=s.life){ s.destroy(); sparks.splice(i,1); } }
+    clouds.forEach(c=>{ c.x-= (t<3.8? 60:10)*c.z*dt; if(c.x<-120) c.x=W+120; });
+    trail.alpha=Math.max(0, 1-(t-2.7)/1.2);
+    if(t>=total) finish();
+  });
+  return resolveP;
+};
 })();

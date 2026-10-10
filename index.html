@@ -297,6 +297,15 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
 .dotcap{font-size:14px;color:var(--muted);font-weight:700;text-align:center;margin-top:4px;}
 .badge-new{background:var(--gold); color:#fff; font-size:12px; border-radius:999px; padding:2px 8px; font-family:var(--font-body); vertical-align:middle; margin-left:6px;}
 .friend{font-size:22px; margin-left:auto;}
+/* Intro */
+#intro{position:fixed; inset:0; z-index:45; background:#BBDDF8; transition:opacity .6s;}
+#intro.fade{opacity:0; pointer-events:none;}
+#introHost{position:absolute; inset:0;}
+#intro .introhint{position:absolute; bottom:max(18px, env(safe-area-inset-bottom,0px)); left:0; right:0; text-align:center; color:rgba(59,42,82,.55); font-weight:700; font-size:13px; pointer-events:none;}
+/* Glitzer um das Start-Einhorn */
+#unicornHome{position:relative;}
+#unicornHome .gl{position:absolute; color:#FFD98A; font-size:14px; pointer-events:none; animation:glint 1.8s ease-in-out infinite; text-shadow:0 0 6px rgba(255,217,138,.9);}
+@keyframes glint{0%,100%{opacity:0; transform:scale(.3) rotate(0deg)}50%{opacity:1; transform:scale(1.2) rotate(45deg)}}
 /* overlay + fx */
 #overlay{position:fixed; inset:0; background:rgba(59,42,82,.35); display:none; align-items:center; justify-content:center; padding:20px; z-index:40;}
 #overlay.show{display:flex;}
@@ -460,11 +469,12 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
   </section>
 
 </div>
+<div id="intro" hidden><div id="introHost"></div><div class="introhint">Tippen zum Überspringen</div></div>
 <div id="overlay"><div class="box" id="overlayBox"></div></div>
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="game.js?v=18"></script>
+<script src="game.js?v=19"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -800,7 +810,7 @@ const ITEMS=[
 function unicornSVG(items, size){
   const has=id=>items>=ITEMS.findIndex(x=>x.id===id)+1;
   return `
-  <svg viewBox="0 0 200 170" width="${size}" height="${size*0.85}" role="img" aria-label="Dein Einhorn">
+  <svg viewBox="0 -12 200 182" width="${size}" height="${size*0.91}" role="img" aria-label="Dein Einhorn">
     ${has('rainbow')?`<g opacity="0.9">
       <path d="M20 150 A80 80 0 0 1 180 150" fill="none" stroke="#F96D6D" stroke-width="7"/>
       <path d="M28 150 A72 72 0 0 1 172 150" fill="none" stroke="#F2CE4B" stroke-width="7"/>
@@ -820,7 +830,8 @@ function unicornSVG(items, size){
     </g>
     ${has('boots')?`<g fill="#9A6AE8"><rect x="69" y="138" width="13" height="10" rx="4"/><rect x="87" y="140" width="13" height="10" rx="4"/><rect x="105" y="140" width="13" height="10" rx="4"/><rect x="121" y="138" width="13" height="10" rx="4"/></g>`:''}
     <path d="M126 28 L120 12 L134 22 Z" fill="#FFFFFF" stroke="#3B2A52" stroke-width="3"/>
-    <polygon points="138,24 143,2 150,22" fill="#F2B83C" stroke="#D99A1E" stroke-width="2"/>
+    <polygon points="136,26 144,-8 153,24" fill="#F2B83C" stroke="#D99A1E" stroke-width="2.5"/>
+    <path d="M139 14 L150 11 M141 5 L148 3" stroke="#D99A1E" stroke-width="2" stroke-linecap="round"/>
     <g stroke-linecap="round" fill="none" stroke-width="7">
       <path d="M128 28 Q112 36 112 56" stroke="#F8A0C8"/>
       <path d="M124 38 Q110 48 112 68" stroke="#B493F0"/>
@@ -986,7 +997,7 @@ function renderHome(){
   const cur=open[open.length-1];
   $('homeSub').textContent = m>=100 ? 'Alle Inseln leuchten! Du kannst das ganze Einmaleins! 🦄' :
     'Lumi und Funkel brauchen dich auf der '+cur+'er-Insel ('+FRIENDS[cur][0]+' wartet dort)';
-  $('unicornHome').innerHTML=unicornSVG(S.items,200);
+  $('unicornHome').innerHTML=unicornSVG(S.items,200)+[[8,18,0],[86,4,.6],[12,70,1.1],[90,60,.3],[48,-2,.9],[70,82,1.4]].map(([x,y,d])=>'<span class="gl" style="left:'+x+'%;top:'+y+'%;animation-delay:'+d+'s">✦</span>').join('');
   $('btnSound').textContent=S.sound?'🔊':'🔇';
   $('btnBlitz').disabled = unlockedRows(S).length<2;
   $('streakInfo').textContent = S.streak.len>1 ? '🔥 '+S.streak.len+' Tage am Stück' : '';
@@ -1686,11 +1697,26 @@ function initStars(){
     st.style.fontSize=(8+Math.random()*9)+'px'; st.style.animationDelay=(Math.random()*2.5)+'s';
     l.appendChild(st); }
 }
+async function playIntroOnce(){
+  const eng=window.Wolkenritt;
+  if(!eng || !('ResizeObserver' in window)) return;
+  const box=$('intro'); box.hidden=false;
+  try{
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+    const u=$('unicornHome').getBoundingClientRect();
+    const target={x:u.left+u.width/2, y:u.top+u.height*0.52, w:u.width*0.95};
+    sndWhoosh();
+    await eng.playIntro($('introHost'), {target, onLand:()=>{ sndFanfare(); }});
+  }catch(e){}
+  box.classList.add('fade'); setTimeout(()=>{ box.hidden=true; box.classList.remove('fade'); $('introHost').innerHTML=''; },650);
+}
+function sndWhoosh(){ for(let i=0;i<6;i++) tone(220+i*90,.12,i*0.08,'triangle',.05); }
 function init(){
   load();
   initStars();
   lastOpenCount=unlockedRows(S).length;
   show('home');
+  if(!matchMedia('(prefers-reduced-motion: reduce)').matches) setTimeout(playIntroOnce, 150);
 }
 const _boot=()=>init();
 (window.claude&&window.claude.hot&&window.claude.hot.ready)? window.claude.hot.ready(_boot) : _boot();
