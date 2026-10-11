@@ -45,3 +45,8 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 
 ## Inselbild (seit v31)
 - `islands.js`: `scene` je Insel steuert ferne Bergkette (`farRange`), Berge und Bäume auf der Insel (`islandHills`, Basis y=116, rechts hinter den Bauplätzen) und die Klippe unter schwebenden Inseln (`islandCliff`). Berge haben keine Bodenlinie (`shape()` strichelt nur die Oberkante).
+
+## Vorlesen (seit v32)
+- `speak()` in index.html: nie direkt nach `speechSynthesis.cancel()` sprechen (Chrome verschluckt den Satz), darum 120 ms Pause, wenn gerade gesprochen wurde. Fallback ohne feste Stimme bei Fehler oder wenn nach 1,6 s nichts startet.
+- `unlockSpeech()` muss im ersten Fingertipp laufen (iOS/Chrome sprechen sonst gar nicht). Hängt an jedem pointerdown und am "Lumi rufen"-Knopf. Nicht entfernen.
+- Elternbereich hat "Stimme testen" mit Diagnose (Anzahl Stimmen, gesprochen x von y, letzter Fehler).

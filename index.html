@@ -549,8 +549,8 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=31"></script>
-<script src="game.js?v=31"></script>
+<script src="islands.js?v=32"></script>
+<script src="game.js?v=32"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -792,22 +792,58 @@ function load(){
 function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(e){} }
 
 /* ---------- Audio: Vorlesen + Klänge ---------- */
-let voices=[]; function loadVoices(){ try{ voices=speechSynthesis.getVoices(); }catch(e){} }
-try{ loadVoices(); speechSynthesis.onvoiceschanged=loadVoices; }catch(e){}
+/* Vorlesen. Robust gegen drei bekannte Browser-Fallen:
+   1) iOS/Safari und Chrome sprechen erst, nachdem einmal INNERHALB eines Fingertipps gesprochen wurde -> unlockSpeech()
+   2) Chrome (v. a. Android) verschluckt ein speak() direkt nach cancel() -> kurz warten, nur abbrechen wenn nötig
+   3) Hängt die Sprachausgabe (pausiert, Stimme fehlt), bleibt es still -> resume(), Fallback ohne feste Stimme, Watchdog */
+let voices=[], voiceBad=false, speechUnlocked=false, curUtt=null, speakSeq=0;
+const speechDiag={calls:0, starts:0, lastErr:'', lastText:''};
+function loadVoices(){ try{ voices=speechSynthesis.getVoices()||[]; }catch(e){} }
+try{ loadVoices(); speechSynthesis.addEventListener ? speechSynthesis.addEventListener('voiceschanged',loadVoices) : (speechSynthesis.onvoiceschanged=loadVoices); }catch(e){}
+function pickVoice(){
+  if(voiceBad||!voices.length) return null;
+  const de=voices.filter(v=>/^de([-_]|$)/i.test(v.lang));
+  return de.find(v=>v.localService&&/anna|petra|helena|katja|female|weiblich/i.test(v.name))
+      || de.find(v=>/anna|petra|helena|katja|female|weiblich/i.test(v.name))
+      || de.find(v=>v.localService) || de[0] || null;
+}
+function unlockSpeech(){
+  if(speechUnlocked||!('speechSynthesis' in window)) return;
+  speechUnlocked=true;
+  try{ speechSynthesis.resume(); const u=new SpeechSynthesisUtterance(' '); u.volume=0; u.lang='de-DE'; speechSynthesis.speak(u); }catch(e){}
+  loadVoices();
+}
+['pointerdown','touchend','click','keydown'].forEach(ev=>document.addEventListener(ev,unlockSpeech,{capture:true,passive:true}));
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'){ try{ speechSynthesis.cancel(); speechSynthesis.resume(); }catch(e){} } });
 function speak(text, cb){
-  if(!S.sound || !('speechSynthesis' in window)){ cb&&cb(); return; }
-  // cb darf genau einmal laufen; Safari lässt onend gern aus, darum Watchdog
   let done=false; const fire=()=>{ if(done) return; done=true; cb&&cb(); };
-  try{
-    speechSynthesis.cancel();
-    const u=new SpeechSynthesisUtterance(text);
-    u.lang='de-DE'; u.rate=1.06; u.pitch=1.16;
-    const v=voices.find(v=>/de[-_]/i.test(v.lang)&&/anna|petra|helena|female|google/i.test(v.name)) || voices.find(v=>/de[-_]/i.test(v.lang));
-    if(v) u.voice=v;
-    u.onend=fire; u.onerror=fire;
-    speechSynthesis.speak(u);
-    if(cb) setTimeout(fire, Math.max(2000, text.length*110));
-  }catch(e){ fire(); }
+  if(!S.sound || !('speechSynthesis' in window) || !text){ fire(); return; }
+  const my=++speakSeq; speechDiag.calls++; speechDiag.lastText=String(text).slice(0,60);
+  const ss=window.speechSynthesis;
+  let busy=false; try{ busy=ss.speaking||ss.pending; ss.resume(); if(busy) ss.cancel(); }catch(e){}
+  const go=(attempt)=>{
+    if(my!==speakSeq) { fire(); return; }          // inzwischen kam ein neuerer Satz
+    let started=false;
+    try{
+      const u=new SpeechSynthesisUtterance(text);
+      u.lang='de-DE'; u.rate=1.04; u.pitch=1.14; u.volume=1;
+      const v=attempt===0?pickVoice():null; if(v) u.voice=v;
+      u.onstart=()=>{ started=true; speechDiag.starts++; };
+      u.onend=fire;
+      u.onerror=e=>{
+        const err=(e&&e.error)||'?'; speechDiag.lastErr=err;
+        if(err==='interrupted'||err==='canceled'){ fire(); return; }
+        if(attempt===0){ if(v) voiceBad=true; setTimeout(()=>go(1),80); } else fire();
+      };
+      curUtt=u;                                      // Referenz halten, sonst räumt Chrome sie weg
+      ss.resume(); ss.speak(u);
+      // Watchdog: nach 1,6 s noch nicht losgelegt -> einmal ohne feste Stimme neu versuchen
+      setTimeout(()=>{ if(my!==speakSeq||started||done) return; try{ if(!ss.speaking){ if(attempt===0){ ss.cancel(); setTimeout(()=>go(1),80); } } }catch(e){} },1600);
+    }catch(e){ speechDiag.lastErr=String(e&&e.message||e); fire(); }
+    if(cb) setTimeout(fire, Math.max(2500, String(text).length*115));
+  };
+  // nach cancel() kurz warten, sonst verschluckt Chrome den neuen Satz
+  if(busy) setTimeout(()=>go(0),120); else go(0);
 }
 let AC=null;
 function tone(freq,dur,when,type,gain){
@@ -2001,6 +2037,8 @@ function renderParent(){
     +'<h2>Einstellungen</h2>'
     +'<div class="setrow"><label>Name des Kindes</label><input type="text" id="setName" value="'+S.name.replace(/"/g,'&quot;')+'"></div>'
     +'<div class="setrow"><label>Ton und Vorlesen</label><button class="toggle'+(S.sound?' on':'')+'" id="setSound" role="switch" aria-checked="'+S.sound+'" aria-label="Ton"><i></i></button></div>'
+    +'<div class="setrow"><label>Vorlesen prüfen</label><button class="smallbtn" id="setVoiceTest">Stimme testen</button></div>'
+    +'<div id="voiceDiag" style="font-size:12px;color:var(--muted);font-weight:600;margin:-4px 0 6px"></div>'
     +'<div class="setrow"><label>Aufgaben pro Runde</label><div>'+[5,10,15].map(n=>'<button class="smallbtn" data-tc="'+n+'" style="'+(S.tasksPerRound===n?'background:var(--accent-soft)':'')+'">'+n+'</button>').join(' ')+'</div></div>'
     +'<h2>Sicherung</h2>'
     +'<p style="margin:2px 0;font-size:13px;color:var(--muted)">Der Lernstand liegt nur auf diesem Gerät. Zum Sichern Text kopieren, zum Übertragen hier einfügen.</p>'
@@ -2014,6 +2052,11 @@ function renderParent(){
 
   $('setName').addEventListener('change',e=>{ S.name=(e.target.value||'').trim()||'Du'; save(); });
   $('setSound').addEventListener('click',()=>{ S.sound=!S.sound; save(); renderParent(); });
+  $('setVoiceTest').addEventListener('click',()=>{
+    unlockSpeech(); speak('Hallo '+S.name+'! Ich bin Lumi. Hörst du mich?');
+    setTimeout(()=>{ const de=voices.filter(v=>/^de/i.test(v.lang)).length;
+      $('voiceDiag').textContent='Stimmen: '+voices.length+' (deutsch: '+de+') · gesprochen: '+speechDiag.starts+' von '+speechDiag.calls+(speechDiag.lastErr?' · Fehler: '+speechDiag.lastErr:'')+(S.sound?'':' · Ton ist aus!'); },2500);
+  });
   w.querySelectorAll('[data-tc]').forEach(b=>b.addEventListener('click',()=>{ S.tasksPerRound=parseInt(b.dataset.tc,10); save(); renderParent(); }));
   $('bkExport').addEventListener('click',()=>{ $('backupTa').value=JSON.stringify(S); $('bkMsg').textContent='Stand steht im Feld.'; });
   $('bkCopy').addEventListener('click',async()=>{
@@ -2046,13 +2089,13 @@ async function playIntroOnce(){
   const box=$('intro'); box.hidden=false;
   try{
     // erst der Ruf-Knopf: schaltet den Ton frei (Browser spielen vor der ersten Berührung nichts)
-    await new Promise(res=>{ const b=$('introCall'); b.hidden=false; b.onclick=()=>{ b.hidden=true; $('introCard').hidden=true; res(); }; });
+    await new Promise(res=>{ const b=$('introCall'); b.hidden=false; b.onclick=()=>{ unlockSpeech(); b.hidden=true; $('introCard').hidden=true; res(); }; });
     $('introHint').hidden=false;
     await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
     const u=$('unicornHome').getBoundingClientRect();
     const target={x:u.left+u.width/2, y:u.top+u.height*0.52, w:u.width*0.95};
     playIntroMusic();
-    await eng.playIntro($('introHost'), {target, items:gearKey(S.gear), onLand:()=>{ sndFanfare(); }});
+    await eng.playIntro($('introHost'), {target, items:gearKey(S.gear), onLand:()=>{ sndFanfare(); setTimeout(()=>speak('Hallo '+S.name+'! Lumi ist da!'),500); }});
   }catch(e){}
   box.classList.add('fade'); setTimeout(()=>{ box.hidden=true; box.classList.remove('fade'); $('introHost').innerHTML=''; },650);
 }
