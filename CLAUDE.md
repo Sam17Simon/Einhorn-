@@ -61,4 +61,5 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 ## Sicherung (seit v36)
 - Einmal am Tag lädt die App beim Tippen auf einen Knopf im Rundenende-Screen `lumi-sicherung-JJJJ-MM-TT.json` in den Download-Ordner (`maybeDailyBackup`, Tag in localStorage `einhorn_lastBackup`). Downloads gehen nur direkt nach einem Fingertipp, darum dort.
 - Elternbereich: "Jetzt sichern" und "Sicherungsdatei laden". `navigator.storage.persist()` wird beim Start angefragt.
+- Feste Datei (seit v37, nur wenn `showSaveFilePicker` existiert): im Elternbereich einmal wählen, Griff liegt in IndexedDB `lumi-backup`, danach täglich überschreiben (`backupToFixed`). Fehlen Rechte oder die Funktion, gibt es wie bisher die Download-Datei.
 - Kein Cloud-Dienst, keine Anmeldung. Bewusste Entscheidung von Simon: simpel.

@@ -550,8 +550,8 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=36"></script>
-<script src="game.js?v=36"></script>
+<script src="islands.js?v=37"></script>
+<script src="game.js?v=37"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -802,7 +802,33 @@ function downloadBackup(){
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
   try{ localStorage.setItem(BK_KEY,day); }catch(e){}
 }
-function maybeDailyBackup(){ if(lastBackupDay()!==todayStr(Date.now())){ try{ downloadBackup(); }catch(e){} } }
+/* Feste Sicherungsdatei (wenn der Browser es kann): einmal im Elternbereich wählen, danach wird
+   täglich dieselbe Datei überschrieben. Keine Dateisammlung im Download-Ordner. Der Datei-Griff liegt in IndexedDB. */
+const CAN_FIXED_FILE = typeof window.showSaveFilePicker==='function';
+function idb(){ return new Promise((res,rej)=>{ const r=indexedDB.open('lumi-backup',1); r.onupgradeneeded=()=>r.result.createObjectStore('kv'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+async function idbGet(k){ const db=await idb(); return new Promise(res=>{ const q=db.transaction('kv').objectStore('kv').get(k); q.onsuccess=()=>res(q.result); q.onerror=()=>res(null); }); }
+async function idbSet(k,v){ const db=await idb(); return new Promise(res=>{ const t=db.transaction('kv','readwrite'); t.objectStore('kv').put(v,k); t.oncomplete=()=>res(true); t.onerror=()=>res(false); }); }
+async function writeFixed(h){ const w=await h.createWritable(); await w.write(JSON.stringify(S)); await w.close(); try{ localStorage.setItem(BK_KEY,todayStr(Date.now())); }catch(e){} }
+async function chooseFixedFile(){
+  const h=await window.showSaveFilePicker({suggestedName:'lumi-sicherung.json', types:[{description:'Lumi-Sicherung', accept:{'application/json':['.json']}}]});
+  await idbSet('handle',h); await writeFixed(h); return h;
+}
+/* true = in die feste Datei geschrieben. Muss aus einem Fingertipp heraus laufen (Rechte-Abfrage). */
+async function backupToFixed(){
+  if(!CAN_FIXED_FILE) return false;
+  let h=null; try{ h=await idbGet('handle'); }catch(e){}
+  if(!h) return false;
+  try{
+    let perm=await h.queryPermission({mode:'readwrite'});
+    if(perm!=='granted') perm=await h.requestPermission({mode:'readwrite'});
+    if(perm!=='granted') return false;
+    await writeFixed(h); return true;
+  }catch(e){ return false; }
+}
+function maybeDailyBackup(){
+  if(lastBackupDay()===todayStr(Date.now())) return;
+  backupToFixed().then(ok=>{ if(!ok){ try{ downloadBackup(); }catch(e){} } });
+}
 /* Browser bitten, den Lernstand nie automatisch zu löschen (Speicherdruck, lange nicht benutzt). */
 let storagePersisted=null;
 try{ if(navigator.storage&&navigator.storage.persist){ navigator.storage.persisted().then(p=>{ storagePersisted=p; if(!p) return navigator.storage.persist().then(ok=>{ storagePersisted=ok; }); }).catch(()=>{}); } }catch(e){}
@@ -2100,6 +2126,7 @@ function renderParent(){
     +'<div class="setrow"><label>Aufgaben pro Runde</label><div>'+[5,10,15].map(n=>'<button class="smallbtn" data-tc="'+n+'" style="'+(S.tasksPerRound===n?'background:var(--accent-soft)':'')+'">'+n+'</button>').join(' ')+'</div></div>'
     +'<h2>Sicherung</h2>'
     +'<p style="margin:2px 0;font-size:13px;color:var(--muted)">Einmal am Tag legt Lumi nach der ersten Runde eine Sicherungsdatei in den Download-Ordner (lumi-sicherung-Datum.json). Letzte Sicherung: '+(lastBackupDay()||'noch keine')+'</p>'
+    +(CAN_FIXED_FILE?'<p style="margin:4px 0;font-size:13px;color:var(--muted)">Besser: eine feste Datei wählen. Dann überschreibt Lumi jeden Tag dieselbe Datei statt neue anzulegen. Feste Datei: <b id="bkFixedName">…</b></p><div class="btnrow" style="justify-content:flex-start"><button class="smallbtn" id="bkFixed">Feste Sicherungsdatei wählen</button></div>':'<p style="margin:4px 0;font-size:13px;color:var(--muted)">Dieses Gerät kann keine feste Datei überschreiben, darum entsteht jeden Tag eine neue. Alte Dateien kannst du gefahrlos löschen, die neueste reicht.</p>')
     +'<div class="btnrow" style="justify-content:flex-start"><button class="smallbtn" id="bkNow">Jetzt sichern</button><button class="smallbtn" id="bkFileBtn">Sicherungsdatei laden</button><input type="file" id="bkFile" accept=".json,application/json" hidden></div>'
     +'<p style="margin:8px 0 2px;font-size:13px;color:var(--muted)">Oder als Text kopieren und auf einem anderen Gerät einfügen:</p>'
     +'<textarea class="backup" id="backupTa"></textarea>'
@@ -2118,7 +2145,14 @@ function renderParent(){
       $('voiceDiag').textContent='Stimmen: '+voices.length+' (deutsch: '+de+') · gesprochen: '+speechDiag.starts+' von '+speechDiag.calls+' · Weg: '+speechDiag.mode+' · Neuversuche: '+speechDiag.retries+(speechDiag.lastErr?' · Fehler: '+speechDiag.lastErr:'')+(S.sound?'':' · Ton ist aus!')+(IS_ANDROID?' · Android':''); },5000);
   });
   w.querySelectorAll('[data-tc]').forEach(b=>b.addEventListener('click',()=>{ S.tasksPerRound=parseInt(b.dataset.tc,10); save(); renderParent(); }));
-  $('bkNow').addEventListener('click',()=>{ downloadBackup(); $('bkMsg').textContent='Sicherungsdatei liegt im Download-Ordner.'; });
+  $('bkNow').addEventListener('click',async()=>{ if(await backupToFixed()) $('bkMsg').textContent='In die feste Sicherungsdatei geschrieben.'; else { downloadBackup(); $('bkMsg').textContent='Sicherungsdatei liegt im Download-Ordner.'; } });
+  if(CAN_FIXED_FILE){
+    idbGet('handle').then(h=>{ const el=$('bkFixedName'); if(el) el.textContent=h?h.name:'noch keine'; }).catch(()=>{});
+    $('bkFixed').addEventListener('click',async()=>{
+      try{ const h=await chooseFixedFile(); $('bkFixedName').textContent=h.name; $('bkMsg').textContent='Feste Datei gewählt und gesichert. Ab jetzt wird sie jeden Tag überschrieben.'; }
+      catch(e){ $('bkMsg').textContent=(e&&e.name==='AbortError')?'Abgebrochen.':'Das hat nicht geklappt. Es bleibt bei der täglichen Download-Datei.'; }
+    });
+  }
   $('bkFileBtn').addEventListener('click',()=>$('bkFile').click());
   $('bkFile').addEventListener('change',async e=>{
     const f=e.target.files&&e.target.files[0]; if(!f) return;
