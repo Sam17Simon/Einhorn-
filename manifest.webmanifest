@@ -1,6 +1,6 @@
 {
-  "name": "Einhorn-Einmaleins",
-  "short_name": "Einmaleins",
+  "name": "Lumi",
+  "short_name": "Lumi",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
