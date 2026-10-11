@@ -57,3 +57,8 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 - Tippt man auf der Insel das Tier an, sagt es `nextIslandLine(r)`: wie viele lila Sterne (Box 3+) auf der neuesten offenen Insel noch fehlen (8 von 10 nötig), welche Insel dann kommt und einen Spieltipp.
 - Tipp-Regel: viele neue Aufgaben (3+) → Inselritt; mehr wackelnde (Box 0-1) als fast sichere → Zaubertraining; sonst Wolkenflug mit schnellen Antworten (Box 2 → 3 nur bei schneller richtiger Antwort, siehe `applyResult`).
 - Unter den Sternen der aktuellen Insel steht "x von 8 für die Ner-Insel". Elemente in `.islwrap` dürfen nicht schrumpfen (`flex-shrink:0`).
+
+## Sicherung (seit v36)
+- Einmal am Tag lädt die App beim Tippen auf einen Knopf im Rundenende-Screen `lumi-sicherung-JJJJ-MM-TT.json` in den Download-Ordner (`maybeDailyBackup`, Tag in localStorage `einhorn_lastBackup`). Downloads gehen nur direkt nach einem Fingertipp, darum dort.
+- Elternbereich: "Jetzt sichern" und "Sicherungsdatei laden". `navigator.storage.persist()` wird beim Start angefragt.
+- Kein Cloud-Dienst, keine Anmeldung. Bewusste Entscheidung von Simon: simpel.

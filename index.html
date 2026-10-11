@@ -550,8 +550,8 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=35"></script>
-<script src="game.js?v=35"></script>
+<script src="islands.js?v=36"></script>
+<script src="game.js?v=36"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -791,6 +791,18 @@ function load(){
   S=defaultState();
 }
 function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(e){} }
+/* Tägliche Sicherungsdatei in den Download-Ordner. Downloads gehen nur direkt nach einem Fingertipp,
+   darum hängt das an den Knöpfen des Rundenende-Screens. Höchstens eine Datei pro Tag. */
+const BK_KEY='einhorn_lastBackup';
+function lastBackupDay(){ try{ return localStorage.getItem(BK_KEY)||''; }catch(e){ return ''; } }
+function downloadBackup(){
+  const day=todayStr(Date.now());
+  const blob=new Blob([JSON.stringify(S)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='lumi-sicherung-'+day+'.json';
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  try{ localStorage.setItem(BK_KEY,day); }catch(e){}
+}
+function maybeDailyBackup(){ if(lastBackupDay()!==todayStr(Date.now())){ try{ downloadBackup(); }catch(e){} } }
 /* Browser bitten, den Lernstand nie automatisch zu löschen (Speicherdruck, lange nicht benutzt). */
 let storagePersisted=null;
 try{ if(navigator.storage&&navigator.storage.persist){ navigator.storage.persisted().then(p=>{ storagePersisted=p; if(!p) return navigator.storage.persist().then(ok=>{ storagePersisted=ok; }); }).catch(()=>{}); } }catch(e){}
@@ -1236,6 +1248,7 @@ function show(name){
   stopAllRec();
   trackScreen();
 }
+document.querySelectorAll('#scr-end button').forEach(b=>b.addEventListener('click',maybeDailyBackup,{capture:true}));
 document.querySelectorAll('[data-home]').forEach(b=>b.addEventListener('click',()=>{ leaveActivity(); show('home'); }));
 function leaveActivity(){ stopRide(); stopRun(); clearInterval(bzTick); BZ=null; endRound(false); }
 
@@ -2086,7 +2099,9 @@ function renderParent(){
     +'<div id="voiceDiag" style="font-size:12px;color:var(--muted);font-weight:600;margin:-4px 0 6px"></div>'
     +'<div class="setrow"><label>Aufgaben pro Runde</label><div>'+[5,10,15].map(n=>'<button class="smallbtn" data-tc="'+n+'" style="'+(S.tasksPerRound===n?'background:var(--accent-soft)':'')+'">'+n+'</button>').join(' ')+'</div></div>'
     +'<h2>Sicherung</h2>'
-    +'<p style="margin:2px 0;font-size:13px;color:var(--muted)">Der Lernstand liegt nur auf diesem Gerät. Zum Sichern Text kopieren, zum Übertragen hier einfügen.</p>'
+    +'<p style="margin:2px 0;font-size:13px;color:var(--muted)">Einmal am Tag legt Lumi nach der ersten Runde eine Sicherungsdatei in den Download-Ordner (lumi-sicherung-Datum.json). Letzte Sicherung: '+(lastBackupDay()||'noch keine')+'</p>'
+    +'<div class="btnrow" style="justify-content:flex-start"><button class="smallbtn" id="bkNow">Jetzt sichern</button><button class="smallbtn" id="bkFileBtn">Sicherungsdatei laden</button><input type="file" id="bkFile" accept=".json,application/json" hidden></div>'
+    +'<p style="margin:8px 0 2px;font-size:13px;color:var(--muted)">Oder als Text kopieren und auf einem anderen Gerät einfügen:</p>'
     +'<textarea class="backup" id="backupTa"></textarea>'
     +'<div class="btnrow" style="justify-content:flex-start">'
     +'<button class="smallbtn" id="bkExport">Lernstand anzeigen</button>'
@@ -2103,6 +2118,13 @@ function renderParent(){
       $('voiceDiag').textContent='Stimmen: '+voices.length+' (deutsch: '+de+') · gesprochen: '+speechDiag.starts+' von '+speechDiag.calls+' · Weg: '+speechDiag.mode+' · Neuversuche: '+speechDiag.retries+(speechDiag.lastErr?' · Fehler: '+speechDiag.lastErr:'')+(S.sound?'':' · Ton ist aus!')+(IS_ANDROID?' · Android':''); },5000);
   });
   w.querySelectorAll('[data-tc]').forEach(b=>b.addEventListener('click',()=>{ S.tasksPerRound=parseInt(b.dataset.tc,10); save(); renderParent(); }));
+  $('bkNow').addEventListener('click',()=>{ downloadBackup(); $('bkMsg').textContent='Sicherungsdatei liegt im Download-Ordner.'; });
+  $('bkFileBtn').addEventListener('click',()=>$('bkFile').click());
+  $('bkFile').addEventListener('change',async e=>{
+    const f=e.target.files&&e.target.files[0]; if(!f) return;
+    try{ const p=JSON.parse(await f.text()); if(p&&p.v===1&&p.facts){ S=p; if(!S.islands) S.islands={}; if(!S.spent) S.spent=0; if(!S.gear){ S.gear=gearOf(S.items||0); S.rewards=S.items||0; } save(); renderParent(); $('bkMsg').textContent='Lernstand aus der Datei geladen.'; } else throw 0; }
+    catch(err){ $('bkMsg').textContent='Das ist keine Lumi-Sicherungsdatei.'; }
+  });
   $('bkExport').addEventListener('click',()=>{ $('backupTa').value=JSON.stringify(S); $('bkMsg').textContent='Stand steht im Feld.'; });
   $('bkCopy').addEventListener('click',async()=>{
     $('backupTa').value=JSON.stringify(S);
