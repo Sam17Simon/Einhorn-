@@ -549,8 +549,8 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=32"></script>
-<script src="game.js?v=32"></script>
+<script src="islands.js?v=33"></script>
+<script src="game.js?v=33"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -792,58 +792,72 @@ function load(){
 function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(e){} }
 
 /* ---------- Audio: Vorlesen + Klänge ---------- */
-/* Vorlesen. Robust gegen drei bekannte Browser-Fallen:
-   1) iOS/Safari und Chrome sprechen erst, nachdem einmal INNERHALB eines Fingertipps gesprochen wurde -> unlockSpeech()
-   2) Chrome (v. a. Android) verschluckt ein speak() direkt nach cancel() -> kurz warten, nur abbrechen wenn nötig
-   3) Hängt die Sprachausgabe (pausiert, Stimme fehlt), bleibt es still -> resume(), Fallback ohne feste Stimme, Watchdog */
-let voices=[], voiceBad=false, speechUnlocked=false, curUtt=null, speakSeq=0;
-const speechDiag={calls:0, starts:0, lastErr:'', lastText:''};
-function loadVoices(){ try{ voices=speechSynthesis.getVoices()||[]; }catch(e){} }
-try{ loadVoices(); speechSynthesis.addEventListener ? speechSynthesis.addEventListener('voiceschanged',loadVoices) : (speechSynthesis.onvoiceschanged=loadVoices); }catch(e){}
+/* Vorlesen. Selbstheilend, weil jedes Gerät anders zickt:
+   - Android-Chrome schweigt, wenn u.voice gesetzt ist und u.lang nicht exakt voice.lang ("de_DE") ist.
+   - Android-Chrome bleibt manchmal in "speaking" hängen; dann startet nichts mehr, bis cancel() kommt.
+   - Android: pause()/resume() wirken wie Abbruch, darum dort nie aufrufen.
+   - iOS und Chrome sprechen erst, nachdem einmal im Fingertipp gesprochen wurde.
+   Ablauf: Satz sprechen, auf onstart warten. Kommt nach 1,5 s kein Start, abbrechen und die nächste
+   Variante probieren (nur Sprache / feste Stimme mit passender Sprache / ganz ohne Angaben).
+   Die Variante, die geklappt hat, wird gespeichert und beim nächsten Mal zuerst genommen. */
+const IS_ANDROID=/Android/i.test(navigator.userAgent);
+const SPEECH_MODES=['lang','voice','plain'];
+let voices=[], speechUnlocked=false, curUtt=null, speakSeq=0;
+let speechMode=(()=>{ try{ const m=localStorage.getItem('einhorn_speechMode'); return SPEECH_MODES.includes(m)?m:'lang'; }catch(e){ return 'lang'; } })();
+const speechDiag={calls:0, starts:0, retries:0, lastErr:'', lastText:'', mode:speechMode};
+function loadVoices(){ try{ const v=speechSynthesis.getVoices(); if(v&&v.length) voices=v; }catch(e){} }
+try{ loadVoices(); speechSynthesis.onvoiceschanged=loadVoices; }catch(e){}
+let voicePoll=0; const vp=setInterval(()=>{ loadVoices(); if(voices.length||++voicePoll>20) clearInterval(vp); },250);
+function deVoices(){ return voices.filter(v=>/^de([-_]|$)/i.test(v.lang||'')); }
 function pickVoice(){
-  if(voiceBad||!voices.length) return null;
-  const de=voices.filter(v=>/^de([-_]|$)/i.test(v.lang));
+  const de=deVoices(); if(!de.length) return null;
   return de.find(v=>v.localService&&/anna|petra|helena|katja|female|weiblich/i.test(v.name))
-      || de.find(v=>/anna|petra|helena|katja|female|weiblich/i.test(v.name))
-      || de.find(v=>v.localService) || de[0] || null;
+      || de.find(v=>v.default) || de.find(v=>v.localService) || de[0];
 }
 function unlockSpeech(){
   if(speechUnlocked||!('speechSynthesis' in window)) return;
-  speechUnlocked=true;
-  try{ speechSynthesis.resume(); const u=new SpeechSynthesisUtterance(' '); u.volume=0; u.lang='de-DE'; speechSynthesis.speak(u); }catch(e){}
-  loadVoices();
+  speechUnlocked=true; loadVoices();
+  if(IS_ANDROID) return;                       // Android braucht das nicht, und leere Sätze stören dort eher
+  try{ const u=new SpeechSynthesisUtterance(' '); u.volume=0; u.lang='de-DE'; speechSynthesis.speak(u); }catch(e){}
 }
 ['pointerdown','touchend','click','keydown'].forEach(ev=>document.addEventListener(ev,unlockSpeech,{capture:true,passive:true}));
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'){ try{ speechSynthesis.cancel(); speechSynthesis.resume(); }catch(e){} } });
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'){ try{ speechSynthesis.cancel(); }catch(e){} } });
+function makeUtt(text,mode){
+  const u=new SpeechSynthesisUtterance(text);
+  u.rate=1.04; u.pitch=1.14; u.volume=1;
+  if(mode==='lang'){ u.lang='de-DE'; }
+  else if(mode==='voice'){ const v=pickVoice(); if(v){ u.voice=v; u.lang=v.lang; } else u.lang='de-DE'; }
+  return u;                                     // 'plain': gar nichts setzen, Gerätestandard
+}
 function speak(text, cb){
   let done=false; const fire=()=>{ if(done) return; done=true; cb&&cb(); };
   if(!S.sound || !('speechSynthesis' in window) || !text){ fire(); return; }
   const my=++speakSeq; speechDiag.calls++; speechDiag.lastText=String(text).slice(0,60);
   const ss=window.speechSynthesis;
-  let busy=false; try{ busy=ss.speaking||ss.pending; ss.resume(); if(busy) ss.cancel(); }catch(e){}
-  const go=(attempt)=>{
-    if(my!==speakSeq) { fire(); return; }          // inzwischen kam ein neuerer Satz
-    let started=false;
+  let busy=false; try{ busy=ss.speaking||ss.pending; if(busy) ss.cancel(); }catch(e){}
+  if(cb) setTimeout(fire, Math.max(3000, String(text).length*120)+1600);
+  const order=[speechMode].concat(SPEECH_MODES.filter(m=>m!==speechMode));
+  const go=(i)=>{
+    if(my!==speakSeq){ fire(); return; }        // ein neuerer Satz hat übernommen
+    if(i>=order.length){ fire(); return; }
+    const mode=order[i]; let started=false, failed=false;
+    const next=()=>{ if(failed||started||my!==speakSeq) return; failed=true; speechDiag.retries++; try{ ss.cancel(); }catch(e){} setTimeout(()=>go(i+1),150); };
     try{
-      const u=new SpeechSynthesisUtterance(text);
-      u.lang='de-DE'; u.rate=1.04; u.pitch=1.14; u.volume=1;
-      const v=attempt===0?pickVoice():null; if(v) u.voice=v;
-      u.onstart=()=>{ started=true; speechDiag.starts++; };
+      const u=makeUtt(text,mode);
+      u.onstart=()=>{ started=true; speechDiag.starts++; speechDiag.mode=mode;
+        if(speechMode!==mode){ speechMode=mode; try{ localStorage.setItem('einhorn_speechMode',mode); }catch(e){} } };
       u.onend=fire;
-      u.onerror=e=>{
-        const err=(e&&e.error)||'?'; speechDiag.lastErr=err;
-        if(err==='interrupted'||err==='canceled'){ fire(); return; }
-        if(attempt===0){ if(v) voiceBad=true; setTimeout(()=>go(1),80); } else fire();
-      };
-      curUtt=u;                                      // Referenz halten, sonst räumt Chrome sie weg
-      ss.resume(); ss.speak(u);
-      // Watchdog: nach 1,6 s noch nicht losgelegt -> einmal ohne feste Stimme neu versuchen
-      setTimeout(()=>{ if(my!==speakSeq||started||done) return; try{ if(!ss.speaking){ if(attempt===0){ ss.cancel(); setTimeout(()=>go(1),80); } } }catch(e){} },1600);
-    }catch(e){ speechDiag.lastErr=String(e&&e.message||e); fire(); }
-    if(cb) setTimeout(fire, Math.max(2500, String(text).length*115));
+      u.onerror=e=>{ const err=(e&&e.error)||'?'; speechDiag.lastErr=err+' ('+mode+')';
+        if(err==='interrupted'||err==='canceled'){ if(!started&&my===speakSeq) next(); else fire(); return; }
+        started?fire():next(); };
+      curUtt=u;                                   // Referenz halten, sonst räumt Chrome sie weg
+      if(!IS_ANDROID){ try{ ss.resume(); }catch(e){} }
+      ss.speak(u);
+      setTimeout(()=>{ if(!started) next(); },1500);
+    }catch(e){ speechDiag.lastErr=String(e&&e.message||e); next(); }
   };
   // nach cancel() kurz warten, sonst verschluckt Chrome den neuen Satz
-  if(busy) setTimeout(()=>go(0),120); else go(0);
+  setTimeout(()=>go(0), busy?150:0);
 }
 let AC=null;
 function tone(freq,dur,when,type,gain){
@@ -2053,9 +2067,9 @@ function renderParent(){
   $('setName').addEventListener('change',e=>{ S.name=(e.target.value||'').trim()||'Du'; save(); });
   $('setSound').addEventListener('click',()=>{ S.sound=!S.sound; save(); renderParent(); });
   $('setVoiceTest').addEventListener('click',()=>{
-    unlockSpeech(); speak('Hallo '+S.name+'! Ich bin Lumi. Hörst du mich?');
+    unlockSpeech(); speak('Hallo '+S.name+'! Ich bin Lumi. Hörst du mich?'); $('voiceDiag').textContent='Ich teste …';
     setTimeout(()=>{ const de=voices.filter(v=>/^de/i.test(v.lang)).length;
-      $('voiceDiag').textContent='Stimmen: '+voices.length+' (deutsch: '+de+') · gesprochen: '+speechDiag.starts+' von '+speechDiag.calls+(speechDiag.lastErr?' · Fehler: '+speechDiag.lastErr:'')+(S.sound?'':' · Ton ist aus!'); },2500);
+      $('voiceDiag').textContent='Stimmen: '+voices.length+' (deutsch: '+de+') · gesprochen: '+speechDiag.starts+' von '+speechDiag.calls+' · Weg: '+speechDiag.mode+' · Neuversuche: '+speechDiag.retries+(speechDiag.lastErr?' · Fehler: '+speechDiag.lastErr:'')+(S.sound?'':' · Ton ist aus!')+(IS_ANDROID?' · Android':''); },5000);
   });
   w.querySelectorAll('[data-tc]').forEach(b=>b.addEventListener('click',()=>{ S.tasksPerRound=parseInt(b.dataset.tc,10); save(); renderParent(); }));
   $('bkExport').addEventListener('click',()=>{ $('backupTa').value=JSON.stringify(S); $('bkMsg').textContent='Stand steht im Feld.'; });
