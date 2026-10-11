@@ -52,3 +52,8 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 - Nie direkt nach `cancel()` sprechen, 150 ms warten.
 - `unlockSpeech()` im ersten Fingertipp (für iOS). Nicht entfernen.
 - Elternbereich: "Stimme testen" zeigt Stimmen, gesprochen x von y, Weg, Neuversuche, letzten Fehler.
+
+## Nächste Insel (seit v34)
+- Tippt man auf der Insel das Tier an, sagt es `nextIslandLine(r)`: wie viele lila Sterne (Box 3+) auf der neuesten offenen Insel noch fehlen (8 von 10 nötig), welche Insel dann kommt und einen Spieltipp.
+- Tipp-Regel: viele neue Aufgaben (3+) → Inselritt; mehr wackelnde (Box 0-1) als fast sichere → Zaubertraining; sonst Wolkenflug mit schnellen Antworten (Box 2 → 3 nur bei schneller richtiger Antwort, siehe `applyResult`).
+- Unter den Sternen der aktuellen Insel steht "x von 8 für die Ner-Insel". Elemente in `.islwrap` dürfen nicht schrumpfen (`flex-shrink:0`).

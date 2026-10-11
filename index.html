@@ -183,9 +183,10 @@ button:focus-visible, input:focus-visible{outline:3px solid var(--accent); outli
 .islcard .ministars{margin-top:2px;}
 .isltitle{font-family:var(--font-disp); font-size:19px; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;}
 .islwrap{flex:1; overflow-y:auto; display:flex; flex-direction:column; align-items:center; gap:10px; padding-block:4px 30px;}
+.islwrap > *{flex-shrink:0;}
 .islstage{width:100%; max-width:420px;}
 .islstage svg{width:100%; height:auto; display:block; border-radius:28px; border:2px solid var(--line);}
-.islbubble{background:var(--card); border:2px solid var(--line); border-radius:18px; padding:8px 14px; font-weight:700; text-align:center; max-width:420px; min-height:40px;}
+.islbubble{background:var(--card); border:2px solid var(--line); border-radius:18px; padding:10px 14px; font-weight:700; font-size:15px; line-height:1.4; text-align:center; max-width:420px; width:100%; min-height:40px;}
 .islprogress{display:flex; gap:4px; align-items:center; font-size:13px; color:var(--muted); font-weight:700;}
 .islprogress svg{width:16px;height:16px;}
 .islh2{font-family:var(--font-disp); font-size:20px; margin:8px 0 0;}
@@ -549,8 +550,8 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=33"></script>
-<script src="game.js?v=33"></script>
+<script src="islands.js?v=34"></script>
+<script src="game.js?v=34"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -1938,13 +1939,40 @@ function renderPath(){
   }
 }
 const ANIMAL_LINES={
-  wait:['Hallo! Ich bin {n}. Übst du die {r}er-Reihe mit mir?','Psst, ich warte hier auf dich. Schaffst du die {r}er-Reihe?','Die {r}er-Reihe macht mich ganz müde. Hilfst du mir?'],
-  awake:['Juhu, du bist da! Die {r}er-Reihe kannst du schon!','Reiten wir noch eine Runde? Ich liebe den Inselritt!','Schau dir meine Insel an! Hast du Sterne für etwas Neues?']
+  wait:['Hallo! Ich bin {n}. Übst du die {r}er-Reihe mit mir? Tipp mich an, dann sag ich dir, was noch fehlt.','Psst, ich warte hier auf dich. Schaffst du die {r}er-Reihe?','Die {r}er-Reihe macht mich ganz müde. Hilfst du mir?'],
+  awake:['Juhu, du bist da! Die {r}er-Reihe kannst du schon! Tipp mich an, dann verrate ich dir die nächste Insel.','Reiten wir noch eine Runde? Ich liebe den Inselritt!','Schau dir meine Insel an! Hast du Sterne für etwas Neues?']
 };
 function islandLine(r){
   const m=rowMastery(S,r)>=ROW_UNLOCK_SHARE, pool=ANIMAL_LINES[m?'awake':'wait'];
   return pool[Math.floor(Math.random()*pool.length)].replace('{n}',FRIENDS[r][1]).replace('{r}',r);
 }
+/* Was fehlt bis zur nächsten Insel? Kindgerecht, mit Spieltipp. Wird gesagt, wenn man das Tier antippt.
+   Regel: Die neueste offene Insel braucht 8 lila Sterne (Aufgaben in Box 3+), dann taucht die nächste auf.
+   Lila wird eine Aufgabe nur durch eine SCHNELLE richtige Antwort, darum der Tipp je nach Stand. */
+function nextIslandLine(r){
+  const open=unlockedRows(S), cur=open[open.length-1], next=nextLockedRow(S);
+  if(next===null) return pickOne(['Alle Inseln sind schon offen! Jetzt kannst du alle Sterne golden machen.','Du hast alle Inseln geweckt! Schaffst du es, dass alle Sterne golden leuchten?']);
+  const facts=rowFacts(S,cur), need=Math.ceil(ROW_UNLOCK_SHARE*10);
+  const sure=facts.filter(f=>f.box>=ROW_UNLOCK_MIN_BOX).length, rest=Math.max(1,need-sure);
+  const neu=facts.filter(f=>f.seen===0).length;
+  const wackelt=facts.filter(f=>f.seen>0&&f.box<=1).length;
+  const fast=facts.filter(f=>f.box===2).length;
+  const nextName='die '+next+'er-Insel', nextFriend=FRIENDS[next][1];
+  const where = r===cur ? 'auf meiner Insel' : 'auf der '+cur+'er-Insel';
+  let tip;
+  if(neu>=3) tip = r===cur ? 'Tipp: Reite den Inselritt hier bei mir. Da lernst du die ganze '+cur+'er-Reihe kennen.' : 'Tipp: Flieg zur '+cur+'er-Insel und reite dort den Inselritt.';
+  else if(wackelt>=fast && wackelt>0) tip='Tipp: Spiel das Zaubertraining. Da übst du ganz in Ruhe die Aufgaben, die noch wackeln.';
+  else tip='Tipp: Spiel den Wolkenflug und antworte ganz schnell aus dem Kopf. Dann werden die Sterne lila.';
+  const almost = fast>0 && fast>=rest ? ' Bei '+plural(fast,'Aufgabe','Aufgaben')+' fehlt nur noch eine schnelle Antwort!' : '';
+  const head = rest===1
+    ? pickOne(['Nur noch 1 lila Stern '+where+', dann taucht '+nextName+' auf!','Fast geschafft! Noch 1 lila Stern '+where+', dann kommt '+nextName+'.'])
+    : pickOne(['Noch '+rest+' lila Sterne '+where+', dann taucht '+nextName+' auf!','Weißt du was? Mit '+rest+' lila Sternen mehr '+where+' wacht '+nextName+' auf.']
+        .concat(sure>0?['Du hast schon '+sure+' von '+need+' lila Sternen '+where+'. Bei '+need+' taucht '+nextName+' auf!']:[]));
+  const friend = r===cur ? ' Dort wartet '+nextFriend+'.' : '';
+  const done = r!==cur ? pickOne(['Meine Insel leuchtet schon, danke! ','Mich hast du schon geweckt! ']) : '';
+  return done+head+friend+almost+' '+tip;
+}
+function pickOne(a){ return a[Math.floor(Math.random()*a.length)]; }
 function openIsland(r){
   const W=IW(); ISL=r;
   const mastered=rowMastery(S,r)>=ROW_UNLOCK_SHARE;
@@ -1954,9 +1982,9 @@ function openIsland(r){
   const line=islandLine(r);
   $('islBubble').textContent=line;
   const facts=rowFacts(S,r), sure=facts.filter(f=>f.box>=3).length;
-  $('islProgress').innerHTML=facts.map(f=> f.box>=5?starSVG('#F2B83C') : f.box>=3?starSVG('#9A6AE8') : f.seen>0?starSVG('#D9CFF0'):starSVG('#EEE8F8')).join('')+'<span style="margin-left:6px">'+sure+' von 10 sicher'+(S.best.rows[r]?' · Rekord '+(S.best.rows[r]/1000).toFixed(1).replace('.',',')+' s':'')+'</span>';
+  $('islProgress').innerHTML=facts.map(f=> f.box>=5?starSVG('#F2B83C') : f.box>=3?starSVG('#9A6AE8') : f.seen>0?starSVG('#D9CFF0'):starSVG('#EEE8F8')).join('')+'<span style="margin-left:6px">'+(()=>{ const op=unlockedRows(S), nx=nextLockedRow(S); return (r===op[op.length-1]&&nx!==null)? Math.min(sure,8)+' von 8 für die '+nx+'er-Insel' : sure+' von 10 sicher'; })()+(S.best.rows[r]?' · Rekord '+(S.best.rows[r]/1000).toFixed(1).replace('.',',')+' s':'')+'</span>';
   const an=$('islStage').querySelector('.isl-animal');
-  if(an) an.addEventListener('click',()=>{ an.classList.remove('hop'); void an.getBBox(); an.classList.add('hop'); smallSparkle(); sndGood(); const t=islandLine(r); $('islBubble').textContent=t; speak(t); });
+  if(an){ an.style.cursor='pointer'; an.addEventListener('click',()=>{ an.classList.remove('hop'); void an.getBBox(); an.classList.add('hop'); smallSparkle(); sndGood(); const t=nextIslandLine(r); $('islBubble').textContent=t; speak(t); }); }
   renderShop(r);
   show('island');
   speak(line);
