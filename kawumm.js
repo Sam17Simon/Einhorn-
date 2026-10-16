@@ -104,7 +104,7 @@ if(typeof document!=='undefined'){
 
 const KW_INK='#3B2A52';
 const KW_IMG='assets/kawumm.png?v=1';
-const KW_VOICE={rate:1.08, pitch:0.85, alt:true};   // Kawumm klingt tiefer als Lumi (Lumi: 1.14)
+const KW_VOICE={rate:1.12, pitch:1.0, alt:true};    // natürliche Tonhöhe, etwas schneller und frecher als Lumi (Lumi: Tonhöhe 1.14, Tempo 1.04)
 let kwTest=false;                                    // Testmodus aus dem Elternbereich, gilt bis zum Neustart
 let KR=null;                                         // laufende Schatzsuche
 let kwVaultRet='path';
