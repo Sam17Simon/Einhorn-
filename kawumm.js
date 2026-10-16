@@ -582,7 +582,7 @@ function kwRenderLayerAt(k, noOpts){
   L.style.transition='none'; L.style.transform='none';
   const r=KR.r, cur=k*r;
   let h='<svg class="kwpath" viewBox="0 0 100 100" preserveAspectRatio="none">';
-  if(!noOpts && k>=1) KW_OPT_X.forEach(x=>{ h+='<path d="M50 '+(KW_ST.y*100+6)+' Q'+((50+x*100)/2)+' '+((KW_ST.y+KW_OPT_Y)*50)+' '+(x*100)+' '+(KW_OPT_Y*100-8)+'" fill="none" stroke="'+((KR.world&&KR.world.path)||'#fff')+'" stroke-width="3" stroke-dasharray="2 9" stroke-linecap="round" vector-effect="non-scaling-stroke" opacity=".9"/>'; });
+  // keine Linien zwischen den Inseln (Entscheidung Simon)
   h+='</svg>';
   h+='<div class="kwst" style="left:'+(KW_ST.x*100)+'%;top:'+(KW_ST.y*100)+'%">'+kwStationHTML(cur,false)+'</div>';
   KR.opts=[];
