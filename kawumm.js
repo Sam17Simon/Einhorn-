@@ -40,26 +40,43 @@ function kwAvailable(kw, fwdShare){
 }
 /* Wie viel Hilfe die Karte zeigt:
    sea1 = Meer, Anfang: kommende Zahlen schwach sichtbar
-   sea2 = Meer nach einer fehlerfreien Fahrt: kommende Zahlen als ?, gefahrene Spur bleibt sichtbar
+   sea2 = Meer ohne Hilfe (nach einer Fahrt mit höchstens 1 Fehler): kommende Zahlen als ?, gefahrene Spur bleibt sichtbar
    space = Weltall: nur die aktuelle Zahl und der Sprung */
-function kwHelpMode(rs){ return rs.stage==='space' ? 'space' : (rs.clean>=1 ? 'sea2' : 'sea1'); }
-/* Plan einer Fahrt: Start (Super-Speed im Weltall startet mitten in der Reihe) und wo Störenfriede kommen.
-   Ein Störenfried legt sich auf die drei Inseln (oder taucht sie unter, schnappt sie ...), dann tippt Romy die Zahl selbst ein.
-   Meer: erst wenn die Zahlen nicht mehr vorgezeigt werden (nach einer sauberen Fahrt), höchstens einmal pro Fahrt.
-   Weltall: öfter, nie zweimal hintereinander. Nie im ersten Schritt, nie in der allerersten Fahrt. */
+function kwHelpOff(rs){ if(rs.helpOff===undefined) rs.helpOff = rs.clean>=1 || rs.stage==='space'; return rs.helpOff; }
+function kwHelpMode(rs){ return rs.stage==='space' ? 'space' : (kwHelpOff(rs) ? 'sea2' : 'sea1'); }
+/* Wohin sich ein Störenfried setzen darf. Eintippen ist die schwerste Übung und gehört dorthin, wo es fast sitzt.
+   Wackelige Schritte (Fach 0 und 1) behalten immer ihre Inseln als Stütze. Am liebsten Fach 2 und 3: richtig, aber noch nicht blitzschnell. */
+function kwCoverWeight(st){ if(!st || st.seen===0 || st.box<2) return 0; return st.box<=3 ? 3 : st.box===4 ? 1.5 : 1; }
+/* Plan einer Fahrt: Start (Super-Speed / Rückenwind starten mitten in der Reihe) und wo Störenfriede kommen.
+   Meer: nur ohne Hilfe (sea2), höchstens einmal pro Fahrt, gezielt auf einen fast sicheren Schritt.
+   Weltall: öfter, nur fast sichere Schritte, nie zweimal hintereinander. Nie im ersten Schritt, nie in der allerersten Fahrt. */
 function kwPlanRun(rs, rng){
   rng=rng||Math.random;
   let startK=10, superSpeed=false;
   if(rs.stage==='space' && rs.runs>0 && rng()<0.35){ startK=5+Math.floor(rng()*4); superSpeed=true; }
+  else if(rs.stage==='sea' && kwHelpOff(rs) && rs.runs>0 && rng()<0.2){ startK=6+Math.floor(rng()*4); superSpeed=true; }
   const covers=[];
-  if(rs.stage==='space'){
-    let last=false;
-    for(let k=startK;k>=1;k--){ const c = rs.runs>0 && k!==startK && !last && rng()<0.3; if(c) covers.push(k); last=c; }
-  } else if(rs.clean>=1 && rs.runs>0 && rng()<0.7){
-    covers.push(1+Math.floor(rng()*(startK-1)));
+  if(rs.runs>0){
+    if(rs.stage==='space'){
+      let last=false;
+      for(let k=startK;k>=1;k--){
+        const w=k===startK?0:kwCoverWeight(rs.steps[k]);
+        const c = w>0 && !last && rng() < (w>=3?0.45:0.25);
+        if(c) covers.push(k); last=c;
+      }
+    } else if(kwHelpOff(rs) && rng()<0.7){
+      const cand=[]; for(let k=startK-1;k>=1;k--){ const w=kwCoverWeight(rs.steps[k]); if(w>0) cand.push([k,w]); }
+      let sum=cand.reduce((a,c)=>a+c[1],0), t=rng()*sum;
+      for(const [k,w] of cand){ t-=w; if(t<=0){ covers.push(k); break; } }
+    }
   }
   return {startK, superSpeed, covers};
 }
+/* Wiederholung: Karten im Weltall kommen nach einer Pause wieder dran, die Pause wird jedes Mal länger.
+   Klappt die Wiederholung nicht (mehr als 1 Fehler), geht es wieder mit kurzer Pause los. */
+const KW_REVIEW_DAYS=[2,4,8,16,30];
+function kwIsDue(rs, now){ return !!(rs && rs.stage==='space' && rs.last && now-rs.last >= KW_REVIEW_DAYS[Math.min(rs.reviews||0, KW_REVIEW_DAYS.length-1)]*86400000); }
+function kwDueIn(rs, now){ if(!rs||rs.stage!=='space'||!rs.last) return null; return Math.max(0, Math.ceil((rs.last + KW_REVIEW_DAYS[Math.min(rs.reviews||0, KW_REVIEW_DAYS.length-1)]*86400000 - now)/86400000)); }
 /* Drei Inseln zur Wahl: richtige Zahl plus typische Rückwärts-Fehler.
    Zahl übersprungen (zwei Sprünge), nur 1 weggenommen, Zehnerübergang vergessen (32-4 -> 38). */
 function kwOptions(r, k, rng){
@@ -82,21 +99,36 @@ function kwApplyStep(s, correct, rt){
   if(correct){ s.ok++; if(rt<=KW_FAST) s.box=Math.min(5,s.box+1); else if(s.box<2) s.box++; }
   else { s.no++; s.box=Math.max(0, Math.min(s.box,1)); }
 }
-/* Fahrt beendet. clean = alles richtig und schnell. Zwei saubere Fahrten am Stück im Meer: ab ins Weltall. */
-function kwFinishRun(rs, clean){
-  const res={toSpace:false, find:false, full:false};
+/* Fahrt beendet. st = {clean, errors, mode}. clean = alles richtig und schnell.
+   Meer mit Hilfe (sea1): höchstens 1 Fehler, dann ist die Hilfe weg. Zählt nie fürs Weltall.
+   Meer ohne Hilfe (sea2): zwei saubere Fahrten am Stück, dann ab ins Weltall. 4 Fehler oder mehr: die Hilfe kommt zurück. */
+function kwFinishRun(rs, st, now){
+  if(typeof st==='boolean') st={clean:st, errors:st?0:1, mode:kwHelpMode(rs)};   // alter Aufruf
+  now=now||Date.now();
+  const res={toSpace:false, find:false, full:false, helpOff:false, helpBack:false, review:false, reviewOk:false};
+  const wasDue=kwIsDue(rs, now);
   rs.runs++;
   if(rs.stage==='sea'){
-    rs.clean = clean ? rs.clean+1 : 0;
-    if(rs.clean>=2){ rs.stage='space'; res.toSpace=true; }
+    if(st.mode==='sea1'){
+      rs.clean=0;
+      if(st.errors<=1){ rs.helpOff=true; res.helpOff=true; }
+    } else {
+      rs.clean = st.clean ? rs.clean+1 : 0;
+      if(rs.clean>=2){ rs.stage='space'; rs.reviews=0; res.toSpace=true; }
+      else if(st.errors>=4){ rs.helpOff=false; res.helpBack=true; }
+    }
+  } else if(wasDue){
+    res.review=true; res.reviewOk = st.errors<=1;
+    rs.reviews = res.reviewOk ? (rs.reviews||0)+1 : 0;
   }
+  rs.last=now;
   if(rs.finds<KW_CAP){ rs.finds++; res.find=true; res.full = rs.finds===KW_CAP; }
   return res;
 }
 /* ================= KW-LOGIC-END ================= */
 
 if(typeof module!=='undefined' && module.exports){
-  module.exports={KW_ORDER,KW_CAP,kwDefault,kwRowState,kwRowSafe,kwAvailable,kwHelpMode,kwPlanRun,kwOptions,kwApplyStep,kwFinishRun};
+  module.exports={KW_ORDER,KW_CAP,kwDefault,kwRowState,kwRowSafe,kwAvailable,kwHelpMode,kwHelpOff,kwPlanRun,kwOptions,kwApplyStep,kwFinishRun,kwIsDue,kwDueIn,kwCoverWeight};
 }
 
 /* ===================== Oberfläche ===================== */
@@ -108,6 +140,7 @@ const KW_VOICE={rate:1.12, pitch:1.0, alt:true};    // natürliche Tonhöhe, etw
 let kwTest=false;                                    // Testmodus aus dem Elternbereich, gilt bis zum Neustart
 let KR=null;                                         // laufende Schatzsuche
 let kwVaultRet='path';
+let kwDueSaid=false;
 
 function kws(){ if(!S.kw) S.kw=kwDefault(); return S.kw; }
 function kwActive(){ return kwTest || (KW_LIVE && kws().joined); }
@@ -128,6 +161,7 @@ const KW_LINES={
   ok:['Kawumm! Richtig!','Volltreffer, Käpt\'n!','Hab ich doch gewusst!','Ha! Zu leicht für uns!','Weiter so!','Genau da lang!','Sauber gesegelt!'],
   wrong:['Huch, das war nur Nebel! Es geht zur {n}.','Ui, fast! Die richtige Insel ist die {n}.','Ups! Das passiert sogar mir. Wir segeln zur {n}.','Hoppla! Kein Problem, Piraten probieren weiter. Es ist die {n}.'],
   wrongSpace:['Huch, das war nur ein Sternennebel! Es geht zur {n}.','Ups, falscher Planet! Wir fliegen zur {n}.'],
+  wind:['Rückenwind! Wir rauschen ein Stück weiter!','Huch, eine Windböe! Schon sind wir bei der {n}!','Segel voll Wind! Weiter geht es bei der {n}!'],
   speed:['Super-Speed! Festhalten!','Kawumm-Turbo! Wir springen ein Stück weiter!','Wusch! Mit Super-Speed sind wir schon bei der {n}!'],
   treasure:['Schatz gefunden! Kawumm!','Da ist die Schatzkiste! Ich wusste es!','Juhu! Wir sind reich!']
 };
@@ -463,6 +497,8 @@ button.kwwait:active{transform:none;}
 .kwhint{display:block; margin-top:6px; background:#fff; border:2px solid #E04A40; border-radius:14px; padding:6px 10px; color:${KW_INK}; font-size:14px;}
 .islcard.kwhi{border-color:#E04A40; animation:kwhi 1.1s ease-in-out 6;}
 .kwmapcard .btns{display:flex; gap:8px; flex-wrap:wrap;}
+.kwbadge.due{background:#F2B83C; color:${KW_INK}; animation:kwduepulse 1.6s ease-in-out infinite;}
+@keyframes kwduepulse{50%{transform:scale(1.08)}}
 .kwbadge{display:inline-block; align-self:flex-start; background:#E04A40; color:#fff; font-size:11px; font-weight:800; border-radius:999px; padding:1px 8px; margin-top:2px;}
 /* Schatzkammer */
 .kwvault{flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:12px; padding-block:6px 30px; align-items:center;}
@@ -562,7 +598,7 @@ function kwStart(r, ret){
 /* Super-Speed: Kawumm überfliegt die ersten Stationen, die Zahlen leuchten dabei kurz auf */
 function kwSuperSpeed(){
   const my=KR.id, r=KR.r, target=KR.plan.startK;
-  kwBanner('Super-Speed!',1500); sndWhoosh();
+  kwBanner(KR.space?'Super-Speed!':'Rückenwind!',1500); sndWhoosh();
   const s=kwShip(); s.classList.remove('sway'); void s.offsetWidth; s.classList.add('zoom');
   let j=10;
   const tick=()=>{
@@ -572,7 +608,7 @@ function kwSuperSpeed(){
     if(j>target) setTimeout(tick,340);
     else {
       kwRenderLayer();
-      kwSayLine(kwPick(KW_LINES.speed).replace('{n}',target*r));
+      kwSayLine(kwPick(KR.space?KW_LINES.speed:KW_LINES.wind).replace('{n}',target*r));
       setTimeout(()=>{ if(!KR||KR.id!==my) return; s.classList.remove('zoom'); s.classList.add('sway'); kwStep(); },1300);
     }
   };
@@ -734,7 +770,8 @@ function kwTreasure(ai){
   const r=KR.r, rs=KR.rs, before=kwAvail();
   // die letzte Insel bekommt die Schatzkiste
   const btns=$('kwLayerIn').querySelectorAll('.kwopt'); if(btns[ai]) btns[ai].innerHTML=kwStationHTML(0,true);
-  const res=kwFinishRun(rs, KR.clean);
+  const wasDue=kwIsDue(rs, Date.now());
+  const res=kwFinishRun(rs, {clean:KR.clean, errors:KR.steps-KR.ok, mode:KR.mode}, Date.now());
   bumpStreak(S,Date.now()); save();
   const after=kwAvail(), newRow=after.find(x=>!before.includes(x));
   const box=KW_BOX[r];
@@ -743,6 +780,10 @@ function kwTreasure(ai){
   if(res.find) lines.push(res.full ? (cap(box.a)+'! Jetzt ist '+artDet(r)+' '+box.name+' ganz voll. Kawumm, ist das schön!') : (cap(box.a)+' für '+artAcc(r)+' '+box.name+'!'));
   else lines.push(cap(artNom(r))+' '+box.name+' ist schon ganz voll. Du bist eine echte Schatzjägerin!');
   if(res.toSpace) lines.push('Du bist so gut! Bei der '+r+'er-Karte fliegen wir ab jetzt ins Weltall!');
+  else if(res.review) lines.push(res.reviewOk ? 'Super! Du hast die '+r+'er-Karte nicht vergessen!' : 'Gut, dass wir nochmal gefahren sind! Bald fahren wir sie wieder.');
+  else if(res.helpOff) lines.push('Ab jetzt zeigt die Karte die Zahlen nicht mehr vor. Du schaffst das auch so!');
+  else if(res.helpBack) lines.push('Die Karte hilft dir wieder ein bisschen. Das ist ganz normal.');
+  else if(rs.stage==='sea' && KR.mode==='sea1') lines.push('Schaffst du die Fahrt mit höchstens einem Fehler? Dann geht es ohne Hilfe weiter!');
   else if(rs.stage==='sea') lines.push(rs.clean>=1 ? 'Noch eine Fahrt ohne Fehler und ganz schnell, dann geht es ins Weltall!' : 'Schaffst du zwei Fahrten ohne Fehler und ganz schnell? Dann fliegen wir ins Weltall!');
   if(newRow) lines.push('Und weißt du was? Es gibt eine neue Schatzkarte: die '+newRow+'er-Reihe rückwärts! Ich warte auf der '+newRow+'er-Insel.');
   const my=KR.id;
@@ -841,8 +882,8 @@ function kwIslandCard(r){
   el.hidden=false;
   const kw=kws(), av=kwAvail(), rs=kw.rows[r];
   if(av.includes(r)){
-    const space=rs&&rs.stage==='space';
-    el.innerHTML='<div class="kwcard"><img src="'+KW_IMG+'" alt=""><div class="tx"><b>Schatzsuche mit Kawumm</b>Die '+r+'er-Reihe rückwärts. '+(space?'Ab ins Weltall!':'Im Meer.')+'<small>'+((rs&&rs.finds)||0)+' von '+KW_CAP+' Schätzen für '+artAcc(r)+' '+KW_BOX[r].name+'</small></div><button class="kwbtn" id="kwIslGo">Los!</button></div>';
+    const space=rs&&rs.stage==='space', due=kwIsDue(rs,Date.now());
+    el.innerHTML='<div class="kwcard"><img src="'+KW_IMG+'" alt=""><div class="tx"><b>'+(due?'Hier wartet noch ein Schatz!':'Schatzsuche mit Kawumm')+'</b>'+(due?'Weißt du die '+r+'er-Reihe rückwärts noch? ':'Die '+r+'er-Reihe rückwärts. ')+(space?'Ab ins Weltall!':'Im Meer.')+'<small>'+((rs&&rs.finds)||0)+' von '+KW_CAP+' Schätzen für '+artAcc(r)+' '+KW_BOX[r].name+'</small></div><button class="kwbtn" id="kwIslGo">Los!</button></div>';
     $('kwIslGo').onclick=()=>kwStart(r,'island');
     kwArm(el);
   } else {
@@ -857,15 +898,22 @@ function kwMapCard(list){
   const av=kwAvail(), open=unlockedRows(S);
   const loose=av.filter(r=>!open.includes(r));     // Karte ohne offene Insel (z. B. die Einser zu Beginn)
   const d=document.createElement('div'); d.className='kwcard kwmapcard';
-  d.innerHTML='<img src="'+KW_IMG+'" alt=""><div class="tx"><b>Kawumms Schiff</b>Hier liegt die Schatzkammer.'+(loose.length?' Und eine Schatzkarte, die direkt am Schiff startet!':'')+'</div><div class="btns">'
-    +loose.map(r=>'<button class="kwbtn" data-kwr="'+r+'">'+r+'er rückwärts</button>').join('')
+  const due=kwDueRows();
+  const dueIsl=due.filter(r=>open.includes(r)), dueShip=due.filter(r=>!open.includes(r));
+  const dueLine = dueIsl.length ? 'Auf der '+dueIsl.map(r=>r+'er').join(' und der ')+'-Insel wartet noch ein Schatz!' : dueShip.length ? 'Hier am Schiff wartet noch ein Schatz! Die '+dueShip[0]+'er-Karte.' : '';
+  const dueTxt = dueLine ? ' '+dueLine : '';
+  d.innerHTML='<img src="'+KW_IMG+'" alt=""><div class="tx"><b>Kawumms Schiff</b>Hier liegt die Schatzkammer.'+(loose.length?' Und eine Schatzkarte, die direkt am Schiff startet!':'')+dueTxt+'</div><div class="btns">'
+    +loose.map(r=>'<button class="kwbtn" data-kwr="'+r+'">'+r+'er rückwärts'+(due.includes(r)?' ★':'')+'</button>').join('')
     +'<button class="kwbtn sec" id="kwMapVault">Schatzkammer</button></div>';
   list.appendChild(d);
   kwArm(d);
+  // einmal pro App-Start erinnern, wenn ein alter Schatz wartet
+  if(due.length && !kwDueSaid){ kwDueSaid=true; setTimeout(()=>{ if(current==='path') kwSay('Ahoi! '+dueLine+' Weißt du die Karte noch?'); },1200); }
   d.querySelectorAll('[data-kwr]').forEach(b=>b.addEventListener('click',()=>kwStart(+b.dataset.kwr,'path')));
   d.querySelector('#kwMapVault').addEventListener('click',()=>kwOpenVault('path'));
 }
-function kwMapBadge(r){ return kwActive() && kwAvail().includes(r) ? '<span class="kwbadge">Schatzkarte</span>' : ''; }
+function kwDueRows(){ const kw=kws(), now=Date.now(); return kwAvail().filter(r=>kwIsDue(kw.rows[r],now)); }
+function kwMapBadge(r){ if(!kwActive()||!kwAvail().includes(r)) return ''; return kwDueRows().includes(r) ? '<span class="kwbadge due">Schatz wartet!</span>' : '<span class="kwbadge">Schatzkarte</span>'; }
 
 /* ---------- Brief: Kawumm fragt, ob sie kommen darf ---------- */
 function kwShowLetter(fromParent){
@@ -942,13 +990,14 @@ function kwParentHTML(){
   let rows='';
   for(const r of KW_ORDER){
     const rs=kw.rows[r], a=av.includes(r);
-    rows+='<tr><td>'+r+'er</td><td>'+(a?(rs&&rs.stage==='space'?'Weltall':'Meer'):'zu')+'</td><td>'+(rs?kwRowSafe(rs)+' / 10':'–')+'</td><td>'+(rs?rs.finds:0)+'</td><td>'+(rs?rs.runs:0)+'</td><td>'+(a?'<button class="smallbtn" data-kwgo="'+r+'">Starten</button> <button class="smallbtn" data-kwst="'+r+'">'+(rs&&rs.stage==='space'?'→ Meer':'→ Weltall')+'</button>':'')+'</td></tr>';
+    const dueIn=kwDueIn(rs,Date.now()), stg=a?(rs&&rs.stage==='space'?'Weltall'+(dueIn===0?' · fällig':dueIn!==null?' · in '+dueIn+' T':''):(rs&&kwHelpOff(rs)?'Meer ohne Hilfe':'Meer')):'zu';
+    rows+='<tr><td>'+r+'er</td><td>'+stg+'</td><td>'+(rs?kwRowSafe(rs)+' / 10':'–')+'</td><td>'+(rs?rs.finds:0)+'</td><td>'+(rs?rs.runs:0)+'</td><td>'+(a?'<button class="smallbtn" data-kwgo="'+r+'">Starten</button> <button class="smallbtn" data-kwst="'+r+'">'+(rs&&rs.stage==='space'?'→ Meer':'→ Weltall')+'</button>'+(rs&&rs.stage==='space'?' <button class="smallbtn" data-kwdue="'+r+'">fällig machen</button>':''):'')+'</td></tr>';
   }
   return '<p style="margin:2px 0;font-size:13px;color:var(--muted)">'+(KW_LIVE?'Live: Romy sieht Kawumm, sobald der Brief angenommen ist.':'Noch nicht live: Romy sieht davon nichts. Testmodus gilt nur bis zum Neustart der App.')+' Brief angenommen: <b>'+(kw.joined?'ja':'nein')+'</b>.</p>'
     +'<div class="setrow"><label>Testmodus (Kawumm auf Inseln und Karte zeigen)</label><button class="toggle'+(kwTest?' on':'')+'" id="kwTestTgl" role="switch" aria-checked="'+kwTest+'" aria-label="Testmodus"><i></i></button></div>'
     +'<div class="btnrow" style="justify-content:flex-start"><button class="smallbtn" id="kwLetterBtn">Brief ansehen</button><button class="smallbtn" id="kwVaultBtn">Schatzkammer öffnen</button><button class="smallbtn" id="kwVoiceBtn">Kawumms Stimme</button><button class="smallbtn" id="kwLetterReset">Brief zurücksetzen</button><button class="smallbtn danger" id="kwReset">Kawumm-Stand löschen</button></div>'
     +'<table class="kwtable"><tr><th>Reihe</th><th>Stufe</th><th>sicher</th><th>Schätze</th><th>Fahrten</th><th></th></tr>'+rows+'</table>'
-    +'<p style="margin:4px 0;font-size:12px;color:var(--muted)">Neue Karte kommt, wenn die Karte davor im Meer geschafft ist (2 Fahrten am Stück ohne Fehler, alle Antworten unter 4 s) und die eigene Vorwärtsreihe 5 von 10 lila Sterne hat.</p>'
+    +'<p style="margin:4px 0;font-size:12px;color:var(--muted)">Meer mit Hilfe: Fahrt mit höchstens 1 Fehler, dann ohne Hilfe. Ins Weltall: 2 Fahrten am Stück ohne Hilfe, ohne Fehler, alle Antworten unter 4 s. Neue Karte kommt, wenn die Karte davor im Weltall ist und die eigene Vorwärtsreihe 5 von 10 lila Sterne hat. Weltall-Karten kommen zur Wiederholung nach 2, 4, 8, 16, 30 Tagen.</p>'
     +'<div id="kwMsg" style="font-size:13px;color:var(--muted);font-weight:700;"></div>';
 }
 function kwParentWire(){
@@ -962,7 +1011,8 @@ function kwParentWire(){
   $('kwReset').onclick=()=>{ if(!armed){ armed=true; $('kwReset').textContent='Wirklich? Nochmal tippen'; setTimeout(()=>{ armed=false; const b=$('kwReset'); if(b) b.textContent='Kawumm-Stand löschen'; },4000); return; }
     S.kw=kwDefault(); save(); renderParent(); };
   document.querySelectorAll('[data-kwgo]').forEach(b=>b.onclick=()=>kwStart(+b.dataset.kwgo,'parent'));
-  document.querySelectorAll('[data-kwst]').forEach(b=>b.onclick=()=>{ const rs=kwRowState(kw,+b.dataset.kwst); rs.stage=rs.stage==='space'?'sea':'space'; rs.clean=0; save(); renderParent(); });
+  document.querySelectorAll('[data-kwdue]').forEach(x=>x.onclick=()=>{ const rs=kw.rows[+x.dataset.kwdue]; rs.last=Date.now()-31*86400000; save(); renderParent(); });
+  document.querySelectorAll('[data-kwst]').forEach(b=>b.onclick=()=>{ const rs=kwRowState(kw,+b.dataset.kwst); rs.stage=rs.stage==='space'?'sea':'space'; rs.clean=0; rs.helpOff=rs.stage==='space'; rs.last=Date.now(); rs.reviews=0; save(); renderParent(); });
 }
 
 /* ---------- Start ---------- */
