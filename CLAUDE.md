@@ -66,7 +66,7 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 
 ## Kawumm: Rückwärtsreihen (seit v38, noch nicht live)
 - Alles in `kawumm.js` (vor dem Hauptskript geladen). Lernlogik oben zwischen KW-LOGIC-START/END, in Node testbar (`require('./kawumm.js')`). Bild: `assets/kawumm.png` (freigestellte Vorlage von Simon, nicht nachzeichnen). Spiegeln nur per CSS `scaleX(-1)`.
-- Live schalten: `KW_LIVE = true` in kawumm.js. Dann kommt beim Öffnen nach dem Intro einmal der Brief ("Post für Romy", Button "Ja, komm vorbei!" erst nach dem Vorlesen, mind. 5 s). Bis dahin sieht Romy nichts.
+- Live schalten: `KW_LIVE = true` in kawumm.js. Dann kommt beim Öffnen nach dem Intro einmal der Brief ("Post für Romy", Brief wird nicht vorgelesen, Romy liest selbst. Button "Ja, komm vorbei!" nach `KW_READ_MS` (15 s)). Bis dahin sieht Romy nichts.
 - Elternbereich, Abschnitt Kawumm: Testmodus (nur bis Neustart), Brief ansehen, Schatzkammer, Stimme, Brief zurücksetzen, Kawumm-Stand löschen, je Reihe Starten und Stufe umschalten.
 - Stand liegt getrennt in `S.kw` = {joined, rows:{reihe:{stage:'sea'|'space', clean, runs, finds, steps:{k:{box,...}}}}}. Schritt k = von k·r nach (k-1)·r. Nie mit `S.facts` vermischen.
 - Freischaltung: Start immer mit 1er rückwärts. Nächste Karte in `KW_ORDER` (1,2,10,5,4,8,3,6,9,7) nur, wenn die Karte davor im Weltall ist UND die eigene Vorwärtsreihe 5 von 10 lila hat. Ins Weltall: 2 Fahrten am Stück ohne Fehler, alle Antworten unter 4 s.

@@ -14,6 +14,7 @@ const KW_FWD_SHARE = 0.5;     // eigene Vorwärtsreihe halbwegs: 5 von 10 Aufgab
 const KW_FAST = 4000;         // schnelle Antwort wie vorwärts
 const KW_SAFE_BOX = 3;
 const KW_CAP = 10;            // Schätze pro Sammelbehälter
+const KW_READ_MS = 15000;     // Lesezeit für den Brief, bevor "Ja, komm vorbei!" erscheint
 
 /* ================= KW-LOGIC-START ================= */
 function kwDefault(){ return {joined:false, rows:{}}; }
@@ -624,14 +625,13 @@ function kwShowLetter(fromParent){
   $('overlay').classList.add('show');
   [523,659,523,784].forEach((f,i)=>tone(f,.14,i*0.12,'triangle',.08));
   speak('Post für '+name+'!');
-  let shown=false, opened=Date.now();
+  let shown=false;
   const showYes=()=>{ if(shown) return; shown=true; $('kwYes').classList.add('show'); };
   setTimeout(()=>{
     $('kwEnv').classList.add('open');
     setTimeout(()=>{ $('kwEnv').classList.add('away'); const p=$('kwPaper'); p.classList.add('show'); void p.offsetWidth; p.classList.add('in');
-      kwSay('Ahoi '+name+'! Hier ist Kawumm, die Piratin. Ich habe gehört, dass du mit Lumi die Inseln rettest. Wie mutig! Ich habe Schatzkarten. Aber meine Karten sind verrückt: Man muss sie rückwärts lesen. Darf ich zu dir kommen und mitmachen?',
-        ()=>setTimeout(showYes, Math.max(0, 5000-(Date.now()-opened))));
-      setTimeout(showYes, 16000);
+      // Den Brief liest Romy selbst. Nichts vorlesen, der Knopf kommt nach Lesezeit.
+      setTimeout(showYes, KW_READ_MS);
     },650);
   },1300);
   $('kwYes').onclick=()=>{ kws().joined=true; save(); kwWelcome(fromParent); };
