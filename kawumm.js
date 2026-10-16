@@ -113,7 +113,10 @@ function kws(){ if(!S.kw) S.kw=kwDefault(); return S.kw; }
 function kwActive(){ return kwTest || (KW_LIVE && kws().joined); }
 function kwFwd(r){ return rowMastery(S,r); }
 function kwAvail(){ return kwAvailable(kws(), kwFwd); }
-function kwSay(t,cb){ speak(t,cb,KW_VOICE); }
+/* Vorlesen. Jeder neue Tipp bricht den laufenden Satz ab (kwHush). Nach einem Abbruch 150 ms warten, sonst verschluckt Chrome den nächsten Satz. */
+let kwHushAt=0;
+function kwSay(t,cb){ const wait=150-(Date.now()-kwHushAt); if(wait>0) setTimeout(()=>speak(t,cb,KW_VOICE),wait); else speak(t,cb,KW_VOICE); }
+function kwHush(){ try{ speakSeq++; speechSynthesis.cancel(); }catch(e){} kwHushAt=Date.now(); }
 function kwPick(a){ return a[Math.floor(Math.random()*a.length)]; }
 function kwNum(n){ return n===1?'eins':String(n); }
 function kwNoRainbow(g){ const c=Object.assign({}, gearOf(g)); delete c.rainbow; return c; }
@@ -380,7 +383,7 @@ kwCSS.textContent=`
 .kwstrip b.faint{opacity:.38;}
 .kwstrip b.zip{animation:kwzip .5s ease;}
 @keyframes kwzip{0%{transform:scale(1.6); background:#FFE27A}100%{transform:scale(1)}}
-.kwsay{position:absolute; left:10px; right:10px; bottom:10px; z-index:4; background:rgba(255,255,255,.95); border-radius:16px; padding:6px 12px; font-weight:700; font-size:15px; text-align:center; color:${KW_INK}; min-height:1.6em; pointer-events:none;}
+.kwsay{display:none; position:absolute; left:10px; right:10px; bottom:10px; z-index:4; background:rgba(255,255,255,.95); border-radius:16px; padding:6px 12px; font-weight:700; font-size:15px; text-align:center; color:${KW_INK}; min-height:1.6em; pointer-events:none;}
 .kwbanner{position:absolute; top:34%; left:50%; transform:translate(-50%,-50%) scale(0); z-index:5; background:#E04A40; color:#fff; font-family:var(--font-disp); font-weight:700; font-size:28px; padding:6px 22px; border-radius:999px; white-space:nowrap; transition:transform .35s cubic-bezier(.3,1.4,.5,1); pointer-events:none;}
 .kwbanner.show{transform:translate(-50%,-50%) scale(1);}
 .kwend{position:absolute; inset:0; z-index:6; background:rgba(251,247,254,.96); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:16px; text-align:center; overflow-y:auto;}
@@ -504,7 +507,7 @@ function kwPlaceShip(xr, yr, animate){
   s.style.left=(xr*w)+'px'; s.style.top=(yr*h - islH*0.18)+'px';
   if(!animate){ void s.offsetWidth; s.style.transition=''; }
 }
-function kwSayLine(t){ const el=$('kwSay'); if(el) el.textContent=t; kwSay(t); }
+function kwSayLine(t){ kwSay(t); }
 function kwBanner(t,ms){ const b=$('kwBanner'); b.textContent=t; b.classList.add('show'); setTimeout(()=>b.classList.remove('show'), ms||1400); }
 
 function kwStart(r, ret){
@@ -536,7 +539,6 @@ function kwStart(r, ret){
   } else {
     kwRenderStrip();
     const how = 'Wir starten bei '+(10*r)+'. Immer '+kwNum(r)+' zurück. Wohin segeln wir?';
-    $('kwSay').textContent=open;
     kwSay(open+' '+how);
     setTimeout(()=>{ if(!KR||KR.id!==my) return; kwStep(); }, 600);
   }
@@ -603,7 +605,6 @@ function kwStep(){
   if(KR.plan.covers.includes(KR.k)){ kwBlock(); return; }
   if(KR.steps>0){
     // kurz die Zahl sagen, damit der Weg hörbar bleibt
-    $('kwSay').textContent=cur+'. Und weiter?';
     if(KR.steps<3) kwSay(cur+'. Und weiter?'); else kwSay(String(cur));
   }
   KR.busy=false; KR.t=performance.now();
@@ -631,7 +632,7 @@ function kwBlock(){
   $('kwMap').appendChild(pad);
   pad.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>kwType(b.dataset.k)));
   const line=kwPick(c.say);
-  setTimeout(()=>{ if(!KR||KR.id!==my) return; pad.classList.add('show'); $('kwSay').textContent=line; kwSay(line+' Tipp die Zahl ein!'); KR.busy=false; KR.t=performance.now(); }, 700);
+  setTimeout(()=>{ if(!KR||KR.id!==my) return; pad.classList.add('show'); kwSay(line+' Tipp die Zahl ein!'); KR.busy=false; KR.t=performance.now(); }, 700);
 }
 function kwType(k){
   if(!KR||KR.busy||!KR.block) return;
@@ -683,7 +684,7 @@ function kwChoose(i){
   if(correct){
     sndGood(); $('kwStars').textContent=S.stars;
     const b=btns[ai].getBoundingClientRect(); burst(18,(b.left+b.width/2)/innerWidth,(b.top+b.height/2)/innerHeight,6);
-    if(Math.random()<0.4) kwSayLine(kwPick(KW_LINES.ok)); else $('kwSay').textContent=kwPick(KW_LINES.ok);
+    if(Math.random()<0.4) kwSayLine(kwPick(KW_LINES.ok));
     kwSail(ai,0);
   } else {
     sndAgain();
@@ -920,6 +921,10 @@ function kwParentWire(){
 }
 
 /* ---------- Start ---------- */
+document.addEventListener('pointerdown',e=>{
+  if(!e.target.closest('button')) return;
+  if(current==='kw'||current==='vault'||e.target.closest('.kwletterbox')) kwHush();
+},{capture:true, passive:true});
 function kwSetup(){
   $('kwBack').addEventListener('click',()=>kwLeave());
   $('kwVaultBack').addEventListener('click',()=>{ if(kwVaultRet==='parent'){ renderParent(); show('parent'); } else { renderPath(); show('path'); } });
