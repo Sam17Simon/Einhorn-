@@ -444,10 +444,37 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
       <div class="islbubble" id="islBubble"></div>
       <div class="islprogress" id="islProgress"></div>
       <button class="cta" id="btnIslandRide">Inselritt starten</button>
+      <div id="islKw" hidden style="width:100%;display:flex;justify-content:center"></div>
       <h2 class="islh2">Insel ausbauen</h2>
       <div class="shop" id="islShop"></div>
       <div class="giftline" id="islGiftLine"></div>
     </div>
+  </section>
+
+  <!-- KAWUMM: Schatzsuche (kawumm.js) -->
+  <section class="screen" id="scr-kw">
+    <div class="bar">
+      <button class="iconbtn" id="kwBack" aria-label="Zurück">←</button>
+      <h1 class="isltitle" id="kwTitle"></h1>
+      <div class="spacer"></div>
+      <div class="starchip"><svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 16.9 5.9 20.4l1.5-6.8L2.2 9l6.9-.7z" fill="#F2B83C"/></svg><span id="kwStars">0</span></div>
+    </div>
+    <div class="kwstrip" id="kwStrip"></div>
+    <div class="kwmap" id="kwMap">
+      <div class="kwlayer" id="kwLayer"></div>
+      <div class="kwbanner" id="kwBanner"></div>
+      <div class="kwsay" id="kwSay"></div>
+      <div class="kwend" id="kwEnd" hidden></div>
+    </div>
+  </section>
+
+  <!-- KAWUMM: Schatzkammer -->
+  <section class="screen" id="scr-vault">
+    <div class="bar">
+      <button class="iconbtn" id="kwVaultBack" aria-label="Zurück">←</button>
+      <h1 style="font-family:var(--font-disp);font-size:24px;margin:0;">Kawumms Schatzkammer</h1>
+    </div>
+    <div class="kwvault" id="kwVault"></div>
   </section>
 
   <!-- RIDE -->
@@ -550,8 +577,9 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=37"></script>
-<script src="game.js?v=37"></script>
+<script src="islands.js?v=38"></script>
+<script src="game.js?v=38"></script>
+<script src="kawumm.js?v=38"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -864,14 +892,16 @@ function unlockSpeech(){
 }
 ['pointerdown','touchend','click','keydown'].forEach(ev=>document.addEventListener(ev,unlockSpeech,{capture:true,passive:true}));
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'){ try{ speechSynthesis.cancel(); }catch(e){} } });
-function makeUtt(text,mode){
+/* vo: andere Sprecherin (z. B. Kawumm): {rate, pitch, alt}. alt = im Weg 'voice' eine zweite deutsche Stimme nehmen, falls das Gerät eine hat. */
+function altVoice(){ const de=deVoices(), main=pickVoice(); return de.find(v=>v!==main&&v.localService) || de.find(v=>v!==main) || main; }
+function makeUtt(text,mode,vo){
   const u=new SpeechSynthesisUtterance(text);
-  u.rate=1.04; u.pitch=1.14; u.volume=1;
+  u.rate=(vo&&vo.rate)||1.04; u.pitch=(vo&&vo.pitch)||1.14; u.volume=1;
   if(mode==='lang'){ u.lang='de-DE'; }
-  else if(mode==='voice'){ const v=pickVoice(); if(v){ u.voice=v; u.lang=v.lang; } else u.lang='de-DE'; }
+  else if(mode==='voice'){ const v=(vo&&vo.alt)?altVoice():pickVoice(); if(v){ u.voice=v; u.lang=v.lang; } else u.lang='de-DE'; }
   return u;                                     // 'plain': gar nichts setzen, Gerätestandard
 }
-function speak(text, cb){
+function speak(text, cb, vo){
   let done=false; const fire=()=>{ if(done) return; done=true; cb&&cb(); };
   if(!S.sound || !('speechSynthesis' in window) || !text){ fire(); return; }
   const my=++speakSeq; speechDiag.calls++; speechDiag.lastText=String(text).slice(0,60);
@@ -885,7 +915,7 @@ function speak(text, cb){
     const mode=order[i]; let started=false, failed=false;
     const next=()=>{ if(failed||started||my!==speakSeq) return; failed=true; speechDiag.retries++; try{ ss.cancel(); }catch(e){} setTimeout(()=>go(i+1),150); };
     try{
-      const u=makeUtt(text,mode);
+      const u=makeUtt(text,mode,vo);
       u.onstart=()=>{ started=true; speechDiag.starts++; speechDiag.mode=mode;
         if(speechMode!==mode){ speechMode=mode; try{ localStorage.setItem('einhorn_speechMode',mode); }catch(e){} } };
       u.onend=fire;
@@ -1276,13 +1306,13 @@ function show(name){
 }
 document.querySelectorAll('#scr-end button').forEach(b=>b.addEventListener('click',maybeDailyBackup,{capture:true}));
 document.querySelectorAll('[data-home]').forEach(b=>b.addEventListener('click',()=>{ leaveActivity(); show('home'); }));
-function leaveActivity(){ stopRide(); stopRun(); clearInterval(bzTick); BZ=null; endRound(false); }
+function leaveActivity(){ stopRide(); stopRun(); clearInterval(bzTick); BZ=null; endRound(false); if(window.KW) KW.stop(); }
 
 /* Zeiterfassung: zählt nur in Übungs-Screens bei sichtbarem Tab */
 let secTimer=null;
 function trackScreen(){
   clearInterval(secTimer);
-  if(['practice','ride','blitz','run'].includes(current)){
+  if(['practice','ride','blitz','run','kw'].includes(current)){
     secTimer=setInterval(()=>{ if(document.visibilityState==='visible'){ logDay(S,Date.now(),1,0,0); if(Math.random()<0.1) save(); } },1000);
   }
 }
@@ -1965,6 +1995,7 @@ function renderPath(){
   const open=unlockedRows(S), next=nextLockedRow(S), W=IW();
   $('mapStarCount').textContent=starsAvail();
   const el=$('pathList'); el.innerHTML='';
+  if(window.KW) KW.mapCard(el);
   for(const r of ROW_ORDER){
     const facts=rowFacts(S,r);
     const stars=facts.map(f=> f.box>=5?starSVG('#F2B83C') : f.box>=3?starSVG('#9A6AE8') : f.seen>0?starSVG('#D9CFF0'):starSVG('#EEE8F8')).join('');
@@ -1974,7 +2005,8 @@ function renderPath(){
     b.innerHTML=W.islandSVG(r,{open:isOpen, mastered, built:islandBuilt(r), size:200})
       +'<div class="nm">'+r+'er · '+W.ISLANDS[r].title+'</div>'
       +'<div class="ministars">'+stars+'</div>'
-      +'<div class="st">'+(mastered?FRIENDS[r][1]+' ist wach ✨': isOpen?FRIENDS[r][1]+' wartet auf dich': r===next?'Schaff die '+open[open.length-1]+'er-Insel, dann kommt diese':'Kommt später dran')+'</div>';
+      +'<div class="st">'+(mastered?FRIENDS[r][1]+' ist wach ✨': isOpen?FRIENDS[r][1]+' wartet auf dich': r===next?'Schaff die '+open[open.length-1]+'er-Insel, dann kommt diese':'Kommt später dran')+'</div>'
+      +(isOpen&&window.KW?KW.badge(r):'');
     if(isOpen) b.addEventListener('click',()=>openIsland(r));
     else b.addEventListener('click',()=>{ speak(r===next?'Diese Insel taucht bald auf. Erst die '+open[open.length-1]+'er-Reihe schaffen!':'Diese Insel ist noch hinter den Wolken.'); });
     el.appendChild(b);
@@ -2028,6 +2060,7 @@ function openIsland(r){
   const an=$('islStage').querySelector('.isl-animal');
   if(an){ an.style.cursor='pointer'; an.addEventListener('click',()=>{ an.classList.remove('hop'); void an.getBBox(); an.classList.add('hop'); smallSparkle(); sndGood(); const t=nextIslandLine(r); $('islBubble').textContent=t; speak(t); }); }
   renderShop(r);
+  if(window.KW) KW.islandCard(r);
   show('island');
   speak(line);
 }
@@ -2118,6 +2151,7 @@ function renderParent(){
     +'<div class="legend"><span><i style="background:#F3F0F8"></i>neu</span><span><i style="background:#E3D6F6"></i>in Arbeit</span><span><i style="background:#CDB4F0"></i>sicher</span><span><i style="background:#F2B83C"></i>blitzschnell</span><span>! = Stolperfakt</span></div>'
     +heat
     +'<h2>Bestzeiten Inselritt</h2><div class="besttimes">'+bests+'</div>'
+    +'<h2>Kawumm (Rückwärtsreihen)</h2>'+(window.KW?KW.parentHTML():'')
     +'<h2>Einstellungen</h2>'
     +'<div class="setrow"><label>Name des Kindes</label><input type="text" id="setName" value="'+S.name.replace(/"/g,'&quot;')+'"></div>'
     +'<div class="setrow"><label>Ton und Vorlesen</label><button class="toggle'+(S.sound?' on':'')+'" id="setSound" role="switch" aria-checked="'+S.sound+'" aria-label="Ton"><i></i></button></div>'
@@ -2137,6 +2171,7 @@ function renderParent(){
     +'<button class="smallbtn danger" id="bkReset">Alles zurücksetzen</button>'
     +'</div><div id="bkMsg" style="font-size:13px;color:var(--muted);font-weight:700;"></div>';
 
+  if(window.KW) KW.parentWire();
   $('setName').addEventListener('change',e=>{ S.name=(e.target.value||'').trim()||'Du'; save(); });
   $('setSound').addEventListener('click',()=>{ S.sound=!S.sound; save(); renderParent(); });
   $('setVoiceTest').addEventListener('click',()=>{
@@ -2205,8 +2240,10 @@ function init(){
   load();
   initStars();
   lastOpenCount=unlockedRows(S).length;
+  if(window.KW) KW.setup();
   show('home');
-  if(!matchMedia('(prefers-reduced-motion: reduce)').matches) setTimeout(playIntroOnce, 150);
+  if(!matchMedia('(prefers-reduced-motion: reduce)').matches) setTimeout(()=>playIntroOnce().then(()=>{ if(window.KW) KW.maybeLetter(); }), 150);
+  else if(window.KW) setTimeout(()=>KW.maybeLetter(), 600);
 }
 const _boot=()=>init();
 (window.claude&&window.claude.hot&&window.claude.hot.ready)? window.claude.hot.ready(_boot) : _boot();

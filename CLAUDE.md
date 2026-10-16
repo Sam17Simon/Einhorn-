@@ -63,3 +63,15 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 - Elternbereich: "Jetzt sichern" und "Sicherungsdatei laden". `navigator.storage.persist()` wird beim Start angefragt.
 - Feste Datei (seit v37, nur wenn `showSaveFilePicker` existiert): im Elternbereich einmal wählen, Griff liegt in IndexedDB `lumi-backup`, danach täglich überschreiben (`backupToFixed`). Fehlen Rechte oder die Funktion, gibt es wie bisher die Download-Datei.
 - Kein Cloud-Dienst, keine Anmeldung. Bewusste Entscheidung von Simon: simpel.
+
+## Kawumm: Rückwärtsreihen (seit v38, noch nicht live)
+- Alles in `kawumm.js` (vor dem Hauptskript geladen). Lernlogik oben zwischen KW-LOGIC-START/END, in Node testbar (`require('./kawumm.js')`). Bild: `assets/kawumm.png` (freigestellte Vorlage von Simon, nicht nachzeichnen). Spiegeln nur per CSS `scaleX(-1)`.
+- Live schalten: `KW_LIVE = true` in kawumm.js. Dann kommt beim Öffnen nach dem Intro einmal der Brief ("Post für Romy", Button "Ja, komm vorbei!" erst nach dem Vorlesen, mind. 5 s). Bis dahin sieht Romy nichts.
+- Elternbereich, Abschnitt Kawumm: Testmodus (nur bis Neustart), Brief ansehen, Schatzkammer, Stimme, Brief zurücksetzen, Kawumm-Stand löschen, je Reihe Starten und Stufe umschalten.
+- Stand liegt getrennt in `S.kw` = {joined, rows:{reihe:{stage:'sea'|'space', clean, runs, finds, steps:{k:{box,...}}}}}. Schritt k = von k·r nach (k-1)·r. Nie mit `S.facts` vermischen.
+- Freischaltung: Start immer mit 1er rückwärts. Nächste Karte in `KW_ORDER` (1,2,10,5,4,8,3,6,9,7) nur, wenn die Karte davor im Weltall ist UND die eigene Vorwärtsreihe 5 von 10 lila hat. Ins Weltall: 2 Fahrten am Stück ohne Fehler, alle Antworten unter 4 s.
+- Hilfe: Meer anfangs kommende Zahlen schwach sichtbar, nach einer sauberen Fahrt nur noch ?, Weltall nur aktuelle Zahl und Sprung. Störenfriede (Möwe, Alien) verdecken die Leiste: Meer 15 %, Weltall 30 %, nie zweimal hintereinander, nie in der ersten Fahrt. Super-Speed (Weltall, 35 %) startet mitten in der Reihe.
+- Falsche Inseln: übersprungen, nur 1 weggenommen, Zehnerübergang vergessen (`kwOptions`).
+- Schatzkammer: je Reihe ein verrückter Behälter (`KW_BOX`), jede geschaffte Fahrt bringt einen Schatz, 10 passen hinein. Zugang über Kawumms Schiff oben in der Inselwelt und nach jeder Fahrt.
+- Kawumms Stimme: `speak(text, cb, KW_VOICE)` mit eigener Tonhöhe und Tempo; im Sprechweg `voice` eine zweite deutsche Stimme, falls vorhanden. Nie Stimme ohne passende Sprache setzen (Android).
+- Gemeinsam hüpfen: `kwDuoHTML`, Lumi immer ohne Regenbogen (`kwNoRainbow`).
