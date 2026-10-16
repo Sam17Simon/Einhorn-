@@ -81,6 +81,8 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 - Abwechslung: Inseln (4 Formen, 4 Farben, 9 Deko-Teile) und Planeten (Farbe, Muster, Ringe, Mond) werden je Zahl aus `KR.seed` gewürfelt: gleiche Zahl sieht innerhalb einer Fahrt gleich aus, jede Fahrt neu. Dazu Kleinigkeiten am Kartenrand (`kwFxHTML`).
 - Kawumms Stimme: `speak(text, cb, KW_VOICE)` mit natürlicher Tonhöhe 1.0 und Tempo 1.12 (Lumi 1.14 und 1.04). Verstellte Tonhöhe klingt blechern, darum nicht weiter verbiegen. Eine zweite Gerätestimme gibt es auf Romys Handy nicht; im Sprechweg `voice` eine zweite deutsche Stimme, falls vorhanden. Nie Stimme ohne passende Sprache setzen (Android).
 - Gemeinsam hüpfen: `kwDuoHTML`, Lumi immer ohne Regenbogen (`kwNoRainbow`). Danach erzählt Kawumm, was sie macht und kann, und `kwGoToShip` führt in die Inselwelt: Schiff-Karte leuchtet, Kawumm zeigt darauf (ist die Einser-Insel offen, leuchtet die mit).
+- Ruhe: alle Übergänge bewusst langsam (Segeln 1,1 s, Karte rückt 1 s). Knöpfe (CTAs) erst nach 1,5 bis 2 s klickbar (`kwArm`). Nicht wieder schneller machen.
+- Weltall-Start (`kwLaunch`): Wenn eine Karte das Meer schafft, segelt das Schiff in die Mitte, Countdown 3, 2, 1, Sternenhimmel blendet über, Schiff hebt ab, dann erst der Schatz-Bildschirm.
 - In der Schatzsuche keine Textblase unten, nur Sprache. Jeder Tipp auf einen Knopf bricht den laufenden Satz ab (`kwHush`, danach 150 ms bis zum nächsten Satz).
 - Gesprochene Texte: keine Laute ohne Vokal und keine gedehnten Buchstaben (Mmmh, Pssst, Juhuuu, Uiii). Die Sprachausgabe buchstabiert die. Stattdessen Lecker, Hör mal, Juhu, Ui.
 - Brieftext: frech und kurz, für Romy selbst lesbar. Nicht wieder brav machen.

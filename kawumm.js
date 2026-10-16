@@ -346,10 +346,10 @@ const kwCSS=document.createElement('style');
 kwCSS.textContent=`
 .kwmap{position:relative; flex:1; min-height:0; overflow:hidden; border-radius:28px; border:2px solid #9ED3EA; background-color:#7CC6E8;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='90'%3E%3Cpath d='M10 30 q10 -8 20 0 t20 0 M70 70 q10 -8 20 0 t20 0' fill='none' stroke='%23ffffff' stroke-opacity='.45' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-size:120px 90px; transition:background-position .6s ease;}
+  background-size:120px 90px; transition:background-position 1s ease;}
 .kwmap.space{border-color:#4B3F86; background-color:#2A2150;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='120'%3E%3Cg fill='%23ffffff'%3E%3Ccircle cx='14' cy='20' r='1.6'/%3E%3Ccircle cx='70' cy='8' r='1.1'/%3E%3Ccircle cx='110' cy='40' r='1.8'/%3E%3Ccircle cx='40' cy='70' r='1.2'/%3E%3Ccircle cx='96' cy='96' r='1.4'/%3E%3Ccircle cx='20' cy='108' r='1'/%3E%3C/g%3E%3Cpath d='M58 52 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2 Z' fill='%23FFE27A' opacity='.8'/%3E%3C/svg%3E");}
-.kwlayer{position:absolute; inset:0; transition:transform .65s ease-in-out;}
+.kwlayer{position:absolute; inset:0; transition:transform 1s ease-in-out;}
 .kwlayerin{position:absolute; inset:0;}
 .kwfx{position:absolute; width:16%; max-width:70px; transform:translate(-50%,-50%); pointer-events:none; animation:kwbob2 2.6s ease-in-out infinite; opacity:.95;}
 .kwfx svg{width:100%; height:auto; display:block;}
@@ -357,16 +357,16 @@ kwCSS.textContent=`
 .kwsmoke{animation:kwsmoke 2.4s ease-in-out infinite;}
 @keyframes kwsmoke{50%{transform:translateY(-3px); opacity:.6}}
 .kwlayer svg.kwpath{position:absolute; inset:0; width:100%; height:100%; pointer-events:none;}
-.kwst,.kwopt{position:absolute; width:30%; max-width:150px; transform:translate(-50%,-50%); transition:opacity .4s, transform .3s;}
+.kwst,.kwopt{position:absolute; width:30%; max-width:150px; transform:translate(-50%,-50%); transition:opacity .7s, transform .4s;}
 .kwopt{background:none; padding:0; border:0;}
 .kwopt:active{transform:translate(-50%,-50%) scale(.94);}
 .kwisl{width:100%; height:auto; display:block; overflow:visible;}
 .kwnum{font-family:var(--font-disp); font-weight:700; font-size:24px; fill:${KW_INK}; paint-order:stroke; stroke:#fff; stroke-width:5px; stroke-linejoin:round;}
-.kwopt.fog{animation:kwfog .9s ease forwards;}
+.kwopt.fog{animation:kwfog 1.2s ease forwards;}
 @keyframes kwfog{0%{transform:translate(-50%,-50%)}20%{transform:translate(-56%,-50%)}40%{transform:translate(-44%,-50%)}60%{transform:translate(-53%,-50%)}100%{transform:translate(-50%,-50%); opacity:.25; filter:blur(3px) grayscale(1)}}
 .kwopt.glow .kwisl{filter:drop-shadow(0 0 10px #FFE27A) drop-shadow(0 0 4px #FFE27A);}
 .kwopt.gone{opacity:0;}
-.kwship{position:absolute; width:26%; max-width:130px; aspect-ratio:120/100; transform:translate(-50%,-92%); pointer-events:none; z-index:3; transition:left .75s ease-in-out, top .75s ease-in-out;}
+.kwship{position:absolute; width:26%; max-width:130px; aspect-ratio:120/100; transform:translate(-50%,-92%); pointer-events:none; z-index:3; transition:left 1.1s ease-in-out, top 1.1s ease-in-out;}
 .kwship svg{position:absolute; inset:0; width:100%; height:100%; overflow:visible;}
 .kwship .kwpirate{position:absolute; left:20%; bottom:22%; height:74%; width:auto;}
 .kwship.sway{animation:kwsway 2.4s ease-in-out infinite;}
@@ -391,9 +391,9 @@ kwCSS.textContent=`
 .kwend p{margin:0; font-weight:700; color:var(--muted); max-width:360px;}
 .kwend .kwchest{width:150px; height:auto;}
 .kwend .kwchest{overflow:visible;}
-.kwend .kwchest .lid{transform-box:view-box; transform-origin:20px 46px; animation:kwlid .7s ease .3s forwards;}
+.kwend .kwchest .lid{transform-box:view-box; transform-origin:20px 46px; animation:kwlid 1s ease .5s forwards;}
 @keyframes kwlid{to{transform:rotate(-70deg)}}
-.kwend .kwfind{animation:kwfindpop .7s cubic-bezier(.3,1.4,.5,1) .8s both;}
+.kwend .kwfind{animation:kwfindpop .9s cubic-bezier(.3,1.4,.5,1) 1.2s both;}
 @keyframes kwfindpop{from{transform:translateY(40px) scale(.2); opacity:0}}
 .kwend .kwmini{width:96px;}
 
@@ -401,31 +401,31 @@ kwCSS.textContent=`
 .kwopt.locked{pointer-events:none;}
 .kwblock{position:absolute; left:50%; width:96%; max-width:480px; transform:translate(-50%,-55%); z-index:4; pointer-events:none;}
 .kwblock svg{width:100%; height:auto; display:block; overflow:visible;}
-.kwblock.act-lie,.kwblock.act-gulp{animation:kwcritin .55s cubic-bezier(.3,1.4,.5,1) both;}
-.kwblock.act-lie.insky,.kwblock.act-beam{animation:kwcritsky .7s cubic-bezier(.3,1.2,.5,1) both;}
-.kwblock.act-sink{animation:kwcritsink .7s ease both;}
-.kwblock.act-grab{animation:kwcritgrab .6s cubic-bezier(.3,1.4,.5,1) both;}
+.kwblock.act-lie,.kwblock.act-gulp{animation:kwcritin .8s cubic-bezier(.3,1.4,.5,1) both;}
+.kwblock.act-lie.insky,.kwblock.act-beam{animation:kwcritsky 1s cubic-bezier(.3,1.2,.5,1) both;}
+.kwblock.act-sink{animation:kwcritsink 1s ease both;}
+.kwblock.act-grab{animation:kwcritgrab .9s cubic-bezier(.3,1.4,.5,1) both;}
 @keyframes kwcritin{from{transform:translate(-50%,10%) scale(.6); opacity:0}}
 @keyframes kwcritsky{from{transform:translate(-50%,-260%) scale(.5); opacity:0}}
 @keyframes kwcritsink{from{transform:translate(-50%,40%); opacity:0}}
 @keyframes kwcritgrab{0%{transform:translate(-50%,40%) scale(.5); opacity:0}70%{transform:translate(-50%,-62%) scale(1.06)}}
-.kwblock.bye{animation:kwcritout .6s ease forwards!important;}
-.kwblock.act-sink.bye,.kwblock.act-grab.bye{animation:kwcritdown .6s ease forwards!important;}
-.kwblock.insky.bye,.kwblock.act-beam.bye{animation:kwcritup .6s ease forwards!important;}
+.kwblock.bye{animation:kwcritout .9s ease forwards!important;}
+.kwblock.act-sink.bye,.kwblock.act-grab.bye{animation:kwcritdown .9s ease forwards!important;}
+.kwblock.insky.bye,.kwblock.act-beam.bye{animation:kwcritup .9s ease forwards!important;}
 @keyframes kwcritout{to{transform:translate(60%,-90%) rotate(14deg) scale(.6); opacity:0}}
 @keyframes kwcritdown{to{transform:translate(-50%,60%) scale(.7); opacity:0}}
 @keyframes kwcritup{to{transform:translate(-50%,-300%) scale(.5); opacity:0}}
-.kwopt.under-lie{opacity:.0; transition:opacity .25s;}
-.kwopt.under-sink{transform:translate(-50%,10%) scale(.85)!important; opacity:0; transition:transform .5s ease, opacity .5s;}
-.kwopt.under-grab{transform:translate(-50%,-30%) scale(.4) rotate(18deg)!important; opacity:0; transition:transform .45s ease, opacity .45s;}
-.kwopt.under-gulp{transform:translate(40%,-90%) scale(.2)!important; opacity:0; transition:transform .45s ease-in, opacity .45s;}
-.kwopt.under-beam{transform:translate(-50%,-220%) scale(.5)!important; opacity:0; transition:transform .6s ease-in, opacity .6s;}
-.kwopt.back{animation:kwback .5s cubic-bezier(.3,1.4,.5,1);}
+.kwopt.under-lie{opacity:.0; transition:opacity 0.38s;}
+.kwopt.under-sink{transform:translate(-50%,10%) scale(.85)!important; opacity:0; transition:transform 0.75s ease, opacity 0.75s;}
+.kwopt.under-grab{transform:translate(-50%,-30%) scale(.4) rotate(18deg)!important; opacity:0; transition:transform 0.68s ease, opacity 0.68s;}
+.kwopt.under-gulp{transform:translate(40%,-90%) scale(.2)!important; opacity:0; transition:transform 0.68s ease-in, opacity 0.68s;}
+.kwopt.under-beam{transform:translate(-50%,-220%) scale(.5)!important; opacity:0; transition:transform 0.90s ease-in, opacity 0.90s;}
+.kwopt.back{animation:kwback .7s cubic-bezier(.3,1.4,.5,1);}
 @keyframes kwback{from{transform:translate(-50%,-50%) scale(.3); opacity:0}}
 .kwlumijoke{position:relative; transform:rotate(-6deg) scaleX(1.25); transform-origin:50% 60%;}
 .kwlumijoke svg{width:100%; height:auto;}
 .kwlumijoke .zz{position:absolute; right:6%; top:-4%; font-family:var(--font-disp); font-weight:700; font-size:22px; color:#fff; text-shadow:0 2px 0 rgba(59,42,82,.4); animation:islzzz 2.4s ease-in-out infinite;}
-.kwpad{position:absolute; left:8px; right:8px; bottom:8px; z-index:6; background:rgba(255,255,255,.96); border-radius:20px; padding:8px; box-shadow:0 4px 0 rgba(59,42,82,.15); transform:translateY(120%); transition:transform .35s cubic-bezier(.3,1.2,.5,1);}
+.kwpad{position:absolute; left:8px; right:8px; bottom:8px; z-index:6; background:rgba(255,255,255,.96); border-radius:20px; padding:8px; box-shadow:0 4px 0 rgba(59,42,82,.15); transform:translateY(120%); transition:transform .55s cubic-bezier(.3,1.2,.5,1);}
 .kwpad.show{transform:none;}
 .kwpadtop{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:0 6px 6px; font-weight:800; font-size:15px; color:${KW_INK};}
 .kwpadtop b{min-width:84px; text-align:center; font-family:var(--font-disp); font-size:30px; line-height:1.1; color:#E04A40; border-bottom:4px solid #E04A40; font-variant-numeric:tabular-nums;}
@@ -436,6 +436,15 @@ kwCSS.textContent=`
 .kwkeys button:active{transform:translateY(2px); box-shadow:0 1px 0 #EBCB94;}
 .kwkeys .ok{background:#E04A40; color:#fff; border-color:#E04A40; box-shadow:0 3px 0 #A8322B;}
 .kwkeys .del{color:var(--muted); font-size:20px;}
+.kwnight{position:absolute; inset:0; background-color:#2A2150; background-image:${KW_DOTS('ffffff')}; opacity:0; transition:opacity 3s ease; pointer-events:none;}
+.kwnight.on{opacity:1;}
+.kwship.liftoff{animation:kwliftoff 3.2s ease-in forwards!important;}
+@keyframes kwliftoff{0%{transform:translate(-50%,-92%)}12%{transform:translate(-52%,-92%)}18%{transform:translate(-48%,-92%)}24%{transform:translate(-50%,-96%)}100%{transform:translate(-50%,-420%) scale(.55)}}
+.kwcount{position:absolute; left:50%; top:32%; transform:translate(-50%,-50%); z-index:6; font-family:var(--font-disp); font-weight:700; font-size:110px; line-height:1; color:#fff; text-shadow:0 6px 0 rgba(59,42,82,.35); pointer-events:none;}
+.kwcount.pop{animation:kwcountpop 1.1s ease forwards;}
+@keyframes kwcountpop{0%{transform:translate(-50%,-50%) scale(.3); opacity:0}25%{transform:translate(-50%,-50%) scale(1.15); opacity:1}80%{opacity:1}100%{transform:translate(-50%,-50%) scale(1); opacity:0}}
+button.kwwait{opacity:.45; transition:opacity .6s;}
+button.kwwait:active{transform:none;}
 /* Inseln und Karte */
 .kwcard{display:flex; align-items:center; gap:12px; width:100%; max-width:420px; background:#FFF6E6; border:2px solid #EBCB94; border-radius:20px; padding:8px 12px; text-align:left; box-shadow:0 3px 0 #EBCB94;}
 .kwcard img{height:66px; width:auto; flex:0 0 auto;}
@@ -470,12 +479,12 @@ kwCSS.textContent=`
 .kwslot.pop{animation:pop .5s ease;}
 /* Brief und Begrüßung */
 #overlay .box.kwletterbox{background:#FFF8EC; max-width:440px;}
-.kwenv{position:relative; width:220px; height:150px; margin:6px auto 0; transition:transform .5s, opacity .5s;}
+.kwenv{position:relative; width:220px; height:150px; margin:6px auto 0; transition:transform .8s, opacity .8s;}
 .kwenv svg{width:100%; height:100%; overflow:visible;}
-.kwenv .flap{transform-origin:110px 10px; transition:transform .6s ease;}
+.kwenv .flap{transform-origin:110px 10px; transition:transform .9s ease;}
 .kwenv.open .flap{transform:scaleY(-1);}
 .kwenv.away{transform:translateY(40px) scale(.6); opacity:0; height:0; margin:0;}
-.kwpaper{background:#fff; border:2px solid #E2C795; border-radius:14px; padding:14px 16px; text-align:left; font-family:var(--font-disp); font-size:18px; line-height:1.4; color:${KW_INK}; transform:translateY(30px); opacity:0; transition:transform .6s ease, opacity .6s; display:none;}
+.kwpaper{background:#fff; border:2px solid #E2C795; border-radius:14px; padding:14px 16px; text-align:left; font-family:var(--font-disp); font-size:18px; line-height:1.4; color:${KW_INK}; transform:translateY(30px); opacity:0; transition:transform .9s ease, opacity .9s; display:none;}
 .kwpaper.show{display:block;}
 .kwpaper.in{transform:none; opacity:1;}
 .kwpaper .sig{display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-top:6px;}
@@ -508,6 +517,13 @@ function kwPlaceShip(xr, yr, animate){
   if(!animate){ void s.offsetWidth; s.style.transition=''; }
 }
 function kwSayLine(t){ kwSay(t); }
+/* Ruhe: Knöpfe werden erst nach einer Pause klickbar (Entscheidung Simon) */
+const KW_CTA_WAIT=1500;
+function kwArm(root, ms){
+  const bs=(root?root.querySelectorAll('button'):[]);
+  bs.forEach(b=>{ b.disabled=true; b.classList.add('kwwait'); });
+  setTimeout(()=>bs.forEach(b=>{ b.disabled=false; b.classList.remove('kwwait'); }), ms||KW_CTA_WAIT);
+}
 function kwBanner(t,ms){ const b=$('kwBanner'); b.textContent=t; b.classList.add('show'); setTimeout(()=>b.classList.remove('show'), ms||1400); }
 
 function kwStart(r, ret){
@@ -535,12 +551,12 @@ function kwStart(r, ret){
   if(plan.superSpeed){
     KR.k=10; kwRenderStrip(); kwRenderLayerAt(10, true);
     kwSayLine(open);
-    setTimeout(()=>{ if(!KR||KR.id!==my) return; kwSuperSpeed(); }, 1600);
+    setTimeout(()=>{ if(!KR||KR.id!==my) return; kwSuperSpeed(); }, 2000);
   } else {
     kwRenderStrip();
     const how = 'Wir starten bei '+(10*r)+'. Immer '+kwNum(r)+' zurück. Wohin segeln wir?';
     kwSay(open+' '+how);
-    setTimeout(()=>{ if(!KR||KR.id!==my) return; kwStep(); }, 600);
+    setTimeout(()=>{ if(!KR||KR.id!==my) return; kwStep(); }, 1000);
   }
 }
 /* Super-Speed: Kawumm überfliegt die ersten Stationen, die Zahlen leuchten dabei kurz auf */
@@ -553,11 +569,11 @@ function kwSuperSpeed(){
     if(!KR||KR.id!==my) return;
     j--; KR.k=j; kwRenderStrip(true); pling();
     $('kwMap').style.backgroundPosition='0 '+((10-j)*-60)+'px';
-    if(j>target) setTimeout(tick,260);
+    if(j>target) setTimeout(tick,340);
     else {
       kwRenderLayer();
       kwSayLine(kwPick(KW_LINES.speed).replace('{n}',target*r));
-      setTimeout(()=>{ if(!KR||KR.id!==my) return; s.classList.remove('zoom'); s.classList.add('sway'); kwStep(); },900);
+      setTimeout(()=>{ if(!KR||KR.id!==my) return; s.classList.remove('zoom'); s.classList.add('sway'); kwStep(); },1300);
     }
   };
   setTimeout(tick,300);
@@ -620,7 +636,7 @@ function kwBlock(){
   el.innerHTML=c.html||('<svg viewBox="0 0 220 100" aria-hidden="true">'+c.svg+'</svg>');
   IN.appendChild(el);
   // was mit den Inseln passiert
-  setTimeout(()=>{ if(!KR||KR.id!==my) return; opts.forEach(b=>b.classList.add('under-'+c.act)); }, c.act==='lie'?350:500);
+  setTimeout(()=>{ if(!KR||KR.id!==my) return; opts.forEach(b=>b.classList.add('under-'+c.act)); }, c.act==='lie'?500:700);
   if(c.act==='sink'){ tone(220,.25,0,'sine',.12); tone(160,.3,.15,'sine',.1); }
   else if(c.act==='beam'){ [880,990,1180].forEach((f,i)=>tone(f,.1,i*.08,'square',.04)); }
   else if(c.act==='gulp'){ tone(300,.12,0,'triangle',.1); tone(200,.16,.12,'triangle',.1); }
@@ -632,7 +648,7 @@ function kwBlock(){
   $('kwMap').appendChild(pad);
   pad.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>kwType(b.dataset.k)));
   const line=kwPick(c.say);
-  setTimeout(()=>{ if(!KR||KR.id!==my) return; pad.classList.add('show'); kwSay(line+' Tipp die Zahl ein!'); KR.busy=false; KR.t=performance.now(); }, 700);
+  setTimeout(()=>{ if(!KR||KR.id!==my) return; pad.classList.add('show'); kwSay(line+' Tipp die Zahl ein!'); KR.busy=false; KR.t=performance.now(); }, 1100);
 }
 function kwType(k){
   if(!KR||KR.busy||!KR.block) return;
@@ -660,10 +676,10 @@ function kwTypedDone(){
     if(blk) blk.classList.add('bye');
     opts.forEach(b=>{ b.className=b.className.replace(/ ?under-\w+/g,''); b.classList.add('back'); });
     if(opts[ai]) opts[ai].classList.add('glow');
-    setTimeout(()=>{ if(pad) pad.remove(); if(blk) blk.remove(); },700);
+    setTimeout(()=>{ if(pad) pad.remove(); if(blk) blk.remove(); },1000);
     KR.block=null;
-    kwSail(ai, 700);
-  }, correct?700:1500);
+    kwSail(ai, 1000);
+  }, correct?1000:2000);
 }
 /* Ergebnis eines Schritts eintragen (Tippen auf Insel oder Eintippen) */
 function kwRecord(val, rt){
@@ -690,7 +706,7 @@ function kwChoose(i){
     sndAgain();
     btns[i].classList.add('fog'); btns[ai].classList.add('glow');
     kwSayLine(kwPick(KR.space?KW_LINES.wrongSpace:KW_LINES.wrong).replace('{n}',ans));
-    kwSail(ai,1600);
+    kwSail(ai,2200);
   }
 }
 function kwSail(ai, delay){
@@ -710,8 +726,8 @@ function kwSail(ai, delay){
       const m=$('kwMap'), bp=(parseFloat((m.style.backgroundPosition||'0 0').split(' ')[1])||0)-((KW_OPT_Y-KW_ST.y)*h);
       m.style.backgroundPosition='0 '+bp+'px';
       kwRenderStrip();
-      setTimeout(()=>{ if(!KR||KR.id!==my) return; kwRenderLayer(); kwStep(); },650);
-    },750);
+      setTimeout(()=>{ if(!KR||KR.id!==my) return; kwRenderLayer(); kwStep(); },1050);
+    },1150);
   }, delay);
 }
 function kwTreasure(ai){
@@ -730,7 +746,7 @@ function kwTreasure(ai){
   else if(rs.stage==='sea') lines.push(rs.clean>=1 ? 'Noch eine Fahrt ohne Fehler und ganz schnell, dann geht es ins Weltall!' : 'Schaffst du zwei Fahrten ohne Fehler und ganz schnell? Dann fliegen wir ins Weltall!');
   if(newRow) lines.push('Und weißt du was? Es gibt eine neue Schatzkarte: die '+newRow+'er-Reihe rückwärts! Ich warte auf der '+newRow+'er-Insel.');
   const my=KR.id;
-  setTimeout(()=>{
+  const showEnd=()=>{
     if(!KR||KR.id!==my) return;
     const end=$('kwEnd');
     end.innerHTML=`<svg viewBox="0 0 100 80" class="kwchest" aria-hidden="true">
@@ -746,12 +762,38 @@ function kwTreasure(ai){
       <div class="pill">${KR.ok} von ${KR.steps} richtig · ${KR.ok} Sterne</div>
       <div class="btnrow"><button class="kwbtn" id="kwEndVault">Zur Schatzkammer</button><button class="kwbtn sec" id="kwEndAgain">Nochmal</button><button class="kwbtn sec" id="kwEndBack">Fertig</button></div>`;
     end.hidden=false;
+    kwArm(end, 2000);
     kwSay(lines.join(' '));
     const ret=KR.ret;
     $('kwEndVault').onclick=()=>{ kwStop(); kwOpenVault(ret==='parent'?'parent':'path', r); };
     $('kwEndAgain').onclick=()=>{ kwStart(r, ret); };
     $('kwEndBack').onclick=()=>{ kwLeave(); };
-  },1200);
+  };
+  setTimeout(()=>{ if(!KR||KR.id!==my) return; if(res.toSpace) kwLaunch(showEnd); else showEnd(); }, 1800);
+}
+/* Großer Moment: Die Karte ist im Meer geschafft, das Schiff hebt ab ins Weltall */
+function kwLaunch(done){
+  const my=KR.id, L=$('kwLayer'), IN=$('kwLayerIn'), old=kwShip();
+  const alive=()=>KR&&KR.id===my;
+  // Sternenhimmel blendet langsam über das Meer
+  const night=document.createElement('div'); night.className='kwnight';
+  L.insertBefore(night, old);
+  // Schiff bekommt Raketenflammen, gleiche Stelle
+  const tmp=document.createElement('div'); tmp.innerHTML=kwShipHTML(true); const ship=tmp.firstElementChild;
+  ship.style.left=old.style.left; ship.style.top=old.style.top; ship.style.transition='none';
+  old.replaceWith(ship);
+  // erst in die Mitte segeln, dann Countdown
+  requestAnimationFrame(()=>{ ship.style.transition=''; const {w,h}=kwMapSize(); ship.style.left=(w*0.5)+'px'; ship.style.top=(h*0.62)+'px'; });
+  IN.style.transition='opacity 1.2s'; IN.style.opacity='0';
+  const cnt=document.createElement('div'); cnt.className='kwcount'; $('kwMap').appendChild(cnt);
+  kwSay('Weißt du was? Du bist so gut, wir fliegen ins Weltall! Festhalten!');
+  const nums=['3','2','1'];
+  nums.forEach((n,i)=>setTimeout(()=>{ if(!alive()) return; cnt.textContent=n; cnt.classList.remove('pop'); void cnt.offsetWidth; cnt.classList.add('pop'); tone(440+i*110,.2,0,'triangle',.12); kwSay(['Drei','Zwei','Eins'][i]); }, 3200+i*1200));
+  setTimeout(()=>{ if(!alive()) return;
+    cnt.textContent=''; ship.classList.add('liftoff'); night.classList.add('on'); sndWhoosh(); burst(60,0.5,0.6,10);
+    kwSay('Kawumm! Ab ins Weltall!'); kwBanner('Ab ins Weltall!', 2600);
+  }, 3200+3*1200);
+  setTimeout(()=>{ if(!alive()) return; cnt.remove(); bigKnall(); sndFanfare(); done(); }, 3200+3*1200+3600);
 }
 function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
 const KW_GENUS={1:'m',2:'f',10:'n',5:'f',4:'n',8:'f',3:'n',6:'n',9:'f',7:'m'};
@@ -802,6 +844,7 @@ function kwIslandCard(r){
     const space=rs&&rs.stage==='space';
     el.innerHTML='<div class="kwcard"><img src="'+KW_IMG+'" alt=""><div class="tx"><b>Schatzsuche mit Kawumm</b>Die '+r+'er-Reihe rückwärts. '+(space?'Ab ins Weltall!':'Im Meer.')+'<small>'+((rs&&rs.finds)||0)+' von '+KW_CAP+' Schätzen für '+artAcc(r)+' '+KW_BOX[r].name+'</small></div><button class="kwbtn" id="kwIslGo">Los!</button></div>';
     $('kwIslGo').onclick=()=>kwStart(r,'island');
+    kwArm(el);
   } else {
     const i=KW_ORDER.indexOf(r), prev=KW_ORDER[i-1], ps=kw.rows[prev];
     const prevOk=!!(ps&&ps.stage==='space'), have=Math.round(kwFwd(r)*10);
@@ -818,6 +861,7 @@ function kwMapCard(list){
     +loose.map(r=>'<button class="kwbtn" data-kwr="'+r+'">'+r+'er rückwärts</button>').join('')
     +'<button class="kwbtn sec" id="kwMapVault">Schatzkammer</button></div>';
   list.appendChild(d);
+  kwArm(d);
   d.querySelectorAll('[data-kwr]').forEach(b=>b.addEventListener('click',()=>kwStart(+b.dataset.kwr,'path')));
   d.querySelector('#kwMapVault').addEventListener('click',()=>kwOpenVault('path'));
 }
@@ -855,8 +899,8 @@ function kwShowLetter(fromParent){
     setTimeout(()=>{ $('kwEnv').classList.add('away'); const p=$('kwPaper'); p.classList.add('show'); void p.offsetWidth; p.classList.add('in');
       // Den Brief liest Romy selbst. Nichts vorlesen, der Knopf kommt nach Lesezeit.
       setTimeout(showYes, KW_READ_MS);
-    },650);
-  },1300);
+    },950);
+  },1700);
   $('kwYes').onclick=()=>{ kws().joined=true; save(); kwWelcome(fromParent); };
 }
 function kwWelcome(fromParent){
@@ -865,6 +909,7 @@ function kwWelcome(fromParent){
     +'<p style="margin:0;font-weight:700">Kawumm ist Schatzjägerin. Sie segelt übers Meer und fliegt mit ihrem Schiff bis ins Weltall. Ihr Schiff liegt in der Inselwelt, ganz oben.</p>'
     +'<button class="cta" id="kwWelcomeGo" style="background:#E04A40;box-shadow:0 4px 0 #A8322B">Zum Schiff!</button>';
   bigKnall(); sndFanfare();
+  kwArm(box, 2000);
   kwSay('Kawumm! Da bin ich! Hallo '+name+', hallo Lumi! Ich bin Schatzjägerin. Ich segle übers Meer. Und mein Schiff kann fliegen. Bis ins Weltall! Mit Super-Speed! Und ich finde jeden Schatz. Aber nur rückwärts. Das bring ich dir bei. Mein Schiff liegt in der Inselwelt, ganz oben. Komm mit!');
   $('kwWelcomeGo').onclick=()=>{ $('overlay').classList.remove('show'); box.classList.remove('kwletterbox');
     if(fromParent) kwTest=true;                // im Test gleich zeigen, wie es für Romy aussieht
