@@ -12,6 +12,7 @@ const KW_LIVE = false;
 const KW_ORDER = [1,2,10,5,4,8,3,6,9,7];
 const KW_FWD_SHARE = 0.5;     // eigene Vorwärtsreihe halbwegs: 5 von 10 Aufgaben lila (Box 3+)
 const KW_FAST = 4000;         // schnelle Antwort wie vorwärts
+const KW_FAST_TYPE = 7000;    // beim Selbst-Eintippen gilt bis 7 s als schnell
 const KW_SAFE_BOX = 3;
 const KW_CAP = 10;            // Schätze pro Sammelbehälter
 const KW_READ_MS = 15000;     // Lesezeit für den Brief, bevor "Ja, komm vorbei!" erscheint
@@ -42,17 +43,20 @@ function kwAvailable(kw, fwdShare){
    sea2 = Meer nach einer fehlerfreien Fahrt: kommende Zahlen als ?, gefahrene Spur bleibt sichtbar
    space = Weltall: nur die aktuelle Zahl und der Sprung */
 function kwHelpMode(rs){ return rs.stage==='space' ? 'space' : (rs.clean>=1 ? 'sea2' : 'sea1'); }
-/* Plan einer Fahrt: Start (Super-Speed im Weltall startet mitten in der Reihe) und wo Störenfriede sitzen.
-   Störenfriede: im Meer selten, im Weltall öfter, nie zweimal hintereinander, nie im ersten Schritt, nie in der allerersten Fahrt. */
+/* Plan einer Fahrt: Start (Super-Speed im Weltall startet mitten in der Reihe) und wo Störenfriede kommen.
+   Ein Störenfried legt sich auf die drei Inseln (oder taucht sie unter, schnappt sie ...), dann tippt Romy die Zahl selbst ein.
+   Meer: erst wenn die Zahlen nicht mehr vorgezeigt werden (nach einer sauberen Fahrt), höchstens einmal pro Fahrt.
+   Weltall: öfter, nie zweimal hintereinander. Nie im ersten Schritt, nie in der allerersten Fahrt. */
 function kwPlanRun(rs, rng){
   rng=rng||Math.random;
   let startK=10, superSpeed=false;
   if(rs.stage==='space' && rs.runs>0 && rng()<0.35){ startK=5+Math.floor(rng()*4); superSpeed=true; }
-  const p = rs.stage==='space' ? 0.3 : 0.15;
-  const covers=[]; let last=false;
-  for(let k=startK;k>=1;k--){
-    const c = rs.runs>0 && k!==startK && !last && rng()<p;
-    if(c) covers.push(k); last=c;
+  const covers=[];
+  if(rs.stage==='space'){
+    let last=false;
+    for(let k=startK;k>=1;k--){ const c = rs.runs>0 && k!==startK && !last && rng()<0.3; if(c) covers.push(k); last=c; }
+  } else if(rs.clean>=1 && rs.runs>0 && rng()<0.7){
+    covers.push(1+Math.floor(rng()*(startK-1)));
   }
   return {startK, superSpeed, covers};
 }
@@ -121,8 +125,6 @@ const KW_LINES={
   ok:['Kawumm! Richtig!','Volltreffer, Käpt\'n!','Hab ich doch gewusst!','Ha! Zu leicht für uns!','Weiter so!','Genau da lang!','Sauber gesegelt!'],
   wrong:['Huch, das war nur Nebel! Es geht zur {n}.','Uiii, fast! Die richtige Insel ist die {n}.','Ups! Das passiert sogar mir. Wir segeln zur {n}.','Hoppla! Kein Problem, Piraten probieren weiter. Es ist die {n}.'],
   wrongSpace:['Huch, das war nur ein Sternennebel! Es geht zur {n}.','Ups, falscher Planet! Wir fliegen zur {n}.'],
-  gull:['He, Möwe! Runter von meiner Karte!','Oh nein, die Möwe sitzt auf der Karte! Egal, wir wissen das auch so.'],
-  alien:['Ein Alien sitzt auf meiner Karte! Hihi, das kitzelt.','Huch, ein Alien! Keine Angst, das will nur spielen.','He, Alien, das ist meine Karte! Na gut, wir rechnen im Kopf.'],
   speed:['Super-Speed! Festhalten!','Kawumm-Turbo! Wir springen ein Stück weiter!','Wuuusch! Mit Super-Speed sind wir schon bei der {n}!'],
   treasure:['Schatz gefunden! Kawumm!','Da ist die Schatzkiste! Ich wusste es!','Juhuuu! Wir sind reich!']
 };
@@ -215,7 +217,7 @@ function kwIslandSVG(n, treasure){
   const deco=KW_DECO_KEYS[Math.floor(R()*KW_DECO_KEYS.length)], left=R()<0.5, dx=left?20:80;
   const extra=R()<0.35 ? KW_DECO[KW_DECO_KEYS[Math.floor(R()*KW_DECO_KEYS.length)]](left?80:20, sh.top+8) : '';
   return `<svg viewBox="0 0 100 70" class="kwisl" aria-hidden="true">
-    <ellipse cx="50" cy="53" rx="49" ry="14" fill="#BFE7F7" opacity=".75"/>
+    <ellipse cx="50" cy="53" rx="49" ry="14" class="kwring" opacity=".75"/>
     <path d="${sh.sand}" fill="${col[0]}" stroke="${KW_INK}" stroke-width="3" stroke-linejoin="round"/>
     <path d="${sh.grass}" fill="${col[1]}"/>
     ${KW_DECO[deco](dx, sh.top+8)}${extra}
@@ -275,8 +277,63 @@ function kwShipHTML(space){
     </svg>
   </div>`;
 }
-const KW_GULL=`<svg viewBox="0 0 120 70" aria-hidden="true"><ellipse cx="60" cy="44" rx="30" ry="18" fill="#fff" stroke="${KW_INK}" stroke-width="3"/><path d="M34 40 Q14 22 4 30 Q22 34 36 50 Z" fill="#E7EDF5" stroke="${KW_INK}" stroke-width="3" stroke-linejoin="round"/><circle cx="82" cy="30" r="13" fill="#fff" stroke="${KW_INK}" stroke-width="3"/><circle cx="86" cy="27" r="2.6" fill="${KW_INK}"/><path d="M94 32 l14 3 -14 4 Z" fill="#F2B83C" stroke="${KW_INK}" stroke-width="2" stroke-linejoin="round"/><path d="M52 62 v6 M66 62 v6" stroke="#F2B83C" stroke-width="3" stroke-linecap="round"/></svg>`;
-const KW_ALIEN=`<svg viewBox="0 0 120 80" aria-hidden="true"><path d="M48 18 L40 4 M72 18 L80 4" stroke="${KW_INK}" stroke-width="3" stroke-linecap="round"/><circle cx="40" cy="4" r="4" fill="#F96D9B"/><circle cx="80" cy="4" r="4" fill="#F96D9B"/><ellipse cx="60" cy="44" rx="32" ry="28" fill="#8EDB6E" stroke="${KW_INK}" stroke-width="3"/><circle cx="46" cy="38" r="7" fill="#fff" stroke="${KW_INK}" stroke-width="2"/><circle cx="60" cy="32" r="8" fill="#fff" stroke="${KW_INK}" stroke-width="2"/><circle cx="74" cy="38" r="7" fill="#fff" stroke="${KW_INK}" stroke-width="2"/><circle cx="47" cy="39" r="3" fill="${KW_INK}"/><circle cx="61" cy="33" r="3.4" fill="${KW_INK}"/><circle cx="75" cy="39" r="3" fill="${KW_INK}"/><path d="M48 54 Q60 64 72 54" stroke="${KW_INK}" stroke-width="3" fill="#F96D9B" stroke-linejoin="round"/><path d="M28 50 q-10 4 -12 12 M92 50 q10 4 12 12" stroke="${KW_INK}" stroke-width="3" fill="none" stroke-linecap="round"/></svg>`;
+
+/* ---------- Störenfriede auf den Inseln ----------
+   act: lie = legt sich drauf, sink = taucht die Inseln unter, grab = schnappt sie, gulp = schluckt sie, beam = beamt sie weg.
+   Danach tippt Romy die Zahl selbst ein. Zeichnungen 220x100, liegen quer über allen drei Inseln. */
+const KI=KW_INK;
+function kwEye(x,y,r){ return `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff" stroke="${KI}" stroke-width="2"/><circle cx="${x+r*.25}" cy="${y-r*.1}" r="${r*.5}" fill="${KI}"/><circle cx="${x+r*.45}" cy="${y-r*.35}" r="${r*.18}" fill="#fff"/>`; }
+const KW_SMILE=(x,y,w)=>`<path d="M${x-w} ${y} Q${x} ${y+w*.9} ${x+w} ${y}" fill="none" stroke="${KI}" stroke-width="2.6" stroke-linecap="round"/>`;
+const KW_CRIT={sea:[
+  {id:'moewe', name:'Möwe Kreischi', act:'lie', svg:`<path d="M70 58 Q30 30 6 44 Q36 52 62 72 Z M150 58 Q190 30 214 44 Q184 52 158 72 Z" fill="#E7EDF5" stroke="${KI}" stroke-width="3" stroke-linejoin="round"/><ellipse cx="110" cy="64" rx="48" ry="26" fill="#fff" stroke="${KI}" stroke-width="3"/><circle cx="150" cy="44" r="18" fill="#fff" stroke="${KI}" stroke-width="3"/>${kwEye(155,40,5)}<path d="M166 46 l26 4 -26 6 Z" fill="#F2B83C" stroke="${KI}" stroke-width="2.4" stroke-linejoin="round"/>`, say:['Die Möwe Kreischi legt sich auf die Inseln! He, runter da!','Kreischi! Das sind meine Inseln, nicht dein Nest!']},
+  {id:'wal', name:'Wal Wumm', act:'lie', svg:`<path d="M30 70 Q8 50 4 40 Q20 46 32 56 Q24 42 28 30 Q36 48 40 64 Z" fill="#6E8FB8" stroke="${KI}" stroke-width="3" stroke-linejoin="round"/><path d="M34 72 Q40 26 116 24 Q196 26 208 62 Q210 86 180 88 H64 Q36 88 34 72 Z" fill="#7FA1CC" stroke="${KI}" stroke-width="3" stroke-linejoin="round"/><path d="M64 80 Q120 92 196 74" fill="none" stroke="#B9CCE6" stroke-width="7" stroke-linecap="round"/>${kwEye(168,52,6)}${KW_SMILE(182,66,10)}<path d="M120 22 q-6 -12 -14 -12 M120 22 q6 -12 14 -12 M120 22 v-16" stroke="#9ED3EA" stroke-width="4" fill="none" stroke-linecap="round"/>`, say:['Der Wal Wumm hat sich auf die Inseln gelegt! Der ist so faul!','Wumm, du dicker Brummer! Geh runter von meinen Inseln!']},
+  {id:'walsink', name:'Wal Wumm', act:'sink', svg:`<path d="M110 92 Q100 60 76 44 Q96 46 110 60 Q124 46 144 44 Q120 60 110 92 Z" fill="#7FA1CC" stroke="${KI}" stroke-width="3" stroke-linejoin="round"/><g fill="#E6F6FF" stroke="#9ED3EA" stroke-width="2"><circle cx="60" cy="80" r="6"/><circle cx="160" cy="78" r="7"/><circle cx="44" cy="62" r="4"/><circle cx="178" cy="60" r="4"/><circle cx="84" cy="86" r="3"/></g>`, say:['Platsch! Der Wal hat die Inseln untergetaucht! Weißt du die Zahl trotzdem?','Uiii, die Inseln sind weg! Der Wal war das! Sag mir die Zahl!']},
+  {id:'krake', name:'Krake Kringel', act:'grab', svg:`<g fill="none" stroke-linecap="round"><path d="M86 60 Q50 70 40 90 M80 52 Q40 44 14 70 M134 60 Q170 70 180 90 M140 52 Q180 44 206 70 M98 66 Q86 84 92 98 M122 66 Q134 84 128 98" stroke="${KI}" stroke-width="15"/><path d="M86 60 Q50 70 40 90 M80 52 Q40 44 14 70 M134 60 Q170 70 180 90 M140 52 Q180 44 206 70 M98 66 Q86 84 92 98 M122 66 Q134 84 128 98" stroke="#B493F0" stroke-width="10"/></g><ellipse cx="110" cy="40" rx="34" ry="32" fill="#B493F0" stroke="${KI}" stroke-width="3"/>${kwEye(98,40,7)}${kwEye(122,40,7)}${KW_SMILE(110,54,8)}<circle cx="96" cy="20" r="4" fill="#D9C6F8"/>`, say:['Der Krake Kringel schnappt sich die Inseln! Gib die sofort zurück!','Huch! Kringel hat die Inseln geklaut! Ich hab ein bisschen Angst vor Kraken. Sag du die Zahl!']},
+  {id:'robbe', name:'Robbe Rudi', act:'lie', svg:`<ellipse cx="104" cy="70" rx="84" ry="22" fill="#9AA5B8" stroke="${KI}" stroke-width="3"/><path d="M60 84 Q50 96 36 94 Q46 86 50 78 Z M14 64 Q4 56 6 48 Q16 54 24 64 Z" fill="#8792A6" stroke="${KI}" stroke-width="2.6" stroke-linejoin="round"/><circle cx="184" cy="56" r="22" fill="#9AA5B8" stroke="${KI}" stroke-width="3"/>${kwEye(184,50,5)}<ellipse cx="200" cy="62" rx="6" ry="4" fill="${KI}"/><path d="M196 68 l18 -2 M196 71 l18 3" stroke="${KI}" stroke-width="1.6"/>`, say:['Die Robbe Rudi macht ein Nickerchen auf den Inseln!','Rudi, wach auf! Du liegst auf meiner Schatzkarte!']},
+  {id:'kroete', name:'Schildkröte Paula', act:'lie', svg:`<ellipse cx="34" cy="80" rx="14" ry="8" fill="#A7DB7A" stroke="${KI}" stroke-width="2.4"/><ellipse cx="160" cy="84" rx="14" ry="8" fill="#A7DB7A" stroke="${KI}" stroke-width="2.4"/><circle cx="196" cy="60" r="16" fill="#A7DB7A" stroke="${KI}" stroke-width="3"/>${kwEye(200,56,5)}${KW_SMILE(202,66,6)}<path d="M20 74 Q30 24 104 22 Q176 24 186 74 Z" fill="#5FB866" stroke="${KI}" stroke-width="3" stroke-linejoin="round"/><path d="M60 72 L74 40 L104 34 L134 40 L148 72 M74 40 L60 26 M134 40 L148 26 M104 34 V22 M90 72 L104 54 L118 72" fill="none" stroke="#3E8F4B" stroke-width="2.6"/>`, say:['Die Schildkröte Paula sonnt sich auf den Inseln. Ganz langsam!','Paula, beeil dich! Ach nee, Schildkröten beeilen sich nie.']},
+  {id:'pelikan', name:'Pelikan Pieps', act:'gulp', svg:`<ellipse cx="78" cy="64" rx="60" ry="26" fill="#fff" stroke="${KI}" stroke-width="3"/><path d="M40 60 Q60 44 96 52" fill="none" stroke="#E7EDF5" stroke-width="10" stroke-linecap="round"/><circle cx="140" cy="40" r="17" fill="#fff" stroke="${KI}" stroke-width="3"/>${kwEye(144,36,5)}<path d="M152 40 L214 50 L152 50 Z" fill="#F2B83C" stroke="${KI}" stroke-width="2.6" stroke-linejoin="round"/><path d="M152 50 Q184 84 210 52" fill="#F7C948" stroke="${KI}" stroke-width="2.6"/>`, say:['Hamm! Der Pelikan Pieps hat die Inseln verschluckt!','Pieps! Spuck die Inseln wieder aus! Bäh!']},
+  {id:'krabbe', name:'Krabbe Kneif', act:'grab', svg:`<g stroke="${KI}" stroke-width="3" stroke-linecap="round"><path d="M80 74 l-20 18 M90 78 l-12 18 M140 74 l20 18 M130 78 l12 18"/><path d="M84 54 Q50 40 34 30 M136 54 Q170 40 186 30" fill="none"/></g><path d="M20 20 Q34 6 46 20 Q38 26 34 34 Q24 34 20 20 Z M200 20 Q186 6 174 20 Q182 26 186 34 Q196 34 200 20 Z" fill="#F96D6D" stroke="${KI}" stroke-width="3" stroke-linejoin="round"/><ellipse cx="110" cy="64" rx="44" ry="24" fill="#F96D6D" stroke="${KI}" stroke-width="3"/><path d="M98 42 v-12 M122 42 v-12" stroke="${KI}" stroke-width="3"/>${kwEye(98,28,6)}${kwEye(122,28,6)}${KW_SMILE(110,70,10)}`, say:['Die Krabbe Kneif zwickt die Inseln weg! Aua!','Kneif, lass los! Die Inseln brauchen wir!']},
+  {id:'kugel', name:'Kugelfisch Puffi', act:'lie', svg:`<g stroke="${KI}" stroke-width="3" stroke-linecap="round">${Array.from({length:14},(_,i)=>{const a=i/14*Math.PI*2, x1=110+Math.cos(a)*44, y1=52+Math.sin(a)*44, x2=110+Math.cos(a)*54, y2=52+Math.sin(a)*54; return `<path d="M${x1.toFixed(0)} ${y1.toFixed(0)} L${x2.toFixed(0)} ${y2.toFixed(0)}"/>`;}).join('')}</g><circle cx="110" cy="52" r="44" fill="#FFE27A" stroke="${KI}" stroke-width="3"/><path d="M150 50 l22 -12 v28 Z" fill="#F2B83C" stroke="${KI}" stroke-width="2.6" stroke-linejoin="round"/>${kwEye(96,44,9)}${kwEye(122,44,9)}<circle cx="110" cy="70" r="6" fill="#F96D9B" stroke="${KI}" stroke-width="2.4"/>`, say:['Der Kugelfisch Puffi hat sich aufgeblasen! Jetzt sieht man nichts mehr!','Puffi, du bist so rund wie ein Ball! Und du liegst auf meinen Inseln!']},
+  {id:'pinguin', name:'Pinguin Flitz', act:'lie', svg:`<ellipse cx="104" cy="66" rx="78" ry="24" fill="#3B3F5A" stroke="${KI}" stroke-width="3"/><ellipse cx="104" cy="72" rx="62" ry="14" fill="#fff"/><path d="M60 54 Q40 40 30 46 Q44 52 52 62 Z" fill="#3B3F5A" stroke="${KI}" stroke-width="2.6" stroke-linejoin="round"/><path d="M26 66 l-16 -6 v14 Z" fill="#F2B83C" stroke="${KI}" stroke-width="2.4" stroke-linejoin="round"/><circle cx="182" cy="58" r="20" fill="#3B3F5A" stroke="${KI}" stroke-width="3"/><ellipse cx="186" cy="62" rx="12" ry="11" fill="#fff"/>${kwEye(186,56,4.5)}<path d="M198 64 l16 2 -16 5 Z" fill="#F2B83C" stroke="${KI}" stroke-width="2.2" stroke-linejoin="round"/>`, say:['Wuuusch! Der Pinguin Flitz rutscht auf dem Bauch über die Inseln!','Flitz, das ist keine Rutschbahn! Na gut, ein bisschen schon.']},
+  {id:'seekuh', name:'Seekuh Mampf', act:'lie', svg:`<path d="M24 66 Q4 54 4 76 Q4 92 26 82 Z" fill="#C9B4C8" stroke="${KI}" stroke-width="3" stroke-linejoin="round"/><ellipse cx="108" cy="66" rx="86" ry="28" fill="#D8C4D6" stroke="${KI}" stroke-width="3"/><path d="M120 88 Q126 98 140 96 Q134 88 134 82 Z" fill="#C9B4C8" stroke="${KI}" stroke-width="2.6" stroke-linejoin="round"/><circle cx="188" cy="60" r="22" fill="#D8C4D6" stroke="${KI}" stroke-width="3"/><ellipse cx="200" cy="70" rx="13" ry="10" fill="#E8D8E6" stroke="${KI}" stroke-width="2.4"/>${kwEye(184,52,5)}<circle cx="198" cy="68" r="1.8" fill="${KI}"/><circle cx="206" cy="68" r="1.8" fill="${KI}"/><path d="M196 82 q8 -8 0 -10" stroke="#4FA84F" stroke-width="3" fill="none"/>`, say:['Die Seekuh Mampf futtert Seegras auf den Inseln. Mampf, mampf!','Mampf, du verfressenes Seekuh-Ding! Rutsch mal!']}
+], space:[
+  {id:'alien', name:'Alien Blubb', act:'lie', svg:`<path d="M80 30 L66 8 M140 30 L154 8" stroke="${KI}" stroke-width="3" stroke-linecap="round"/><circle cx="66" cy="8" r="5" fill="#F96D9B"/><circle cx="154" cy="8" r="5" fill="#F96D9B"/><ellipse cx="110" cy="62" rx="94" ry="34" fill="#8EDB6E" stroke="${KI}" stroke-width="3"/>${kwEye(84,54,9)}${kwEye(110,46,11)}${kwEye(136,54,9)}<path d="M92 74 Q110 90 128 74" stroke="${KI}" stroke-width="3" fill="#F96D9B" stroke-linejoin="round"/>`, say:['Das Alien Blubb macht es sich auf den Planeten gemütlich! Hihi, das kitzelt.','He, Blubb! Das sind meine Planeten! Keine Angst, das will nur spielen.']},
+  {id:'ufo', name:'Ufo-Zip', act:'beam', svg:`<path d="M80 50 L50 100 H170 L140 50 Z" fill="#FFF3B0" opacity=".55"/><ellipse cx="110" cy="44" rx="72" ry="16" fill="#B493F0" stroke="${KI}" stroke-width="3"/><path d="M80 40 Q110 4 140 40" fill="#E3F3FC" stroke="${KI}" stroke-width="3"/><circle cx="110" cy="26" r="8" fill="#8EDB6E" stroke="${KI}" stroke-width="2"/><circle cx="112" cy="24" r="2.6" fill="${KI}"/><g fill="#FFE27A" stroke="${KI}" stroke-width="1.6"><circle cx="60" cy="48" r="4"/><circle cx="90" cy="54" r="4"/><circle cx="130" cy="54" r="4"/><circle cx="160" cy="48" r="4"/></g>`, say:['Zack! Das Ufo beamt die Planeten weg! Bring die wieder!','Hilfe, ein Beam-Strahl! Die Planeten sind weg. Sag du mir die Zahl!']},
+  {id:'katze', name:'Weltraumkatze Miez', act:'lie', svg:`<path d="M24 60 Q4 40 14 24" fill="none" stroke="${KI}" stroke-width="9" stroke-linecap="round"/><path d="M24 60 Q4 40 14 24" fill="none" stroke="#F2B83C" stroke-width="5" stroke-linecap="round"/><ellipse cx="96" cy="68" rx="76" ry="24" fill="#F2B83C" stroke="${KI}" stroke-width="3"/><path d="M60 52 v28 M90 48 v36 M120 50 v32" stroke="#D99A1E" stroke-width="5" stroke-linecap="round"/><circle cx="176" cy="52" r="30" fill="#E3F3FC" fill-opacity=".6" stroke="${KI}" stroke-width="3"/><path d="M160 40 l4 -14 10 10 M192 40 l-4 -14 -10 10" fill="#F2B83C" stroke="${KI}" stroke-width="2.4" stroke-linejoin="round"/><circle cx="176" cy="54" r="18" fill="#F2B83C" stroke="${KI}" stroke-width="2.4"/>${kwEye(170,50,4)}${kwEye(184,50,4)}<path d="M174 60 l2 2 2 -2" fill="none" stroke="${KI}" stroke-width="2"/><path d="M160 58 l-14 -2 M160 62 l-14 2 M192 58 l14 -2 M192 62 l14 2" stroke="${KI}" stroke-width="1.4"/>`, say:['Die Weltraumkatze Miez schnurrt auf den Planeten! Miau!','Miez, du Schmusekatze! Du liegst auf meiner Karte!']},
+  {id:'robo', name:'Roboter Klonk', act:'lie', svg:`<rect x="20" y="44" width="150" height="46" rx="10" fill="#B8C4D8" stroke="${KI}" stroke-width="3"/><g fill="#F96D6D" stroke="${KI}" stroke-width="1.6"><circle cx="50" cy="66" r="6"/></g><g fill="#FFE27A" stroke="${KI}" stroke-width="1.6"><circle cx="70" cy="66" r="6"/></g><g fill="#8EDB6E" stroke="${KI}" stroke-width="1.6"><circle cx="90" cy="66" r="6"/></g><path d="M110 56 h44 M110 66 h44 M110 76 h44" stroke="#8E9AB0" stroke-width="3"/><rect x="164" y="36" width="50" height="44" rx="8" fill="#CFD8E8" stroke="${KI}" stroke-width="3"/><rect x="172" y="46" width="34" height="14" rx="5" fill="#2A2150"/><circle cx="182" cy="53" r="3.4" fill="#5FC9C9"/><circle cx="196" cy="53" r="3.4" fill="#5FC9C9"/><path d="M178 70 h22" stroke="${KI}" stroke-width="2.6"/><path d="M189 36 v-14" stroke="${KI}" stroke-width="3"/><circle cx="189" cy="18" r="5" fill="#F96D9B" stroke="${KI}" stroke-width="2"/>`, say:['Der Roboter Klonk ist auf den Planeten eingeschlafen. Piep, piep, schnarch!','Klonk, aufwachen! Beep boop! Nix da, der schläft.']},
+  {id:'hase', name:'Mondhase Hoppel', act:'lie', svg:`<ellipse cx="100" cy="68" rx="74" ry="24" fill="#fff" stroke="${KI}" stroke-width="3"/><circle cx="26" cy="64" r="10" fill="#fff" stroke="${KI}" stroke-width="2.6"/><path d="M160 46 Q130 18 104 22 Q126 34 150 54 Z M166 44 Q150 10 126 6 Q142 24 158 50 Z" fill="#fff" stroke="${KI}" stroke-width="2.6" stroke-linejoin="round"/><circle cx="176" cy="58" r="22" fill="#fff" stroke="${KI}" stroke-width="3"/>${kwEye(178,54,5)}<circle cx="194" cy="62" r="3" fill="#F96D9B"/><circle cx="176" cy="58" r="30" fill="none" stroke="#9ED3EA" stroke-width="3"/>`, say:['Der Mondhase Hoppel ist auf die Planeten gehüpft! Hoppel, hoppel!','Hoppel, du Mondhase! Hüpf mal woanders hin!']},
+  {id:'qualle', name:'Sternenqualle Wabbel', act:'lie', svg:`<g fill="none" stroke="#F8A8D0" stroke-width="5" stroke-linecap="round"><path d="M40 56 q-8 14 0 26 q8 12 0 22 M74 60 q-8 14 0 24 q8 10 0 18 M110 62 q-8 14 0 24 q8 10 0 16 M146 60 q8 14 0 24 q-8 10 0 18 M180 56 q8 14 0 26 q-8 12 0 22"/></g><path d="M22 58 Q30 6 110 6 Q190 6 198 58 Q150 66 110 64 Q70 66 22 58 Z" fill="#F8A8D0" fill-opacity=".85" stroke="${KI}" stroke-width="3" stroke-linejoin="round"/>${kwEye(94,36,7)}${kwEye(126,36,7)}${KW_SMILE(110,48,8)}${kwStar(60,26,5,'#FFE27A')}${kwStar(160,28,4,'#FFE27A')}`, say:['Die Sternenqualle Wabbel wabbelt über die Planeten! Wabbel, wabbel!','Iiih, glibberig! Wabbel, du bist ja ganz durchsichtig. Aber die Zahl sehe ich trotzdem nicht!']},
+  {id:'komet', name:'Komet Kometi', act:'lie', svg:`<path d="M140 30 L6 18 L30 44 L4 58 L40 64 L14 88 L140 72 Z" fill="#FFF3B0" stroke="#F2B83C" stroke-width="3" stroke-linejoin="round"/>${kwStar(40,40,6,'#FFE27A')}${kwStar(70,64,5,'#FFE27A')}<circle cx="160" cy="50" r="38" fill="#FFE27A" stroke="${KI}" stroke-width="3"/>${kwEye(148,44,8)}${kwEye(174,44,8)}${KW_SMILE(161,62,12)}`, say:['Der Komet Kometi ist auf den Planeten gelandet! Kawumm, das war knapp!','Kometi, du Raser! Bremsen musst du lernen!']},
+  {id:'kuh', name:'Weltraumkuh Muhli', act:'lie', svg:`<ellipse cx="96" cy="68" rx="76" ry="26" fill="#fff" stroke="${KI}" stroke-width="3"/><path d="M50 52 q14 -4 20 8 q-10 12 -22 4 Z M100 70 q16 -6 22 6 q-8 12 -22 6 Z M130 50 q10 -2 14 6 q-6 8 -14 2 Z" fill="${KI}"/><path d="M22 66 q-14 4 -14 16" stroke="${KI}" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="178" cy="54" r="32" fill="#E3F3FC" fill-opacity=".55" stroke="${KI}" stroke-width="3"/><path d="M164 34 q-8 -6 -6 -14 M192 34 q8 -6 6 -14" stroke="#F2B83C" stroke-width="4" fill="none" stroke-linecap="round"/><circle cx="178" cy="54" r="20" fill="#fff" stroke="${KI}" stroke-width="2.4"/>${kwEye(172,48,4)}${kwEye(186,48,4)}<ellipse cx="179" cy="64" rx="11" ry="7" fill="#F8C7DF" stroke="${KI}" stroke-width="2"/>`, say:['Muuuh! Die Weltraumkuh Muhli liegt auf den Planeten!','Muhli, du kannst doch nicht im Weltall rumliegen! Na gut, du kannst.']}
+]};
+function kwLumiJoke(){ return {id:'lumi', name:'Lumi', act:'lie', html:'<div class="kwlumijoke">'+unicornSVG(kwNoRainbow(S.gear),210)+'<span class="zz">z z z</span></div>', say:['Lumi! Du kannst dich doch nicht einfach auf meine Inseln legen! Hihi. Sag du mir die Zahl.','Waaas? Lumi macht ein Nickerchen auf der Schatzkarte! Typisch Einhorn!']}; }
+function kwPickCritter(){
+  if(Math.random()<0.06) return kwLumiJoke();
+  const pool=KR.space?KW_CRIT.space:KW_CRIT.sea;
+  let c; do{ c=pool[Math.floor(Math.random()*pool.length)]; } while(pool.length>1 && c.id===KR.lastCrit);
+  KR.lastCrit=c.id; return c;
+}
+/* ---------- Meere und Himmel: wechseln von Fahrt zu Fahrt (die ersten zwei Fahrten immer normal) ---------- */
+const KW_WAVES=(c)=>"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='90'%3E%3Cpath d='M10 30 q10 -8 20 0 t20 0 M70 70 q10 -8 20 0 t20 0' fill='none' stroke='%23"+c+"' stroke-opacity='.5' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E\")";
+const KW_BUBBLES=(c)=>"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='90'%3E%3Cg fill='none' stroke='%23"+c+"' stroke-opacity='.55' stroke-width='2'%3E%3Ccircle cx='20' cy='20' r='5'/%3E%3Ccircle cx='30' cy='34' r='3'/%3E%3Ccircle cx='86' cy='60' r='6'/%3E%3Ccircle cx='100' cy='76' r='3'/%3E%3Ccircle cx='60' cy='12' r='2.5'/%3E%3C/g%3E%3C/svg%3E\")";
+const KW_DOTS=(c)=>"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='120'%3E%3Cg fill='%23"+c+"'%3E%3Ccircle cx='14' cy='20' r='1.6'/%3E%3Ccircle cx='70' cy='8' r='1.1'/%3E%3Ccircle cx='110' cy='40' r='1.8'/%3E%3Ccircle cx='40' cy='70' r='1.2'/%3E%3Ccircle cx='96' cy='96' r='1.4'/%3E%3Ccircle cx='20' cy='108' r='1'/%3E%3C/g%3E%3Cpath d='M58 52 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2 Z' fill='%23FFE27A' opacity='.8'/%3E%3C/svg%3E\")";
+const KW_SEAS=[
+  {name:'Meer', bg:'#7CC6E8', bd:'#9ED3EA', ring:'#BFE7F7', img:KW_WAVES('ffffff'), path:'#fff'},
+  {name:'Cola-Meer', bg:'#5A3420', bd:'#3E2416', ring:'#8A5A3B', img:KW_BUBBLES('F5E6D3'), path:'#F5E6D3', say:'Iiih, ein Cola-Meer! Das blubbert und kitzelt am Schiff!'},
+  {name:'Sauer-Meer', bg:'#9BDB4D', bd:'#79B833', ring:'#C8F08A', img:KW_BUBBLES('ffffff'), path:'#fff', say:'Bäh, ein Sauer-Meer! So sauer wie eine Zitrone! Bloß nicht reinfallen!'},
+  {name:'Schoko-Meer', bg:'#A0663A', bd:'#7A4E2A', ring:'#C99A6E', img:KW_WAVES('F3D8B8'), path:'#F3D8B8', say:'Ein Schoko-Meer! Mmmh! Nicht naschen, wir sind auf Schatzsuche!'},
+  {name:'Glitzer-Meer', bg:'#F4A6CF', bd:'#E58AB8', ring:'#FBD3E8', img:KW_DOTS('ffffff'), path:'#fff', say:'Ooooh, ein Glitzer-Meer! Alles funkelt!'}
+];
+const KW_SKIES=[
+  {name:'Weltall', bg:'#2A2150', bd:'#4B3F86', img:KW_DOTS('ffffff'), path:'#FFE27A'},
+  {name:'Bonbon-Galaxie', bg:'#5A1E5E', bd:'#7A3A7E', img:KW_DOTS('F8A8D0'), path:'#F8A8D0', say:'Eine Bonbon-Galaxie! Hier riecht sogar das Weltall nach Erdbeere!'},
+  {name:'Glibber-Nebel', bg:'#123C3A', bd:'#22605C', img:KW_DOTS('8EDB6E'), path:'#8EDB6E', say:'Uiii, der Glibber-Nebel! Hier wohnen die schleimigsten Aliens!'}
+];
+function kwPickWorld(rs){
+  const list=rs.stage==='space'?KW_SKIES:KW_SEAS;
+  if(rs.runs<2 || Math.random()<0.35) return list[0];
+  return list[1+Math.floor(Math.random()*(list.length-1))];
+}
 function kwDuoHTML(size){
   return `<div class="kwduo"><div class="kwduo-lumi">${unicornSVG(kwNoRainbow(S.gear), size||150)}</div><img class="kwduo-kaw" src="${KW_IMG}" alt="Kawumm"></div>`;
 }
@@ -323,13 +380,6 @@ kwCSS.textContent=`
 .kwstrip b.faint{opacity:.38;}
 .kwstrip b.zip{animation:kwzip .5s ease;}
 @keyframes kwzip{0%{transform:scale(1.6); background:#FFE27A}100%{transform:scale(1)}}
-.kwstrip.covered b,.kwstrip.covered .jump{filter:blur(4px); opacity:.5;}
-.kwcover{position:absolute; left:50%; top:50%; width:110px; transform:translate(-50%,-50%); animation:kwcoverin .5s cubic-bezier(.3,1.4,.5,1), kwbob 1.6s ease-in-out .5s infinite; pointer-events:none;}
-.kwcover svg{width:100%; height:auto; display:block;}
-@keyframes kwcoverin{from{transform:translate(-50%,-160%) scale(.4)}}
-@keyframes kwbob{50%{transform:translate(-50%,-62%)}}
-.kwcover.bye{animation:kwbye .6s ease forwards;}
-@keyframes kwbye{to{transform:translate(160%,-140%) rotate(20deg); opacity:0}}
 .kwsay{position:absolute; left:10px; right:10px; bottom:10px; z-index:4; background:rgba(255,255,255,.95); border-radius:16px; padding:6px 12px; font-weight:700; font-size:15px; text-align:center; color:${KW_INK}; min-height:1.6em; pointer-events:none;}
 .kwbanner{position:absolute; top:34%; left:50%; transform:translate(-50%,-50%) scale(0); z-index:5; background:#E04A40; color:#fff; font-family:var(--font-disp); font-weight:700; font-size:28px; padding:6px 22px; border-radius:999px; white-space:nowrap; transition:transform .35s cubic-bezier(.3,1.4,.5,1); pointer-events:none;}
 .kwbanner.show{transform:translate(-50%,-50%) scale(1);}
@@ -343,6 +393,46 @@ kwCSS.textContent=`
 .kwend .kwfind{animation:kwfindpop .7s cubic-bezier(.3,1.4,.5,1) .8s both;}
 @keyframes kwfindpop{from{transform:translateY(40px) scale(.2); opacity:0}}
 .kwend .kwmini{width:96px;}
+
+.kwmap .kwring{fill:var(--kwring,#BFE7F7);}
+.kwopt.locked{pointer-events:none;}
+.kwblock{position:absolute; left:50%; width:96%; max-width:480px; transform:translate(-50%,-55%); z-index:4; pointer-events:none;}
+.kwblock svg{width:100%; height:auto; display:block; overflow:visible;}
+.kwblock.act-lie,.kwblock.act-gulp{animation:kwcritin .55s cubic-bezier(.3,1.4,.5,1) both;}
+.kwblock.act-lie.insky,.kwblock.act-beam{animation:kwcritsky .7s cubic-bezier(.3,1.2,.5,1) both;}
+.kwblock.act-sink{animation:kwcritsink .7s ease both;}
+.kwblock.act-grab{animation:kwcritgrab .6s cubic-bezier(.3,1.4,.5,1) both;}
+@keyframes kwcritin{from{transform:translate(-50%,10%) scale(.6); opacity:0}}
+@keyframes kwcritsky{from{transform:translate(-50%,-260%) scale(.5); opacity:0}}
+@keyframes kwcritsink{from{transform:translate(-50%,40%); opacity:0}}
+@keyframes kwcritgrab{0%{transform:translate(-50%,40%) scale(.5); opacity:0}70%{transform:translate(-50%,-62%) scale(1.06)}}
+.kwblock.bye{animation:kwcritout .6s ease forwards!important;}
+.kwblock.act-sink.bye,.kwblock.act-grab.bye{animation:kwcritdown .6s ease forwards!important;}
+.kwblock.insky.bye,.kwblock.act-beam.bye{animation:kwcritup .6s ease forwards!important;}
+@keyframes kwcritout{to{transform:translate(60%,-90%) rotate(14deg) scale(.6); opacity:0}}
+@keyframes kwcritdown{to{transform:translate(-50%,60%) scale(.7); opacity:0}}
+@keyframes kwcritup{to{transform:translate(-50%,-300%) scale(.5); opacity:0}}
+.kwopt.under-lie{opacity:.0; transition:opacity .25s;}
+.kwopt.under-sink{transform:translate(-50%,10%) scale(.85)!important; opacity:0; transition:transform .5s ease, opacity .5s;}
+.kwopt.under-grab{transform:translate(-50%,-30%) scale(.4) rotate(18deg)!important; opacity:0; transition:transform .45s ease, opacity .45s;}
+.kwopt.under-gulp{transform:translate(40%,-90%) scale(.2)!important; opacity:0; transition:transform .45s ease-in, opacity .45s;}
+.kwopt.under-beam{transform:translate(-50%,-220%) scale(.5)!important; opacity:0; transition:transform .6s ease-in, opacity .6s;}
+.kwopt.back{animation:kwback .5s cubic-bezier(.3,1.4,.5,1);}
+@keyframes kwback{from{transform:translate(-50%,-50%) scale(.3); opacity:0}}
+.kwlumijoke{position:relative; transform:rotate(-6deg) scaleX(1.25); transform-origin:50% 60%;}
+.kwlumijoke svg{width:100%; height:auto;}
+.kwlumijoke .zz{position:absolute; right:6%; top:-4%; font-family:var(--font-disp); font-weight:700; font-size:22px; color:#fff; text-shadow:0 2px 0 rgba(59,42,82,.4); animation:islzzz 2.4s ease-in-out infinite;}
+.kwpad{position:absolute; left:8px; right:8px; bottom:8px; z-index:6; background:rgba(255,255,255,.96); border-radius:20px; padding:8px; box-shadow:0 4px 0 rgba(59,42,82,.15); transform:translateY(120%); transition:transform .35s cubic-bezier(.3,1.2,.5,1);}
+.kwpad.show{transform:none;}
+.kwpadtop{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:0 6px 6px; font-weight:800; font-size:15px; color:${KW_INK};}
+.kwpadtop b{min-width:84px; text-align:center; font-family:var(--font-disp); font-size:30px; line-height:1.1; color:#E04A40; border-bottom:4px solid #E04A40; font-variant-numeric:tabular-nums;}
+.kwpadtop b.good{color:var(--ok); border-color:var(--ok);}
+.kwpadtop b.again{color:var(--warm); border-color:var(--warm);}
+.kwkeys{display:grid; grid-template-columns:repeat(6,1fr); gap:6px;}
+.kwkeys button{font-family:var(--font-disp); font-weight:700; font-size:24px; min-height:50px; border-radius:14px; background:#FFF8EC; border:2px solid #EBCB94; box-shadow:0 3px 0 #EBCB94; color:${KW_INK};}
+.kwkeys button:active{transform:translateY(2px); box-shadow:0 1px 0 #EBCB94;}
+.kwkeys .ok{background:#E04A40; color:#fff; border-color:#E04A40; box-shadow:0 3px 0 #A8322B;}
+.kwkeys .del{color:var(--muted); font-size:20px;}
 /* Inseln und Karte */
 .kwcard{display:flex; align-items:center; gap:12px; width:100%; max-width:420px; background:#FFF6E6; border:2px solid #EBCB94; border-radius:20px; padding:8px 12px; text-align:left; box-shadow:0 3px 0 #EBCB94;}
 .kwcard img{height:66px; width:auto; flex:0 0 auto;}
@@ -422,20 +512,23 @@ function kwStart(r, ret){
   const space=rs.stage==='space';
   KR={r, rs, k:plan.startK, plan, clean:true, ret:ret||'path', busy:true, mode:kwHelpMode(rs), visited:[plan.startK], skipped:[], ok:0, steps:0, space, id:Math.random()};
   if(plan.superSpeed) for(let j=10;j>plan.startK;j--) KR.skipped.push(j);
-  const map=$('kwMap');
+  const map=$('kwMap'), world=kwPickWorld(rs); KR.world=world;
   map.className='kwmap'+(space?' space':'');
+  map.style.backgroundColor=world.bg; map.style.borderColor=world.bd; map.style.backgroundImage=world.img;
+  map.style.setProperty('--kwring', world.ring||'#BFE7F7');
   map.style.backgroundPosition='0 0';
-  $('kwTitle').textContent=(space?'Weltall':'Meer')+' · '+r+'er rückwärts';
+  $('kwTitle').textContent=world.name+' · '+r+'er';
   $('kwStars').textContent=S.stars;
   $('kwEnd').hidden=true;
   KR.seed=Math.floor(Math.random()*1e6)+1;
+  { const p=$('kwPad'); if(p) p.remove(); }
   $('kwLayer').innerHTML='<div class="kwlayerin" id="kwLayerIn"></div>'+kwShipHTML(space);
   show('kw');
   kwRenderLayer();
   kwShip().classList.add('sway');
   const my=KR.id;
   const name=S.name||'Romy';
-  const open = kwPick(space?KW_LINES.startSpace:KW_LINES.startSea).replace('{name}',name);
+  const open = world.say || kwPick(space?KW_LINES.startSpace:KW_LINES.startSea).replace('{name}',name);
   if(plan.superSpeed){
     KR.k=10; kwRenderStrip(); kwRenderLayerAt(10, true);
     kwSayLine(open);
@@ -481,9 +574,7 @@ function kwRenderStrip(zip){
     }
     else h+= mode==='sea1' ? '<b class="faint">'+v+'</b>' : '<b>?</b>';
   }
-  const cov=el.querySelector('.kwcover');
   el.innerHTML=h;
-  if(cov) el.appendChild(cov);
 }
 function kwStationHTML(n, treasure){ return KR.space ? kwPlanetSVG(n,treasure) : kwIslandSVG(n,treasure); }
 function kwRenderLayerAt(k, noOpts){
@@ -491,7 +582,7 @@ function kwRenderLayerAt(k, noOpts){
   L.style.transition='none'; L.style.transform='none';
   const r=KR.r, cur=k*r;
   let h='<svg class="kwpath" viewBox="0 0 100 100" preserveAspectRatio="none">';
-  if(!noOpts && k>=1) KW_OPT_X.forEach(x=>{ h+='<path d="M50 '+(KW_ST.y*100+6)+' Q'+((50+x*100)/2)+' '+((KW_ST.y+KW_OPT_Y)*50)+' '+(x*100)+' '+(KW_OPT_Y*100-8)+'" fill="none" stroke="'+(KR.space?'#FFE27A':'#fff')+'" stroke-width="3" stroke-dasharray="2 9" stroke-linecap="round" vector-effect="non-scaling-stroke" opacity=".9"/>'; });
+  if(!noOpts && k>=1) KW_OPT_X.forEach(x=>{ h+='<path d="M50 '+(KW_ST.y*100+6)+' Q'+((50+x*100)/2)+' '+((KW_ST.y+KW_OPT_Y)*50)+' '+(x*100)+' '+(KW_OPT_Y*100-8)+'" fill="none" stroke="'+((KR.world&&KR.world.path)||'#fff')+'" stroke-width="3" stroke-dasharray="2 9" stroke-linecap="round" vector-effect="non-scaling-stroke" opacity=".9"/>'; });
   h+='</svg>';
   h+='<div class="kwst" style="left:'+(KW_ST.x*100)+'%;top:'+(KW_ST.y*100)+'%">'+kwStationHTML(cur,false)+'</div>';
   KR.opts=[];
@@ -508,30 +599,87 @@ function kwRenderLayerAt(k, noOpts){
 function kwRenderLayer(){ kwRenderLayerAt(KR.k,false); }
 function kwStep(){
   if(!KR) return;
-  const r=KR.r, cur=KR.k*r, el=$('kwStrip');
-  // Störenfried auf der Karte?
-  const old=el.querySelector('.kwcover');
-  if(old){ old.classList.add('bye'); setTimeout(()=>old.remove(),600); el.classList.remove('covered'); }
-  if(KR.plan.covers.includes(KR.k)){
-    const c=document.createElement('div'); c.className='kwcover'; c.innerHTML=KR.space?KW_ALIEN:KW_GULL;
-    setTimeout(()=>{ if(!KR) return; el.appendChild(c); el.classList.add('covered'); kwSayLine(kwPick(KR.space?KW_LINES.alien:KW_LINES.gull)); tone(KR.space?880:660,.12,0,'square',.05); tone(KR.space?990:520,.12,.12,'square',.05); }, old?650:50);
-  } else if(KR.steps>0){
+  const r=KR.r, cur=KR.k*r;
+  if(KR.plan.covers.includes(KR.k)){ kwBlock(); return; }
+  if(KR.steps>0){
     // kurz die Zahl sagen, damit der Weg hörbar bleibt
     $('kwSay').textContent=cur+'. Und weiter?';
     if(KR.steps<3) kwSay(cur+'. Und weiter?'); else kwSay(String(cur));
   }
   KR.busy=false; KR.t=performance.now();
 }
-function kwChoose(i){
-  if(!KR||KR.busy) return;
+/* Ein Störenfried kommt auf die Inseln. Romy tippt die Zahl selbst ein. */
+function kwBlock(){
+  const my=KR.id, c=kwPickCritter(), IN=$('kwLayerIn');
+  KR.block={c, typed:''};
+  const opts=IN.querySelectorAll('.kwopt'); opts.forEach(b=>b.classList.add('locked'));
+  const el=document.createElement('div');
+  el.className='kwblock act-'+c.act+(KR.space?' insky':'');
+  el.style.top=(KW_OPT_Y*100)+'%';
+  el.innerHTML=c.html||('<svg viewBox="0 0 220 100" aria-hidden="true">'+c.svg+'</svg>');
+  IN.appendChild(el);
+  // was mit den Inseln passiert
+  setTimeout(()=>{ if(!KR||KR.id!==my) return; opts.forEach(b=>b.classList.add('under-'+c.act)); }, c.act==='lie'?350:500);
+  if(c.act==='sink'){ tone(220,.25,0,'sine',.12); tone(160,.3,.15,'sine',.1); }
+  else if(c.act==='beam'){ [880,990,1180].forEach((f,i)=>tone(f,.1,i*.08,'square',.04)); }
+  else if(c.act==='gulp'){ tone(300,.12,0,'triangle',.1); tone(200,.16,.12,'triangle',.1); }
+  else { tone(660,.12,0,'square',.05); tone(520,.12,.12,'square',.05); }
+  // Zahlenfeld
+  const pad=document.createElement('div'); pad.className='kwpad'; pad.id='kwPad';
+  pad.innerHTML='<div class="kwpadtop"><span>'+(KR.k===1?'Und die letzte Zahl?':'Welche Zahl kommt jetzt?')+'</span><b id="kwTyped">?</b></div><div class="kwkeys">'
+    +['1','2','3','4','5','⌫','6','7','8','9','0','✓'].map(k=>'<button data-k="'+k+'"'+(k==='✓'?' class="ok"':k==='⌫'?' class="del"':'')+'>'+k+'</button>').join('')+'</div>';
+  $('kwMap').appendChild(pad);
+  pad.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>kwType(b.dataset.k)));
+  const line=kwPick(c.say);
+  setTimeout(()=>{ if(!KR||KR.id!==my) return; pad.classList.add('show'); $('kwSay').textContent=line; kwSay(line+' Tipp die Zahl ein!'); KR.busy=false; KR.t=performance.now(); }, 700);
+}
+function kwType(k){
+  if(!KR||KR.busy||!KR.block) return;
+  const B=KR.block, ans=(KR.k-1)*KR.r, el=$('kwTyped');
+  if(k==='⌫'){ B.typed=B.typed.slice(0,-1); }
+  else if(k==='✓'){ if(B.typed) kwTypedDone(); return; }
+  else if(B.typed.length<3){ B.typed+=k; }
+  el.textContent=B.typed||'?';
+  // genug Ziffern: sofort prüfen, kein OK-Knopf nötig
+  if(B.typed.length>=String(ans).length) setTimeout(()=>{ if(KR&&KR.block===B&&!KR.busy) kwTypedDone(); },180);
+}
+function kwTypedDone(){
+  const B=KR.block, val=parseInt(B.typed,10), ans=(KR.k-1)*KR.r, my=KR.id;
+  const rt=performance.now()-KR.t, eff=rt*KW_FAST/KW_FAST_TYPE;     // 7 s Eintippen zählt wie 4 s Tippen
   KR.busy=true;
-  const rt=performance.now()-KR.t, r=KR.r, k=KR.k, val=KR.opts[i], ans=(k-1)*r, correct=val===ans;
+  const correct=kwRecord(val, eff);
+  $('kwTyped').textContent=correct?String(val):ans;
+  $('kwTyped').classList.add(correct?'good':'again');
+  const IN=$('kwLayerIn'), opts=IN.querySelectorAll('.kwopt'), ai=KR.opts.indexOf(ans), blk=IN.querySelector('.kwblock'), pad=$('kwPad');
+  if(correct){ sndGood(); $('kwStars').textContent=S.stars; kwSayLine(kwPick(['Kawumm! Aus dem Kopf gewusst!','Ha! Da staunt '+B.c.name+'!','Richtig! Und tschüss, '+B.c.name+'!'])); }
+  else { sndAgain(); kwSayLine('Fast! Es ist die '+ans+'. Tschüss, '+B.c.name+'!'); }
+  setTimeout(()=>{
+    if(!KR||KR.id!==my) return;
+    if(pad) pad.classList.remove('show');
+    if(blk) blk.classList.add('bye');
+    opts.forEach(b=>{ b.className=b.className.replace(/ ?under-\w+/g,''); b.classList.add('back'); });
+    if(opts[ai]) opts[ai].classList.add('glow');
+    setTimeout(()=>{ if(pad) pad.remove(); if(blk) blk.remove(); },700);
+    KR.block=null;
+    kwSail(ai, 700);
+  }, correct?700:1500);
+}
+/* Ergebnis eines Schritts eintragen (Tippen auf Insel oder Eintippen) */
+function kwRecord(val, rt){
+  const r=KR.r, k=KR.k, ans=(k-1)*r, correct=val===ans;
   kwApplyStep(KR.rs.steps[k], correct, rt);
   KR.steps++;
   if(correct){ KR.ok++; S.stars++; } else KR.clean=false;
   if(rt>KW_FAST) KR.clean=false;
   logDay(S,Date.now(),0,1,correct?1:0); save();
-  const ai=KR.opts.indexOf(ans), btns=$('kwLayer').querySelectorAll('.kwopt');
+  return correct;
+}
+function kwChoose(i){
+  if(!KR||KR.busy||KR.block) return;
+  KR.busy=true;
+  const rt=performance.now()-KR.t, ans=(KR.k-1)*KR.r, val=KR.opts[i];
+  const correct=kwRecord(val, rt);
+  const ai=KR.opts.indexOf(ans), btns=$('kwLayerIn').querySelectorAll('.kwopt');
   if(correct){
     sndGood(); $('kwStars').textContent=S.stars;
     const b=btns[ai].getBoundingClientRect(); burst(18,(b.left+b.width/2)/innerWidth,(b.top+b.height/2)/innerHeight,6);
@@ -548,7 +696,7 @@ function kwSail(ai, delay){
   const my=KR.id;
   setTimeout(()=>{
     if(!KR||KR.id!==my) return;
-    const btns=$('kwLayer').querySelectorAll('.kwopt');
+    const btns=$('kwLayerIn').querySelectorAll('.kwopt');
     btns.forEach((b,j)=>{ if(j!==ai) b.classList.add('gone'); });
     kwPlaceShip(KW_OPT_X[ai], KW_OPT_Y, true);
     setTimeout(()=>{
@@ -568,8 +716,7 @@ function kwSail(ai, delay){
 function kwTreasure(ai){
   const r=KR.r, rs=KR.rs, before=kwAvail();
   // die letzte Insel bekommt die Schatzkiste
-  const btns=$('kwLayer').querySelectorAll('.kwopt'); if(btns[ai]) btns[ai].innerHTML=kwStationHTML(0,true);
-  const cov=$('kwStrip').querySelector('.kwcover'); if(cov){ cov.classList.add('bye'); setTimeout(()=>cov.remove(),600); } $('kwStrip').classList.remove('covered');
+  const btns=$('kwLayerIn').querySelectorAll('.kwopt'); if(btns[ai]) btns[ai].innerHTML=kwStationHTML(0,true);
   const res=kwFinishRun(rs, KR.clean);
   bumpStreak(S,Date.now()); save();
   const after=kwAvail(), newRow=after.find(x=>!before.includes(x));
@@ -610,7 +757,7 @@ const KW_GENUS={1:'m',2:'f',10:'n',5:'f',4:'n',8:'f',3:'n',6:'n',9:'f',7:'m'};
 function artNom(r){ return {m:'der',f:'die',n:'das'}[KW_GENUS[r]]; }
 function artDet(r){ return 'dein'+{m:'',f:'e',n:''}[KW_GENUS[r]]; }
 function artAcc(r){ return {m:'deinen',f:'deine',n:'dein'}[KW_GENUS[r]]; }
-function kwStop(){ KR=null; }
+function kwStop(){ KR=null; const p=$('kwPad'); if(p) p.remove(); }
 function kwLeave(){
   const ret=KR?KR.ret:'path'; const r=KR?KR.r:null; kwStop();
   if(ret==='island' && typeof openIsland==='function' && r && unlockedRows(S).includes(r)) openIsland(r);

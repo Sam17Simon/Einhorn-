@@ -577,9 +577,9 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=42"></script>
-<script src="game.js?v=42"></script>
-<script src="kawumm.js?v=42"></script>
+<script src="islands.js?v=43"></script>
+<script src="game.js?v=43"></script>
+<script src="kawumm.js?v=43"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -956,7 +956,7 @@ function sndClick(kind){
 }
 document.addEventListener('pointerdown',e=>{
   const b=e.target.closest('button'); if(!b) return;
-  if(b.closest('.pad')) sndClick('pad');
+  if(b.closest('.pad')||b.closest('.kwkeys')) sndClick('pad');
   else if(b.classList.contains('bigbtn')||b.classList.contains('cta')||b.classList.contains('rowbtn')||b.classList.contains('callbtn')) sndClick('big');
   else sndClick('small');
 },{passive:true});
