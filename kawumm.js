@@ -185,29 +185,84 @@ function kwBoxSVG(r, n, size, locked){
   return `<svg viewBox="0 0 100 100" width="${w}" height="${w}" class="kwbox" aria-hidden="true">${back}${r!==8?items:''}${front}${r===8?items:''}${q}${full}</svg>`;
 }
 
-/* ---------- Grafiken der Schatzkarte ---------- */
+/* ---------- Grafiken der Schatzkarte ----------
+   Jede Zahl bekommt ihr eigenes Aussehen. Gleiche Zahl = gleiche Insel innerhalb einer Fahrt
+   (wichtig: die gewählte Insel wird oben zur Station), jede neue Fahrt mischt neu. */
+function kwRng(seed){ let a=seed>>>0; return ()=>{ a=(a+0x6D2B79F5)>>>0; let t=a; t=Math.imul(t^(t>>>15),t|1); t^=t+Math.imul(t^(t>>>7),t|61); return ((t^(t>>>14))>>>0)/4294967296; }; }
+function kwSeed(n){ return n*7919+((KR&&KR.seed)||1); }
+const KW_CHEST=(x,y)=>`<g transform="translate(${x} ${y})"><rect x="0" y="8" width="28" height="16" rx="3" fill="#B9773F" stroke="${KW_INK}" stroke-width="2.4"/><path d="M0 8 Q14 -2 28 8 Z" fill="#A0663A" stroke="${KW_INK}" stroke-width="2.4"/><rect x="11" y="10" width="6" height="7" rx="1.5" fill="#F2B83C"/></g>`;
+const KW_ISLE_SHAPES=[
+  {sand:'M6 48 Q12 26 50 24 Q88 26 94 48 Q80 60 50 60 Q20 60 6 48 Z', grass:'M18 40 Q30 30 50 30 Q70 30 82 40 Q66 46 50 46 Q34 46 18 40 Z', top:30},
+  {sand:'M3 50 Q9 34 50 32 Q91 34 97 50 Q82 61 50 61 Q18 61 3 50 Z', grass:'M14 44 Q30 37 50 37 Q70 37 86 44 Q66 49 50 49 Q34 49 14 44 Z', top:37},
+  {sand:'M6 50 Q6 30 28 28 Q42 28 50 35 Q58 26 74 26 Q95 29 94 50 Q80 61 50 61 Q20 61 6 50 Z', grass:'M14 42 Q16 32 30 33 Q42 34 46 40 Q36 46 24 46 Q14 46 14 42 Z M54 39 Q60 31 74 31 Q88 33 86 42 Q76 47 64 46 Q54 45 54 39 Z', top:32},
+  {sand:'M12 50 Q14 22 50 20 Q86 22 88 50 Q78 61 50 61 Q22 61 12 50 Z', grass:'M22 40 Q26 26 50 26 Q74 26 78 40 Q64 46 50 46 Q36 46 22 40 Z', top:26}
+];
+const KW_ISLE_COL=[['#F6D98B','#8FD39A'],['#F3C9A0','#A7DB7A'],['#EFE0B4','#7CCBA8'],['#F8D3B0','#B6DD8C']];
+const KW_DECO={
+  palm:(x,y)=>`<path d="M${x-2} ${y+4} Q${x} ${y-12} ${x+2} ${y-20}" stroke="#A06A36" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M${x+2} ${y-20} q-10 -2 -14 4 M${x+2} ${y-20} q10 -3 13 3 M${x+2} ${y-20} q-4 -8 -11 -8 M${x+2} ${y-20} q4 -8 10 -7" stroke="#4FA84F" stroke-width="3.2" fill="none" stroke-linecap="round"/><circle cx="${x+1}" cy="${y-17}" r="2" fill="#8A5530"/>`,
+  rocks:(x,y)=>`<path d="M${x-10} ${y+4} Q${x-10} ${y-6} ${x-3} ${y-7} Q${x+3} ${y-8} ${x+4} ${y+4} Z" fill="#B8B0C8" stroke="${KW_INK}" stroke-width="2.2" stroke-linejoin="round"/><path d="M${x+1} ${y+4} Q${x+2} ${y-3} ${x+7} ${y-3} Q${x+12} ${y-2} ${x+11} ${y+4} Z" fill="#CFC7DC" stroke="${KW_INK}" stroke-width="2.2" stroke-linejoin="round"/>`,
+  hut:(x,y)=>`<rect x="${x-7}" y="${y-8}" width="14" height="12" fill="#C98A4E" stroke="${KW_INK}" stroke-width="2.2"/><path d="M${x-10} ${y-7} L${x} ${y-17} L${x+10} ${y-7} Z" fill="#E04A40" stroke="${KW_INK}" stroke-width="2.2" stroke-linejoin="round"/><rect x="${x-2}" y="${y-3}" width="4" height="7" fill="${KW_INK}"/>`,
+  tower:(x,y)=>`<path d="M${x-5} ${y+4} L${x-3} ${y-20} L${x+3} ${y-20} L${x+5} ${y+4} Z" fill="#fff" stroke="${KW_INK}" stroke-width="2.2" stroke-linejoin="round"/><path d="M${x-4.4} ${y-4} H${x+4.4} M${x-3.8} ${y-12} H${x+3.8}" stroke="#E04A40" stroke-width="3.4"/><rect x="${x-4}" y="${y-26}" width="8" height="6" rx="1.5" fill="#FFE27A" stroke="${KW_INK}" stroke-width="2"/><path d="M${x-5} ${y-26} L${x} ${y-31} L${x+5} ${y-26} Z" fill="#E04A40" stroke="${KW_INK}" stroke-width="2" stroke-linejoin="round"/>`,
+  bush:(x,y)=>`<circle cx="${x-4}" cy="${y-3}" r="6" fill="#5FB866" stroke="${KW_INK}" stroke-width="2"/><circle cx="${x+4}" cy="${y-5}" r="7" fill="#6FC676" stroke="${KW_INK}" stroke-width="2"/><circle cx="${x-4}" cy="${y-5}" r="1.8" fill="#F96D9B"/><circle cx="${x+5}" cy="${y-8}" r="1.8" fill="#FFE27A"/><circle cx="${x+3}" cy="${y-1}" r="1.8" fill="#F96D9B"/>`,
+  volcano:(x,y)=>`<path d="M${x-12} ${y+4} L${x-4} ${y-14} L${x+4} ${y-14} L${x+12} ${y+4} Z" fill="#9C7A5E" stroke="${KW_INK}" stroke-width="2.2" stroke-linejoin="round"/><path d="M${x-4} ${y-14} q4 4 8 0" fill="#F28C2E" stroke="${KW_INK}" stroke-width="1.6"/><g class="kwsmoke"><circle cx="${x}" cy="${y-20}" r="3.5" fill="#E7E0EF"/><circle cx="${x+4}" cy="${y-25}" r="4.5" fill="#EFEAF4"/></g>`,
+  flag:(x,y)=>`<path d="M${x} ${y+4} V${y-22}" stroke="#7A4E2A" stroke-width="2.4"/><path d="M${x} ${y-22} L${x+14} ${y-18} L${x} ${y-13} Z" fill="${KW_INK}"/><circle cx="${x+5}" cy="${y-18}" r="1.8" fill="#fff"/><path d="M${x-8} ${y+3} l3 -4 3 4 Z" fill="#F96D9B" stroke="${KW_INK}" stroke-width="1.2"/>`,
+  twopalm:(x,y)=>KW_DECO.palm(x-5,y)+KW_DECO.palm(x+6,y+1),
+  starfish:(x,y)=>`${kwStar(x-4,y-1,5,'#F28C2E')}<path d="M${x+5} ${y+2} q3 -6 6 0 Z" fill="#F8C7DF" stroke="${KW_INK}" stroke-width="1.4"/>`
+};
+const KW_DECO_KEYS=Object.keys(KW_DECO);
 function kwIslandSVG(n, treasure){
+  const R=kwRng(kwSeed(n)), sh=KW_ISLE_SHAPES[Math.floor(R()*KW_ISLE_SHAPES.length)], col=KW_ISLE_COL[Math.floor(R()*KW_ISLE_COL.length)];
+  const deco=KW_DECO_KEYS[Math.floor(R()*KW_DECO_KEYS.length)], left=R()<0.5, dx=left?20:80;
+  const extra=R()<0.35 ? KW_DECO[KW_DECO_KEYS[Math.floor(R()*KW_DECO_KEYS.length)]](left?80:20, sh.top+8) : '';
   return `<svg viewBox="0 0 100 70" class="kwisl" aria-hidden="true">
-    <ellipse cx="50" cy="52" rx="48" ry="14" fill="#BFE7F7" opacity=".75"/>
-    <path d="M6 48 Q12 26 50 24 Q88 26 94 48 Q80 60 50 60 Q20 60 6 48 Z" fill="#F6D98B" stroke="${KW_INK}" stroke-width="3" stroke-linejoin="round"/>
-    <path d="M18 40 Q30 30 50 30 Q70 30 82 40 Q66 46 50 46 Q34 46 18 40 Z" fill="#8FD39A"/>
-    <path d="M80 34 Q82 18 84 10" stroke="#A06A36" stroke-width="3" fill="none" stroke-linecap="round"/>
-    <path d="M84 10 q-10 -2 -14 4 M84 10 q10 -3 13 3 M84 10 q-4 -8 -11 -8 M84 10 q4 -8 10 -7" stroke="#4FA84F" stroke-width="3.2" fill="none" stroke-linecap="round"/>
-    ${treasure?`<g transform="translate(36 22)"><rect x="0" y="8" width="28" height="16" rx="3" fill="#B9773F" stroke="${KW_INK}" stroke-width="2.4"/><path d="M0 8 Q14 -2 28 8 Z" fill="#A0663A" stroke="${KW_INK}" stroke-width="2.4"/><rect x="11" y="10" width="6" height="7" rx="1.5" fill="#F2B83C"/></g>`:''}
-    <text x="50" y="${treasure?57:50}" text-anchor="middle" class="kwnum">${n}</text>
+    <ellipse cx="50" cy="53" rx="49" ry="14" fill="#BFE7F7" opacity=".75"/>
+    <path d="${sh.sand}" fill="${col[0]}" stroke="${KW_INK}" stroke-width="3" stroke-linejoin="round"/>
+    <path d="${sh.grass}" fill="${col[1]}"/>
+    ${KW_DECO[deco](dx, sh.top+8)}${extra}
+    ${treasure?KW_CHEST(36,sh.top-8):''}
+    <text x="50" y="${treasure?58:52}" text-anchor="middle" class="kwnum">${n}</text>
   </svg>`;
 }
-const KW_PLANET=['#F28C2E','#58A6F0','#B493F0','#4FC47F','#F96D9B','#F2B83C'];
+const KW_PLANET=['#F28C2E','#58A6F0','#B493F0','#4FC47F','#F96D9B','#F2B83C','#5FC9C9','#E57A5A'];
 function kwPlanetSVG(n, treasure){
-  const c=KW_PLANET[n%KW_PLANET.length];
+  const R=kwRng(kwSeed(n)), c=KW_PLANET[Math.floor(R()*KW_PLANET.length)], pat=Math.floor(R()*4), ring=Math.floor(R()*3), moon=R()<0.4, tilt=Math.round(R()*30-15);
+  const dark='rgba(59,42,82,.18)', light='rgba(255,255,255,.35)';
+  const pattern=[
+    `<path d="M26 30 Q50 22 74 30 M25 42 Q50 50 75 42" stroke="${dark}" stroke-width="6" fill="none" stroke-linecap="round"/>`,
+    `<circle cx="40" cy="28" r="5" fill="${dark}"/><circle cx="62" cy="44" r="4" fill="${dark}"/><circle cx="58" cy="24" r="2.6" fill="${dark}"/>`,
+    `<circle cx="38" cy="26" r="6" fill="${light}"/><circle cx="64" cy="30" r="3" fill="${light}"/><circle cx="44" cy="48" r="3.5" fill="${light}"/>`,
+    `<path d="M30 36 Q40 22 52 30 Q64 38 70 26" stroke="${light}" stroke-width="5" fill="none" stroke-linecap="round"/>`][pat];
+  const back = ring===1 ? `<path d="M6 38 Q50 22 94 38" fill="none" stroke="#FFE27A" stroke-width="4" opacity=".9" transform="rotate(${tilt} 50 36)"/>` : ring===2 ? `<path d="M10 38 Q50 26 90 38" fill="none" stroke="#9ED3EA" stroke-width="3" opacity=".9" transform="rotate(${tilt} 50 36)"/><path d="M2 40 Q50 22 98 40" fill="none" stroke="#FFE27A" stroke-width="3" opacity=".8" transform="rotate(${tilt} 50 36)"/>` : '';
+  const front = ring===1 ? `<path d="M6 38 Q50 54 94 38" fill="none" stroke="#FFE27A" stroke-width="4" opacity=".95" transform="rotate(${tilt} 50 36)"/>` : ring===2 ? `<path d="M10 38 Q50 50 90 38" fill="none" stroke="#9ED3EA" stroke-width="3" transform="rotate(${tilt} 50 36)"/><path d="M2 40 Q50 58 98 40" fill="none" stroke="#FFE27A" stroke-width="3" transform="rotate(${tilt} 50 36)"/>` : '';
+  const mx=R()<0.5?14:86;
   return `<svg viewBox="0 0 100 70" class="kwisl" aria-hidden="true">
-    <ellipse cx="50" cy="38" rx="44" ry="10" fill="none" stroke="#FFE27A" stroke-width="4" transform="rotate(-10 50 38)" opacity=".9"/>
-    <circle cx="50" cy="36" r="26" fill="${c}" stroke="${KW_INK}" stroke-width="3"/>
-    <circle cx="40" cy="26" r="5" fill="#fff" opacity=".35"/><circle cx="62" cy="46" r="3.5" fill="${KW_INK}" opacity=".15"/>
-    <path d="M8 40 Q50 52 92 36" fill="none" stroke="#FFE27A" stroke-width="4" opacity=".9"/>
-    ${treasure?`<g transform="translate(36 2)"><rect x="0" y="8" width="28" height="16" rx="3" fill="#B9773F" stroke="${KW_INK}" stroke-width="2.4"/><path d="M0 8 Q14 -2 28 8 Z" fill="#A0663A" stroke="${KW_INK}" stroke-width="2.4"/><rect x="11" y="10" width="6" height="7" rx="1.5" fill="#F2B83C"/></g>`:''}
+    ${back}
+    <circle cx="50" cy="36" r="26" fill="${c}" stroke="${KW_INK}" stroke-width="3"/>${pattern}
+    ${front}
+    ${moon?`<circle cx="${mx}" cy="12" r="6" fill="#EDE7F6" stroke="${KW_INK}" stroke-width="2"/><circle cx="${mx-2}" cy="11" r="1.6" fill="#CFC7DC"/>`:''}
+    ${treasure?KW_CHEST(36,2):''}
     <text x="50" y="${treasure?60:46}" text-anchor="middle" class="kwnum">${n}</text>
   </svg>`;
+}
+/* Kleine Dinge am Rand der Karte, damit nicht jede Station gleich aussieht */
+const KW_SEA_FX=[
+  `<svg viewBox="0 0 60 40"><path d="M10 30 Q30 4 50 26" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="2 4" opacity=".7"/><path d="M40 20 q8 -8 14 2 q-6 8 -14 -2 Z" fill="#F28C2E" stroke="${KW_INK}" stroke-width="2"/><path d="M40 20 l-6 -4 v8 Z" fill="#F28C2E" stroke="${KW_INK}" stroke-width="2" stroke-linejoin="round"/><circle cx="50" cy="18" r="1.4" fill="${KW_INK}"/></svg>`,
+  `<svg viewBox="0 0 60 40"><path d="M14 30 Q30 14 46 30" fill="#6E8FB8" stroke="${KW_INK}" stroke-width="2.4"/><circle cx="24" cy="25" r="1.8" fill="${KW_INK}"/><path d="M30 14 q-4 -8 -8 -6 M30 14 q4 -8 8 -6 M30 14 v-8" stroke="#E6F6FF" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg>`,
+  `<svg viewBox="0 0 60 40"><path d="M20 34 Q16 16 24 10 Q30 18 26 34 Z M32 34 Q30 20 36 14 Q42 22 38 34 Z" fill="#B493F0" stroke="${KW_INK}" stroke-width="2" stroke-linejoin="round"/><circle cx="23" cy="20" r="1.6" fill="#fff"/><circle cx="36" cy="24" r="1.6" fill="#fff"/></svg>`,
+  `<svg viewBox="0 0 60 40"><path d="M30 6 V30" stroke="${KW_INK}" stroke-width="2"/><path d="M22 30 Q30 38 38 30 Z" fill="#E04A40" stroke="${KW_INK}" stroke-width="2"/><path d="M24 22 h12 M25 16 h10" stroke="#E04A40" stroke-width="3"/><circle cx="30" cy="6" r="3" fill="#FFE27A" stroke="${KW_INK}" stroke-width="1.4"/></svg>`,
+  `<svg viewBox="0 0 60 40"><path d="M14 28 H46 Q42 36 30 36 Q18 36 14 28 Z" fill="#C98A4E" stroke="${KW_INK}" stroke-width="2"/><path d="M30 6 V28 M31 8 L44 24 H31 Z" fill="#fff" stroke="${KW_INK}" stroke-width="2" stroke-linejoin="round"/></svg>`
+];
+const KW_SPACE_FX=[
+  `<svg viewBox="0 0 60 40"><path d="M6 34 L40 12" stroke="#FFE27A" stroke-width="3" stroke-linecap="round" opacity=".5"/><circle cx="44" cy="10" r="6" fill="#FFF3B0" stroke="${KW_INK}" stroke-width="2"/></svg>`,
+  `<svg viewBox="0 0 60 40"><ellipse cx="30" cy="24" rx="20" ry="7" fill="#B493F0" stroke="${KW_INK}" stroke-width="2.2"/><path d="M20 22 Q30 6 40 22" fill="#E3F3FC" stroke="${KW_INK}" stroke-width="2.2"/><circle cx="30" cy="16" r="3" fill="#8EDB6E"/><circle cx="22" cy="26" r="1.8" fill="#FFE27A"/><circle cx="38" cy="26" r="1.8" fill="#FFE27A"/></svg>`,
+  `<svg viewBox="0 0 60 40"><path d="M30 4 Q40 14 38 30 H22 Q20 14 30 4 Z" fill="#fff" stroke="${KW_INK}" stroke-width="2.2"/><circle cx="30" cy="16" r="3.5" fill="#58A6F0" stroke="${KW_INK}" stroke-width="1.6"/><path d="M22 30 l-6 6 h6 Z M38 30 l6 6 h-6 Z" fill="#E04A40" stroke="${KW_INK}" stroke-width="1.6"/><path d="M26 32 Q30 40 34 32" fill="#F2B83C"/></svg>`,
+  `<svg viewBox="0 0 60 40"><circle cx="30" cy="20" r="10" fill="#EDE7F6" stroke="${KW_INK}" stroke-width="2.2"/><circle cx="26" cy="17" r="2.4" fill="#CFC7DC"/><circle cx="34" cy="24" r="1.8" fill="#CFC7DC"/></svg>`,
+  `<svg viewBox="0 0 60 40">${'' }<g fill="#FFE27A">${[[14,10,4],[44,8,3],[30,26,5],[50,30,2.5]].map(([x,y,r])=>'<circle cx="'+x+'" cy="'+y+'" r="'+r+'" opacity=".85"/>').join('')}</g></svg>`
+];
+function kwFxHTML(){
+  if(Math.random()<0.35) return '';
+  const pool=KR.space?KW_SPACE_FX:KW_SEA_FX, left=Math.random()<0.5;
+  return '<div class="kwfx" style="left:'+(left?10:90)+'%;top:'+(44+Math.random()*6)+'%">'+pool[Math.floor(Math.random()*pool.length)]+'</div>';
 }
 function kwShipHTML(space){
   return `<div class="kwship${space?' fly':''}">
@@ -234,7 +289,13 @@ kwCSS.textContent=`
   background-size:120px 90px; transition:background-position .6s ease;}
 .kwmap.space{border-color:#4B3F86; background-color:#2A2150;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='120'%3E%3Cg fill='%23ffffff'%3E%3Ccircle cx='14' cy='20' r='1.6'/%3E%3Ccircle cx='70' cy='8' r='1.1'/%3E%3Ccircle cx='110' cy='40' r='1.8'/%3E%3Ccircle cx='40' cy='70' r='1.2'/%3E%3Ccircle cx='96' cy='96' r='1.4'/%3E%3Ccircle cx='20' cy='108' r='1'/%3E%3C/g%3E%3Cpath d='M58 52 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2 Z' fill='%23FFE27A' opacity='.8'/%3E%3C/svg%3E");}
-.kwlayer{position:absolute; inset:0; transition:transform .6s ease;}
+.kwlayer{position:absolute; inset:0; transition:transform .65s ease-in-out;}
+.kwlayerin{position:absolute; inset:0;}
+.kwfx{position:absolute; width:16%; max-width:70px; transform:translate(-50%,-50%); pointer-events:none; animation:kwbob2 2.6s ease-in-out infinite; opacity:.95;}
+.kwfx svg{width:100%; height:auto; display:block;}
+@keyframes kwbob2{50%{transform:translate(-50%,-62%)}}
+.kwsmoke{animation:kwsmoke 2.4s ease-in-out infinite;}
+@keyframes kwsmoke{50%{transform:translateY(-3px); opacity:.6}}
 .kwlayer svg.kwpath{position:absolute; inset:0; width:100%; height:100%; pointer-events:none;}
 .kwst,.kwopt{position:absolute; width:30%; max-width:150px; transform:translate(-50%,-50%); transition:opacity .4s, transform .3s;}
 .kwopt{background:none; padding:0; border:0;}
@@ -245,7 +306,7 @@ kwCSS.textContent=`
 @keyframes kwfog{0%{transform:translate(-50%,-50%)}20%{transform:translate(-56%,-50%)}40%{transform:translate(-44%,-50%)}60%{transform:translate(-53%,-50%)}100%{transform:translate(-50%,-50%); opacity:.25; filter:blur(3px) grayscale(1)}}
 .kwopt.glow .kwisl{filter:drop-shadow(0 0 10px #FFE27A) drop-shadow(0 0 4px #FFE27A);}
 .kwopt.gone{opacity:0;}
-.kwship{position:absolute; width:26%; max-width:130px; aspect-ratio:120/100; transform:translate(-50%,-92%); pointer-events:none; z-index:3; transition:left .7s ease-in-out, top .7s ease-in-out;}
+.kwship{position:absolute; width:26%; max-width:130px; aspect-ratio:120/100; transform:translate(-50%,-92%); pointer-events:none; z-index:3; transition:left .75s ease-in-out, top .75s ease-in-out;}
 .kwship svg{position:absolute; inset:0; width:100%; height:100%; overflow:visible;}
 .kwship .kwpirate{position:absolute; left:20%; bottom:22%; height:74%; width:auto;}
 .kwship.sway{animation:kwsway 2.4s ease-in-out infinite;}
@@ -345,7 +406,7 @@ document.head.appendChild(kwCSS);
 /* ---------- Schatzsuche ---------- */
 const KW_ST={x:0.5, y:0.22}, KW_OPT_Y=0.68, KW_OPT_X=[0.2,0.5,0.8];
 function kwMapSize(){ const m=$('kwMap'); return {w:m.clientWidth, h:m.clientHeight}; }
-function kwShip(){ return $('kwMap').querySelector('.kwship'); }
+function kwShip(){ return $('kwLayer').querySelector('.kwship'); }
 function kwPlaceShip(xr, yr, animate){
   const s=kwShip(); if(!s) return;
   if(!animate){ s.style.transition='none'; }
@@ -367,11 +428,10 @@ function kwStart(r, ret){
   $('kwTitle').textContent=(space?'Weltall':'Meer')+' · '+r+'er rückwärts';
   $('kwStars').textContent=S.stars;
   $('kwEnd').hidden=true;
-  map.querySelectorAll('.kwship').forEach(e=>e.remove());
-  map.insertAdjacentHTML('beforeend', kwShipHTML(space));
+  KR.seed=Math.floor(Math.random()*1e6)+1;
+  $('kwLayer').innerHTML='<div class="kwlayerin" id="kwLayerIn"></div>'+kwShipHTML(space);
   show('kw');
   kwRenderLayer();
-  kwPlaceShip(KW_ST.x, KW_ST.y, false);
   kwShip().classList.add('sway');
   const my=KR.id;
   const name=S.name||'Romy';
@@ -427,7 +487,7 @@ function kwRenderStrip(zip){
 }
 function kwStationHTML(n, treasure){ return KR.space ? kwPlanetSVG(n,treasure) : kwIslandSVG(n,treasure); }
 function kwRenderLayerAt(k, noOpts){
-  const L=$('kwLayer'); if(!L||!KR) return;
+  const L=$('kwLayer'), IN=$('kwLayerIn'); if(!L||!IN||!KR) return;
   L.style.transition='none'; L.style.transform='none';
   const r=KR.r, cur=k*r;
   let h='<svg class="kwpath" viewBox="0 0 100 100" preserveAspectRatio="none">';
@@ -439,8 +499,10 @@ function kwRenderLayerAt(k, noOpts){
     KR.opts=kwOptions(r,k);
     KR.opts.forEach((v,i)=>{ h+='<button class="kwopt" data-i="'+i+'" style="left:'+(KW_OPT_X[i]*100)+'%;top:'+(KW_OPT_Y*100)+'%" aria-label="'+v+'">'+kwStationHTML(v,false)+'</button>'; });
   }
-  L.innerHTML=h;
-  L.querySelectorAll('.kwopt').forEach(b=>b.addEventListener('click',()=>kwChoose(+b.dataset.i)));
+  if(!noOpts) h+=kwFxHTML();
+  IN.innerHTML=h;
+  kwPlaceShip(KW_ST.x, KW_ST.y, false);       // im selben Bild wie das Zurücksetzen der Karte: kein Sprung
+  IN.querySelectorAll('.kwopt').forEach(b=>b.addEventListener('click',()=>kwChoose(+b.dataset.i)));
   void L.offsetWidth; L.style.transition='';
 }
 function kwRenderLayer(){ kwRenderLayerAt(KR.k,false); }
@@ -498,7 +560,6 @@ function kwSail(ai, delay){
       L.style.transform='translate('+((KW_ST.x-KW_OPT_X[ai])*w)+'px,'+((KW_ST.y-KW_OPT_Y)*h)+'px)';
       const m=$('kwMap'), bp=(parseFloat((m.style.backgroundPosition||'0 0').split(' ')[1])||0)-((KW_OPT_Y-KW_ST.y)*h);
       m.style.backgroundPosition='0 '+bp+'px';
-      kwPlaceShip(KW_ST.x, KW_ST.y, true);
       kwRenderStrip();
       setTimeout(()=>{ if(!KR||KR.id!==my) return; kwRenderLayer(); kwStep(); },650);
     },750);

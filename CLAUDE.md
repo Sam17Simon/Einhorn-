@@ -73,6 +73,8 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 - Hilfe: Meer anfangs kommende Zahlen schwach sichtbar, nach einer sauberen Fahrt nur noch ?, Weltall nur aktuelle Zahl und Sprung. Störenfriede (Möwe, Alien) verdecken die Leiste: Meer 15 %, Weltall 30 %, nie zweimal hintereinander, nie in der ersten Fahrt. Super-Speed (Weltall, 35 %) startet mitten in der Reihe.
 - Falsche Inseln: übersprungen, nur 1 weggenommen, Zehnerübergang vergessen (`kwOptions`).
 - Schatzkammer: je Reihe ein verrückter Behälter (`KW_BOX`), jede geschaffte Fahrt bringt einen Schatz, 10 passen hinein. Zugang über Kawumms Schiff oben in der Inselwelt und nach jeder Fahrt.
+- Das Schiff steckt in `#kwLayer` und fährt beim Weiterrücken mit der Karte mit. Nie wieder getrennt animieren, sonst rutscht es unter oder über die Inseln. Zurücksetzen von Karte und Schiff im selben Bild (`kwRenderLayerAt`).
+- Abwechslung: Inseln (4 Formen, 4 Farben, 9 Deko-Teile) und Planeten (Farbe, Muster, Ringe, Mond) werden je Zahl aus `KR.seed` gewürfelt: gleiche Zahl sieht innerhalb einer Fahrt gleich aus, jede Fahrt neu. Dazu Kleinigkeiten am Kartenrand (`kwFxHTML`).
 - Kawumms Stimme: `speak(text, cb, KW_VOICE)` mit tieferer Tonhöhe (0.85, Lumi 1.14) und eigenem Tempo; im Sprechweg `voice` eine zweite deutsche Stimme, falls vorhanden. Nie Stimme ohne passende Sprache setzen (Android).
 - Gemeinsam hüpfen: `kwDuoHTML`, Lumi immer ohne Regenbogen (`kwNoRainbow`). Danach erzählt Kawumm, was sie macht und kann, und `kwGoToShip` führt in die Inselwelt: Schiff-Karte leuchtet, Kawumm zeigt darauf (ist die Einser-Insel offen, leuchtet die mit).
 - Brieftext: frech und kurz, für Romy selbst lesbar. Nicht wieder brav machen.
