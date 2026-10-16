@@ -73,5 +73,5 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 - Hilfe: Meer anfangs kommende Zahlen schwach sichtbar, nach einer sauberen Fahrt nur noch ?, Weltall nur aktuelle Zahl und Sprung. Störenfriede (Möwe, Alien) verdecken die Leiste: Meer 15 %, Weltall 30 %, nie zweimal hintereinander, nie in der ersten Fahrt. Super-Speed (Weltall, 35 %) startet mitten in der Reihe.
 - Falsche Inseln: übersprungen, nur 1 weggenommen, Zehnerübergang vergessen (`kwOptions`).
 - Schatzkammer: je Reihe ein verrückter Behälter (`KW_BOX`), jede geschaffte Fahrt bringt einen Schatz, 10 passen hinein. Zugang über Kawumms Schiff oben in der Inselwelt und nach jeder Fahrt.
-- Kawumms Stimme: `speak(text, cb, KW_VOICE)` mit eigener Tonhöhe und Tempo; im Sprechweg `voice` eine zweite deutsche Stimme, falls vorhanden. Nie Stimme ohne passende Sprache setzen (Android).
+- Kawumms Stimme: `speak(text, cb, KW_VOICE)` mit tieferer Tonhöhe (0.85, Lumi 1.14) und eigenem Tempo; im Sprechweg `voice` eine zweite deutsche Stimme, falls vorhanden. Nie Stimme ohne passende Sprache setzen (Android).
 - Gemeinsam hüpfen: `kwDuoHTML`, Lumi immer ohne Regenbogen (`kwNoRainbow`).
