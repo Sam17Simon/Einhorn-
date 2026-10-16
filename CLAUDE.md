@@ -51,7 +51,7 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 - Android-Chrome: Stimme nie ohne passende Sprache setzen (Android meldet `de_DE`), sonst stumm. Dort kein `pause()`/`resume()`, wirkt wie Abbruch.
 - Nie direkt nach `cancel()` sprechen, 150 ms warten.
 - `unlockSpeech()` im ersten Fingertipp (für iOS). Nicht entfernen.
-- Intro: Der Tipp zum Überspringen darf nicht ins Menü durchrutschen. `#intro` bleibt beim Ausblenden tippbar, danach schluckt `tapGuard(1400)` alle Klicks.
+- Intro: Der Tipp zum Überspringen darf nicht ins Menü durchrutschen. `#intro` bleibt beim Ausblenden tippbar, danach schluckt `tapGuard(1400)` alle Klicks, aber nur wenn im Intro getippt wurde (`introTouched`). Läuft das Intro durch, ist das Menü sofort tippbar.
 - Elternbereich: "Stimme testen" zeigt Stimmen, gesprochen x von y, Weg, Neuversuche, letzten Fehler.
 
 ## Nächste Insel (seit v34)

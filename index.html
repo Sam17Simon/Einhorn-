@@ -585,9 +585,9 @@ button.ctawait:active{transform:none;}
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=51"></script>
-<script src="game.js?v=51"></script>
-<script src="kawumm.js?v=51"></script>
+<script src="islands.js?v=52"></script>
+<script src="game.js?v=52"></script>
+<script src="kawumm.js?v=52"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -2246,6 +2246,7 @@ function initStars(){
 let tapGuardUntil=0;
 function tapGuard(ms){ tapGuardUntil=Math.max(tapGuardUntil, Date.now()+ms); }
 document.addEventListener('click',e=>{ if(Date.now()<tapGuardUntil){ e.stopPropagation(); e.preventDefault(); } },true);
+let introTouched=false;
 async function playIntroOnce(){
   const eng=window.Wolkenritt;
   if(!eng || !('ResizeObserver' in window)) return;
@@ -2254,13 +2255,14 @@ async function playIntroOnce(){
     // erst der Ruf-Knopf: schaltet den Ton frei (Browser spielen vor der ersten Berührung nichts)
     await new Promise(res=>{ const b=$('introCall'); b.hidden=false; b.onclick=()=>{ unlockSpeech(); b.hidden=true; $('introCard').hidden=true; res(); }; });
     $('introHint').hidden=false;
+    box.addEventListener('pointerdown',()=>{ introTouched=true; },{once:true});
     await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
     const u=$('unicornHome').getBoundingClientRect();
     const target={x:u.left+u.width/2, y:u.top+u.height*0.52, w:u.width*0.95};
     playIntroMusic();
     await eng.playIntro($('introHost'), {target, items:gearKey(S.gear), onLand:()=>{ sndFanfare(); setTimeout(()=>speak('Hallo '+S.name+'! Lumi ist da!'),500); }});
   }catch(e){}
-  tapGuard(1400);   // der Tipp zum Überspringen darf nicht im Menü dahinter landen
+  if(introTouched) tapGuard(1400);   // der Tipp zum Überspringen darf nicht im Menü dahinter landen
   box.classList.add('fade'); setTimeout(()=>{ box.hidden=true; box.classList.remove('fade'); $('introHost').innerHTML=''; },650);
 }
 function sndWhoosh(){ for(let i=0;i<6;i++) tone(220+i*90,.12,i*0.08,'triangle',.05); }
