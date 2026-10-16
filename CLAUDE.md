@@ -74,4 +74,5 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 - Falsche Inseln: übersprungen, nur 1 weggenommen, Zehnerübergang vergessen (`kwOptions`).
 - Schatzkammer: je Reihe ein verrückter Behälter (`KW_BOX`), jede geschaffte Fahrt bringt einen Schatz, 10 passen hinein. Zugang über Kawumms Schiff oben in der Inselwelt und nach jeder Fahrt.
 - Kawumms Stimme: `speak(text, cb, KW_VOICE)` mit tieferer Tonhöhe (0.85, Lumi 1.14) und eigenem Tempo; im Sprechweg `voice` eine zweite deutsche Stimme, falls vorhanden. Nie Stimme ohne passende Sprache setzen (Android).
-- Gemeinsam hüpfen: `kwDuoHTML`, Lumi immer ohne Regenbogen (`kwNoRainbow`).
+- Gemeinsam hüpfen: `kwDuoHTML`, Lumi immer ohne Regenbogen (`kwNoRainbow`). Danach erzählt Kawumm, was sie macht und kann, und `kwGoToShip` führt in die Inselwelt: Schiff-Karte leuchtet, Kawumm zeigt darauf (ist die Einser-Insel offen, leuchtet die mit).
+- Brieftext: frech und kurz, für Romy selbst lesbar. Nicht wieder brav machen.

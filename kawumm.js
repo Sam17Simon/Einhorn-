@@ -293,6 +293,12 @@ kwCSS.textContent=`
 .kwbtn:active{transform:translateY(2px); box-shadow:0 2px 0 #A8322B;}
 .kwbtn.sec{background:#fff; color:#E04A40; border:2px solid #EBCB94; box-shadow:0 4px 0 #EBCB94;}
 .kwmapcard{grid-column:1/-1; flex-wrap:wrap; max-width:none;}
+.kwmapcard.hi{animation:kwhi 1.1s ease-in-out 6; border-color:#E04A40;}
+.kwmapcard.hi img{animation:kwhopm2 .9s ease-in-out infinite;}
+@keyframes kwhi{50%{box-shadow:0 0 0 6px rgba(224,74,64,.35), 0 3px 0 #EBCB94; transform:scale(1.02)}}
+@keyframes kwhopm2{40%{transform:translateY(-12px) rotate(-6deg)}}
+.kwhint{display:block; margin-top:6px; background:#fff; border:2px solid #E04A40; border-radius:14px; padding:6px 10px; color:${KW_INK}; font-size:14px;}
+.islcard.kwhi{border-color:#E04A40; animation:kwhi 1.1s ease-in-out 6;}
 .kwmapcard .btns{display:flex; gap:8px; flex-wrap:wrap;}
 .kwbadge{display:inline-block; align-self:flex-start; background:#E04A40; color:#fff; font-size:11px; font-weight:800; border-radius:999px; padding:1px 8px; margin-top:2px;}
 /* Schatzkammer */
@@ -320,6 +326,8 @@ kwCSS.textContent=`
 .kwpaper.in{transform:none; opacity:1;}
 .kwpaper .sig{display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-top:6px;}
 .kwpaper .sig img{height:54px;}
+.kwpaper .ps{font-size:15px; color:var(--muted); margin-top:2px;}
+.kwpaper .ps{font-size:15px; color:var(--muted); margin-top:2px;}
 .kwyes{opacity:0; transform:scale(.6); transition:opacity .4s, transform .4s cubic-bezier(.3,1.4,.5,1); pointer-events:none; background:#E04A40; box-shadow:0 4px 0 #A8322B;}
 .kwyes.show{opacity:1; transform:scale(1); pointer-events:auto;}
 .kwduo{display:flex; align-items:flex-end; justify-content:center; gap:6px; height:170px; margin-top:6px;}
@@ -619,8 +627,14 @@ function kwShowLetter(fromParent){
       <circle cx="110" cy="88" r="16" fill="#E04A40" stroke="${KW_INK}" stroke-width="3"/>
       <circle cx="110" cy="85" r="6" fill="#fff"/><path d="M103 94 l14 -6 M103 88 l14 6" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>
     </svg></div>
-    <div class="kwpaper" id="kwPaper">Ahoi ${name}!<br>Hier ist Kawumm, die Piratin. Ich habe gehört, dass du mit Lumi die Inseln rettest. Wie mutig!<br>Ich habe Schatzkarten. Aber meine Karten sind verrückt: Man muss sie rückwärts lesen. Darf ich zu dir kommen und mitmachen?
-      <div class="sig">Deine Kawumm <img src="${KW_IMG}" alt=""></div></div>
+    <div class="kwpaper" id="kwPaper"><b>AHOI ${name}!</b><br>
+      Rate mal, wer schreibt. Genau. ICH!<br>
+      Du rettest mit Lumi die Inseln? Ohne mich?! Frechheit!<br>
+      Ich hab Schatzkarten. Total verrückte. Die liest man rückwärts. Wie ein Krebs!<br>
+      Lumi zählt immer nur vorwärts. Gähn!<br>
+      Ich wette, du kannst rückwärts. Darf ich kommen? Ich bring Kekse mit. Vielleicht.
+      <div class="sig"><b>KAWUMM!</b> <img src="${KW_IMG}" alt=""></div>
+      <div class="ps">PS: Sagst du Nein, schick ich dir eine Möwe.</div></div>
     <button class="cta kwyes" id="kwYes">Ja, komm vorbei!</button>`;
   $('overlay').classList.add('show');
   [523,659,523,784].forEach((f,i)=>tone(f,.14,i*0.12,'triangle',.08));
@@ -639,12 +653,29 @@ function kwShowLetter(fromParent){
 function kwWelcome(fromParent){
   const box=$('overlayBox'), name=S.name||'Romy';
   box.innerHTML='<h2>Kawumm ist da!</h2>'+kwDuoHTML(150)
-    +'<p style="margin:0;font-weight:700">Kawumm und Lumi sind jetzt Freundinnen. Die erste Schatzkarte: die Einserreihe rückwärts, von 10 bis 0. Kawumms Schiff liegt in der Inselwelt.</p>'
-    +'<button class="cta" id="kwWelcomeGo" style="background:#E04A40;box-shadow:0 4px 0 #A8322B">Los geht\'s!</button>';
+    +'<p style="margin:0;font-weight:700">Kawumm ist Schatzjägerin. Sie segelt übers Meer und fliegt mit ihrem Schiff bis ins Weltall. Ihr Schiff liegt in der Inselwelt, ganz oben.</p>'
+    +'<button class="cta" id="kwWelcomeGo" style="background:#E04A40;box-shadow:0 4px 0 #A8322B">Zum Schiff!</button>';
   bigKnall(); sndFanfare();
-  kwSay('Kawumm! Hallo '+name+', hallo Lumi! Ich bin da! Unsere erste Schatzkarte ist die Einserreihe rückwärts. Von zehn bis null. Mein Schiff wartet in der Inselwelt. Komm schnell!');
+  kwSay('Kawumm! Da bin ich! Hallo '+name+', hallo Lumi! Ich bin Schatzjägerin. Ich segle übers Meer. Und mein Schiff kann fliegen. Bis ins Weltall! Mit Super-Speed! Und ich finde jeden Schatz. Aber nur rückwärts. Das bring ich dir bei. Mein Schiff liegt in der Inselwelt, ganz oben. Komm mit!');
   $('kwWelcomeGo').onclick=()=>{ $('overlay').classList.remove('show'); box.classList.remove('kwletterbox');
-    if(fromParent){ renderParent(); } else if(kwActive()){ renderPath(); show('path'); } };
+    if(fromParent) kwTest=true;                // im Test gleich zeigen, wie es für Romy aussieht
+    kwGoToShip(); };
+}
+/* Nach der Begrüßung: in die Inselwelt, Kawumms Schiff leuchtet und Kawumm zeigt darauf */
+function kwGoToShip(){
+  if(!kwActive()) return;
+  renderPath(); show('path');
+  const card=$('pathList').querySelector('.kwmapcard'); if(!card) return;
+  card.scrollIntoView({block:'start'}); card.classList.add('hi');
+  const open=unlockedRows(S), first=KW_ORDER[0];
+  let t='Hier! Das ist mein Schiff! Hier ist auch meine Schatzkammer. ';
+  if(open.includes(first)){
+    t+='Und unsere erste Schatzkarte liegt auf der '+first+'er-Insel. Schau, da steht Schatzkarte!';
+    const isl=$('pathList').querySelector('[data-row="'+first+'"]'); if(isl) isl.classList.add('kwhi');
+  } else t+='Die erste Schatzkarte startet direkt hier am Schiff. Tipp auf den roten Knopf!';
+  card.querySelector('.tx').insertAdjacentHTML('beforeend','<span class="kwhint">'+t+'</span>');
+  kwSay(t);
+  setTimeout(()=>{ card.classList.remove('hi'); },9000);
 }
 function kwMaybeLetter(){
   if(!KW_LIVE || kws().joined) return;
