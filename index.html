@@ -361,7 +361,7 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
 #intro .callcard img{width:min(160px,38vw); height:auto; border-radius:28%; box-shadow:0 10px 30px rgba(59,42,82,.15); animation:callfloat 2.6s ease-in-out infinite;}
 #intro .callcard h1{font-family:var(--font-disp); font-size:clamp(26px,7vw,40px); margin:14px 0 0; color:var(--ink);}
 @keyframes callfloat{50%{transform:translateY(-10px)}}
-#intro.fade{opacity:0; pointer-events:none;}
+#intro.fade{opacity:0;}   /* bleibt beim Ausblenden tippbar, damit kein Tipp aufs Menü dahinter durchrutscht */
 #introHost{position:absolute; inset:0;}
 #intro .introhint{position:absolute; bottom:max(18px, env(safe-area-inset-bottom,0px)); left:0; right:0; text-align:center; color:rgba(59,42,82,.55); font-weight:700; font-size:13px; pointer-events:none;}
 #intro .callbtn{position:absolute; left:50%; top:60%; white-space:nowrap; transform:translateX(-50%); background:var(--accent); color:#fff; font-family:var(--font-disp); font-weight:700; font-size:28px; border-radius:26px; padding:18px 36px; box-shadow:0 6px 0 #5C36A0; animation:callpulse 1.4s ease-in-out infinite;}
@@ -585,9 +585,9 @@ button.ctawait:active{transform:none;}
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=49"></script>
-<script src="game.js?v=49"></script>
-<script src="kawumm.js?v=49"></script>
+<script src="islands.js?v=50"></script>
+<script src="game.js?v=50"></script>
+<script src="kawumm.js?v=50"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -2242,6 +2242,10 @@ function initStars(){
     st.style.fontSize=(8+Math.random()*9)+'px'; st.style.animationDelay=(Math.random()*2.5)+'s';
     l.appendChild(st); }
 }
+/* Tipp-Sperre: schluckt kurz alle Klicks, z. B. nach dem Überspringen des Intros */
+let tapGuardUntil=0;
+function tapGuard(ms){ tapGuardUntil=Math.max(tapGuardUntil, Date.now()+ms); }
+document.addEventListener('click',e=>{ if(Date.now()<tapGuardUntil){ e.stopPropagation(); e.preventDefault(); } },true);
 async function playIntroOnce(){
   const eng=window.Wolkenritt;
   if(!eng || !('ResizeObserver' in window)) return;
@@ -2256,6 +2260,7 @@ async function playIntroOnce(){
     playIntroMusic();
     await eng.playIntro($('introHost'), {target, items:gearKey(S.gear), onLand:()=>{ sndFanfare(); setTimeout(()=>speak('Hallo '+S.name+'! Lumi ist da!'),500); }});
   }catch(e){}
+  tapGuard(1400);   // der Tipp zum Überspringen darf nicht im Menü dahinter landen
   box.classList.add('fade'); setTimeout(()=>{ box.hidden=true; box.classList.remove('fade'); $('introHost').innerHTML=''; },650);
 }
 function sndWhoosh(){ for(let i=0;i<6;i++) tone(220+i*90,.12,i*0.08,'triangle',.05); }
