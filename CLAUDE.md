@@ -64,6 +64,9 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 - Feste Datei (seit v37, nur wenn `showSaveFilePicker` existiert): im Elternbereich einmal wählen, Griff liegt in IndexedDB `lumi-backup`, danach täglich überschreiben (`backupToFixed`). Fehlen Rechte oder die Funktion, gibt es wie bisher die Download-Datei.
 - Kein Cloud-Dienst, keine Anmeldung. Bewusste Entscheidung von Simon: simpel.
 
+## Ruhe in der ganzen App (seit v49)
+- Dialoge (`#overlay`) blenden langsam ein, das Rundenende auch. Knöpfe in Dialogen, am Rundenende und auf dem Inselscreen sind erst nach 1,5 s klickbar (`armCTAs`, blass mit `.ctawait`). Ein MutationObserver sperrt bei jedem neuen Dialog-Inhalt. Antwort-Knöpfe (Zahlenfeld, Tore, Inseln der Schatzsuche) nie sperren, sonst stimmen die Antwortzeiten nicht.
+
 ## Kawumm: Rückwärtsreihen (seit v38, noch nicht live)
 - Alles in `kawumm.js` (vor dem Hauptskript geladen). Lernlogik oben zwischen KW-LOGIC-START/END, in Node testbar (`require('./kawumm.js')`). Bild: `assets/kawumm.png` (freigestellte Vorlage von Simon, nicht nachzeichnen). Spiegeln nur per CSS `scaleX(-1)`.
 - Live schalten: `KW_LIVE = true` in kawumm.js. Dann kommt beim Öffnen nach dem Intro einmal der Brief ("Post für Romy", Brief wird nicht vorgelesen, Romy liest selbst. Button "Ja, komm vorbei!" nach `KW_READ_MS` (15 s)). Bis dahin sieht Romy nichts.
