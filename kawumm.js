@@ -15,6 +15,7 @@ const KW_FAST = 4000;         // schnelle Antwort wie vorwärts
 const KW_FAST_TYPE = 7000;    // beim Selbst-Eintippen gilt bis 7 s als schnell
 const KW_SAFE_BOX = 3;
 const KW_CAP = 10;            // Schätze pro Sammelbehälter
+const KW_LEVELS = 3;          // Stufen je Behälter: normal, Glitzer, Diamant (wie Lumis Extras)
 const KW_READ_MS = 15000;     // Lesezeit für den Brief, bevor "Ja, komm vorbei!" erscheint
 
 /* ================= KW-LOGIC-START ================= */
@@ -105,7 +106,7 @@ function kwApplyStep(s, correct, rt){
 function kwFinishRun(rs, st, now){
   if(typeof st==='boolean') st={clean:st, errors:st?0:1, mode:kwHelpMode(rs)};   // alter Aufruf
   now=now||Date.now();
-  const res={toSpace:false, find:false, full:false, helpOff:false, helpBack:false, review:false, reviewOk:false};
+  const res={toSpace:false, find:false, full:false, levelUp:false, helpOff:false, helpBack:false, review:false, reviewOk:false};
   const wasDue=kwIsDue(rs, now);
   rs.runs++;
   if(rs.stage==='sea'){
@@ -122,13 +123,15 @@ function kwFinishRun(rs, st, now){
     rs.reviews = res.reviewOk ? (rs.reviews||0)+1 : 0;
   }
   rs.last=now;
+  rs.level=rs.level||0;
   if(rs.finds<KW_CAP){ rs.finds++; res.find=true; res.full = rs.finds===KW_CAP; }
+  else if(rs.level<KW_LEVELS-1){ rs.level++; rs.finds=1; res.find=true; res.levelUp=true; }   // voll: verwandelt sich und füllt sich neu
   return res;
 }
 /* ================= KW-LOGIC-END ================= */
 
 if(typeof module!=='undefined' && module.exports){
-  module.exports={KW_ORDER,KW_CAP,kwDefault,kwRowState,kwRowSafe,kwAvailable,kwHelpMode,kwHelpOff,kwPlanRun,kwOptions,kwApplyStep,kwFinishRun,kwIsDue,kwDueIn,kwCoverWeight};
+  module.exports={KW_ORDER,KW_CAP,KW_LEVELS,kwDefault,kwRowState,kwRowSafe,kwAvailable,kwHelpMode,kwHelpOff,kwPlanRun,kwOptions,kwApplyStep,kwFinishRun,kwIsDue,kwDueIn,kwCoverWeight};
 }
 
 /* ===================== Oberfläche ===================== */
@@ -194,7 +197,10 @@ const KW_BOX={
   7:{name:'Vulkantopf', a:'einen Feuerkristall', item:'crystal', lift:-24, line:'Die Feuerkristalle sind warm wie eine Wärmflasche.'}
 };
 function kwItems(r,n){ const b=KW_BOX[r]; let h=''; for(let i=0;i<Math.min(n,KW_CAP);i++){ const [x,y]=KW_SLOTS[i]; h+=KW_ITEM[b.item](x,y+b.lift,i); } return h; }
-function kwBoxSVG(r, n, size, locked){
+const KW_LV_NAME=['','Glitzer-','Diamant-'];
+function kwBoxName(r, lv){ return (KW_LV_NAME[lv||0]||'')+KW_BOX[r].name; }
+function kwBoxSVG(r, n, size, locked, lv){
+  lv=locked?0:(lv||0);
   const I=KW_INK, w=size||100, items=locked?'':kwItems(r,n);
   const L=locked, F=(c)=>L?'#E7DDF5':c, S2=L?'#CFC2E6':I;
   let back='', front='';
@@ -220,8 +226,12 @@ function kwBoxSVG(r, n, size, locked){
       front=`<path d="M18 60 Q50 54 82 60 Q86 92 50 92 Q14 92 18 60 Z" fill="${F('#5A4A6E')}" stroke="${S2}" stroke-width="3"/><ellipse cx="50" cy="60" rx="34" ry="7" fill="none" stroke="${S2}" stroke-width="4"/><path d="M28 90 l-4 6 M72 90 l4 6" stroke="${S2}" stroke-width="4" stroke-linecap="round"/><path d="M30 70 Q28 78 32 84" stroke="#8E7FA8" stroke-width="3" fill="none" stroke-linecap="round"/>`; break;
   }
   const full=!L && n>=KW_CAP ? kwStar(16,22,7,'#FFE27A')+kwStar(86,30,6,'#FFE27A')+kwStar(84,86,5,'#FFE27A') : '';
+  // Glitzer: goldener Schein und Funkeln. Diamant: bunter Schein und ein Diamant obendrauf.
+  const halo = lv===1 ? '<circle cx="50" cy="60" r="44" fill="#FFE27A" opacity=".35"/>'+kwStar(10,48,4,'#FFF3B0')+kwStar(90,58,4,'#FFF3B0')
+            : lv===2 ? '<circle cx="50" cy="60" r="46" fill="#B9E8F7" opacity=".45"/><circle cx="50" cy="60" r="38" fill="#F8C7DF" opacity=".35"/>'+kwStar(10,48,4,'#E3F3FC')+kwStar(90,58,4,'#E3F3FC') : '';
+  const badge = lv===2 ? `<path d="M50 2 L58 10 L50 22 L42 10 Z" fill="#9ED3EA" stroke="${KW_INK}" stroke-width="2" stroke-linejoin="round"/><path d="M42 10 H58 M50 2 V22" stroke="#fff" stroke-width="1"/>` : lv===1 ? kwStar(50,10,8,'#FFE27A') : '';
   const q=L?`<text x="50" y="76" text-anchor="middle" font-family="Baloo 2, sans-serif" font-weight="700" font-size="30" fill="#B8A9D6">?</text>`:'';
-  return `<svg viewBox="0 0 100 100" width="${w}" height="${w}" class="kwbox" aria-hidden="true">${back}${r!==8?items:''}${front}${r===8?items:''}${q}${full}</svg>`;
+  return `<svg viewBox="0 0 100 100" width="${w}" height="${w}" class="kwbox" aria-hidden="true">${halo}${back}${r!==8?items:''}${front}${r===8?items:''}${q}${full}${badge}</svg>`;
 }
 
 /* ---------- Grafiken der Schatzkarte ----------
@@ -777,8 +787,10 @@ function kwTreasure(ai){
   const box=KW_BOX[r];
   bigKnall(); sndFanfare();
   let lines=[kwPick(KW_LINES.treasure)];
-  if(res.find) lines.push(res.full ? (cap(box.a)+'! Jetzt ist '+artDet(r)+' '+box.name+' ganz voll. Kawumm, ist das schön!') : (cap(box.a)+' für '+artAcc(r)+' '+box.name+'!'));
-  else lines.push(cap(artNom(r))+' '+box.name+' ist schon ganz voll. Du bist eine echte Schatzjägerin!');
+  const bn=kwBoxName(r, rs.level), last=(rs.level||0)>=KW_LEVELS-1;
+  if(res.levelUp) lines.push('Kawumm! '+cap(artDet(r))+' '+kwBoxName(r,rs.level-1)+' war ganz voll und hat sich verwandelt! Daraus wurde '+(KW_GENUS[r]==='f'?'eine':'ein')+' '+bn+'! '+({m:'Den',f:'Die',n:'Das'}[KW_GENUS[r]])+' füllen wir auch noch!');
+  else if(res.find) lines.push(res.full ? (cap(box.a)+'! Jetzt ist '+artDet(r)+' '+bn+' ganz voll. '+(last?'Mehr geht nicht! Du bist die Schatzkönigin!':'Pass auf, beim nächsten Schatz passiert etwas!')) : (cap(box.a)+' für '+artAcc(r)+' '+bn+'!'));
+  else lines.push(cap(artNom(r))+' '+bn+' ist schon ganz voll. Du bist eine echte Schatzjägerin!');
   if(res.toSpace) lines.push('Du bist so gut! Bei der '+r+'er-Karte fliegen wir ab jetzt ins Weltall!');
   else if(res.review) lines.push(res.reviewOk ? 'Super! Du hast die '+r+'er-Karte nicht vergessen!' : 'Gut, dass wir nochmal gefahren sind! Bald fahren wir sie wieder.');
   else if(res.helpOff) lines.push('Ab jetzt zeigt die Karte die Zahlen nicht mehr vor. Du schaffst das auch so!');
@@ -799,7 +811,7 @@ function kwTreasure(ai){
       </svg>
       <h2>Schatz gefunden!</h2>
       <p>${lines.slice(1).join(' ')}</p>
-      <div style="display:flex;align-items:center;gap:8px">${kwBoxSVG(r, rs.finds, 96, false)}<b>${Math.min(rs.finds,KW_CAP)} von ${KW_CAP}</b></div>
+      <div style="display:flex;align-items:center;gap:8px">${kwBoxSVG(r, rs.finds, 96, false, rs.level)}<b>${Math.min(rs.finds,KW_CAP)} von ${KW_CAP}</b></div>
       <div class="pill">${KR.ok} von ${KR.steps} richtig · ${KR.ok} Sterne</div>
       <div class="btnrow"><button class="kwbtn" id="kwEndVault">Zur Schatzkammer</button><button class="kwbtn sec" id="kwEndAgain">Nochmal</button><button class="kwbtn sec" id="kwEndBack">Fertig</button></div>`;
     end.hidden=false;
@@ -854,13 +866,13 @@ function kwLeave(){
 function kwOpenVault(ret, popRow){
   kwVaultRet=ret||'path';
   const kw=kws(), av=kwAvail();
-  const total=KW_ORDER.reduce((s,r)=>s+((kw.rows[r]&&kw.rows[r].finds)||0),0);
+  const total=KW_ORDER.reduce((s,r)=>s+(kw.rows[r]?(kw.rows[r].level||0)*KW_CAP+kw.rows[r].finds:0),0);
   const w=$('kwVault');
   let h='<div class="kwhead"><img src="'+KW_IMG+'" alt="Kawumm"><div class="bub" id="kwVaultBub"></div></div><div class="kwshelf">';
   for(const r of KW_ORDER){
-    const rs=kw.rows[r], open=av.includes(r)||!!(rs&&rs.finds), n=rs?rs.finds:0;
-    h+='<button class="kwslot'+(open?'':' locked')+(popRow===r?' pop':'')+'" data-r="'+r+'">'+kwBoxSVG(r,n,120,!open)
-      +'<span class="nm">'+(open?KW_BOX[r].name:'Noch geheim')+'</span><span class="ct">'+(open?Math.min(n,KW_CAP)+' von '+KW_CAP+' · '+r+'er-Karte':'Kommt mit der '+r+'er-Karte')+'</span></button>';
+    const rs=kw.rows[r], open=av.includes(r)||!!(rs&&rs.finds), n=rs?rs.finds:0, lv=rs?(rs.level||0):0;
+    h+='<button class="kwslot'+(open?'':' locked')+(popRow===r?' pop':'')+'" data-r="'+r+'">'+kwBoxSVG(r,n,120,!open,lv)
+      +'<span class="nm">'+(open?kwBoxName(r,lv):'Noch geheim')+'</span><span class="ct">'+(open?Math.min(n,KW_CAP)+' von '+KW_CAP+(lv?' · Stufe '+(lv+1)+' von '+KW_LEVELS:'')+' · '+r+'er-Karte':'Kommt mit der '+r+'er-Karte')+'</span></button>';
   }
   h+='</div>';
   w.innerHTML=h;
@@ -868,7 +880,8 @@ function kwOpenVault(ret, popRow){
   $('kwVaultBub').textContent=hello;
   w.querySelectorAll('.kwslot').forEach(b=>b.addEventListener('click',()=>{
     const r=+b.dataset.r, rs=kw.rows[r], open=!b.classList.contains('locked');
-    const t= open ? KW_BOX[r].line+' '+(rs&&rs.finds>=KW_CAP?'Ganz voll!':'Noch '+(KW_CAP-((rs&&rs.finds)||0))+' Schätze passen hinein.') : 'Das ist noch geheim. Erst brauchen wir die '+r+'er-Schatzkarte!';
+    const lvx=rs?(rs.level||0):0, full=rs&&rs.finds>=KW_CAP;
+    const t= open ? KW_BOX[r].line+' '+(full ? (lvx<KW_LEVELS-1?'Ganz voll! Beim nächsten Schatz verwandelt es sich!':'Ganz voll und ganz besonders!') : 'Noch '+(KW_CAP-((rs&&rs.finds)||0))+' Schätze passen hinein.') : 'Das ist noch geheim. Erst brauchen wir die '+r+'er-Schatzkarte!';
     $('kwVaultBub').textContent=t; kwSay(t); b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
   }));
   show('vault');
@@ -883,7 +896,7 @@ function kwIslandCard(r){
   const kw=kws(), av=kwAvail(), rs=kw.rows[r];
   if(av.includes(r)){
     const space=rs&&rs.stage==='space', due=kwIsDue(rs,Date.now());
-    el.innerHTML='<div class="kwcard"><img src="'+KW_IMG+'" alt=""><div class="tx"><b>'+(due?'Hier wartet noch ein Schatz!':'Schatzsuche mit Kawumm')+'</b>'+(due?'Weißt du die '+r+'er-Reihe rückwärts noch? ':'Die '+r+'er-Reihe rückwärts. ')+(space?'Ab ins Weltall!':'Im Meer.')+'<small>'+((rs&&rs.finds)||0)+' von '+KW_CAP+' Schätzen für '+artAcc(r)+' '+KW_BOX[r].name+'</small></div><button class="kwbtn" id="kwIslGo">Los!</button></div>';
+    el.innerHTML='<div class="kwcard"><img src="'+KW_IMG+'" alt=""><div class="tx"><b>'+(due?'Hier wartet noch ein Schatz!':'Schatzsuche mit Kawumm')+'</b>'+(due?'Weißt du die '+r+'er-Reihe rückwärts noch? ':'Die '+r+'er-Reihe rückwärts. ')+(space?'Ab ins Weltall!':'Im Meer.')+'<small>'+((rs&&rs.finds)||0)+' von '+KW_CAP+' Schätzen für '+artAcc(r)+' '+kwBoxName(r,rs&&rs.level)+'</small></div><button class="kwbtn" id="kwIslGo">Los!</button></div>';
     $('kwIslGo').onclick=()=>kwStart(r,'island');
     kwArm(el);
   } else {
@@ -991,7 +1004,7 @@ function kwParentHTML(){
   for(const r of KW_ORDER){
     const rs=kw.rows[r], a=av.includes(r);
     const dueIn=kwDueIn(rs,Date.now()), stg=a?(rs&&rs.stage==='space'?'Weltall'+(dueIn===0?' · fällig':dueIn!==null?' · in '+dueIn+' T':''):(rs&&kwHelpOff(rs)?'Meer ohne Hilfe':'Meer')):'zu';
-    rows+='<tr><td>'+r+'er</td><td>'+stg+'</td><td>'+(rs?kwRowSafe(rs)+' / 10':'–')+'</td><td>'+(rs?rs.finds:0)+'</td><td>'+(rs?rs.runs:0)+'</td><td>'+(a?'<button class="smallbtn" data-kwgo="'+r+'">Starten</button> <button class="smallbtn" data-kwst="'+r+'">'+(rs&&rs.stage==='space'?'→ Meer':'→ Weltall')+'</button>'+(rs&&rs.stage==='space'?' <button class="smallbtn" data-kwdue="'+r+'">fällig machen</button>':''):'')+'</td></tr>';
+    rows+='<tr><td>'+r+'er</td><td>'+stg+'</td><td>'+(rs?kwRowSafe(rs)+' / 10':'–')+'</td><td>'+(rs?rs.finds+((rs.level||0)?' (Stufe '+((rs.level||0)+1)+')':''):0)+'</td><td>'+(rs?rs.runs:0)+'</td><td>'+(a?'<button class="smallbtn" data-kwgo="'+r+'">Starten</button> <button class="smallbtn" data-kwst="'+r+'">'+(rs&&rs.stage==='space'?'→ Meer':'→ Weltall')+'</button>'+(rs&&rs.stage==='space'?' <button class="smallbtn" data-kwdue="'+r+'">fällig machen</button>':''):'')+'</td></tr>';
   }
   return '<p style="margin:2px 0;font-size:13px;color:var(--muted)">'+(KW_LIVE?'Live: Romy sieht Kawumm, sobald der Brief angenommen ist.':'Noch nicht live: Romy sieht davon nichts. Testmodus gilt nur bis zum Neustart der App.')+' Brief angenommen: <b>'+(kw.joined?'ja':'nein')+'</b>.</p>'
     +'<div class="setrow"><label>Testmodus (Kawumm auf Inseln und Karte zeigen)</label><button class="toggle'+(kwTest?' on':'')+'" id="kwTestTgl" role="switch" aria-checked="'+kwTest+'" aria-label="Testmodus"><i></i></button></div>'
