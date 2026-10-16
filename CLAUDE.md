@@ -81,4 +81,5 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 - Abwechslung: Inseln (4 Formen, 4 Farben, 9 Deko-Teile) und Planeten (Farbe, Muster, Ringe, Mond) werden je Zahl aus `KR.seed` gewürfelt: gleiche Zahl sieht innerhalb einer Fahrt gleich aus, jede Fahrt neu. Dazu Kleinigkeiten am Kartenrand (`kwFxHTML`).
 - Kawumms Stimme: `speak(text, cb, KW_VOICE)` mit tieferer Tonhöhe (0.85, Lumi 1.14) und eigenem Tempo; im Sprechweg `voice` eine zweite deutsche Stimme, falls vorhanden. Nie Stimme ohne passende Sprache setzen (Android).
 - Gemeinsam hüpfen: `kwDuoHTML`, Lumi immer ohne Regenbogen (`kwNoRainbow`). Danach erzählt Kawumm, was sie macht und kann, und `kwGoToShip` führt in die Inselwelt: Schiff-Karte leuchtet, Kawumm zeigt darauf (ist die Einser-Insel offen, leuchtet die mit).
+- Gesprochene Texte: keine Laute ohne Vokal und keine gedehnten Buchstaben (Mmmh, Pssst, Juhuuu, Uiii). Die Sprachausgabe buchstabiert die. Stattdessen Lecker, Hör mal, Juhu, Ui.
 - Brieftext: frech und kurz, für Romy selbst lesbar. Nicht wieder brav machen.
