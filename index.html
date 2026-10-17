@@ -418,13 +418,13 @@ button.ctawait:active{transform:none;}
     <div class="hero">
       <div id="unicornHome"></div>
       <h1 id="homeTitle">Hallo!</h1>
-      <p class="hello" id="homeSub">Dein Einhorn wartet auf dich.</p>
+      <p class="hello" id="homeSub" hidden></p>
     </div>
     <div class="menu">
-      <button class="bigbtn" id="btnRun"><span class="em">🦄</span><span>Wolkenflug<span class="badge-new">Neu</span><small>Flieg mit Lumi und fang Sternschnuppen!</small></span></button>
-      <button class="bigbtn" id="btnPractice"><span class="em">✨</span><span>Zaubertraining<small>Rechnen und Sterne sammeln</small></span></button>
-      <button class="bigbtn" id="btnBlitz"><span class="em">⭐</span><span>Sternschnuppe<small>Wie viele schaffst du in einer Minute?</small></span></button>
-      <button class="bigbtn" id="btnPath"><span class="em">🏝</span><span>Inselwelt<small>Deine Tierfreunde, ihre Inseln und der Inselritt</small></span></button>
+      <button class="bigbtn" id="btnRun"><span class="em">🦄</span><span>Wolkenflug</span></button>
+      <button class="bigbtn" id="btnPractice"><span class="em">✨</span><span>Zaubertraining</span></button>
+      <button class="bigbtn" id="btnBlitz"><span class="em">⭐</span><span>Sternschnuppe</span></button>
+      <button class="bigbtn" id="btnPath"><span class="em">🏝</span><span>Inselwelt</span></button>
     </div>
     <div class="footrow"><span class="ghostbtn" id="giftInfo"></span><span class="ghostbtn" id="streakInfo"></span></div>
   </section>
@@ -458,11 +458,11 @@ button.ctawait:active{transform:none;}
     </div>
     <div class="islwrap">
       <div class="islstage" id="islStage"></div>
-      <div class="islbubble" id="islBubble"></div>
+      <div class="islbubble" id="islBubble" hidden></div>
       <div class="islprogress" id="islProgress"></div>
       <button class="cta" id="btnIslandRide">Inselritt starten</button>
       <div id="islKw" hidden style="width:100%;display:flex;justify-content:center"></div>
-      <h2 class="islh2">Insel ausbauen</h2>
+      <h2 class="islh2" hidden>Insel ausbauen</h2>
       <div class="shop" id="islShop"></div>
       <div class="giftline" id="islGiftLine"></div>
     </div>
@@ -594,9 +594,9 @@ button.ctawait:active{transform:none;}
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=58"></script>
-<script src="game.js?v=58"></script>
-<script src="kawumm.js?v=58"></script>
+<script src="islands.js?v=59"></script>
+<script src="game.js?v=59"></script>
+<script src="kawumm.js?v=59"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -1394,9 +1394,9 @@ function renderHome(){
   $('unicornHome').innerHTML=unicornSVG(S.gear,200)+[[8,18,0],[86,4,.6],[12,70,1.1],[90,60,.3],[48,-2,.9],[70,82,1.4]].map(([x,y,d])=>'<span class="gl" style="left:'+x+'%;top:'+y+'%;animation-delay:'+d+'s">✦</span>').join('');
   $('btnSound').textContent=S.sound?'🔊':'🔇';
   $('btnBlitz').disabled = unlockedRows(S).length<2;
-  $('streakInfo').textContent = S.streak.len>1 ? '🔥 '+S.streak.len+' Tage am Stück' : '';
+  $('streakInfo').textContent = S.streak.len>1 ? '🔥 '+S.streak.len : '';
   const todo=starsToNextGift(), pend=pendingRewards();
-  $('giftInfo').textContent = pend>0 ? '🎁 Ein Geschenk wartet auf Lumi!' : todo===null ? '' : '🎁 Noch '+plural(todo,'Stern','Sterne')+' bis zum Geschenk';
+  $('giftInfo').textContent = pend>0 ? '🎁 Geschenk!' : todo===null ? '' : '🎁 noch '+todo+' ⭐';
   $('giftInfo').onclick = pend>0 ? ()=>showGiftChoice() : null;
 }
 $('btnSound').addEventListener('click',()=>{ S.sound=!S.sound; save(); renderHome(); if(S.sound) speak('Ton an!'); });
@@ -2048,10 +2048,9 @@ function renderPath(){
     b.className='islcard'+(isOpen?'':' locked')+(away?' away':'');
     b.dataset.row=r;
     b.innerHTML=W.islandSVG(r,{open:isOpen, mastered, built:islandBuilt(r), size:200})
-      +'<div class="nm">'+r+'er · '+W.ISLANDS[r].title+'</div>'
+      +'<div class="nm">'+r+'er-Insel</div>'
       +'<div class="ministars">'+stars+'</div>'
       +(away?'<div class="awaysign"><b>Im Urlaub</b><span>🧳 🏖</span></div>':'')
-      +'<div class="st">'+(away?FRIENDS[r][1]+' macht Urlaub. Du kannst die '+r+'er-Reihe schon!': mastered?FRIENDS[r][1]+' ist wach ✨': isOpen?FRIENDS[r][1]+' wartet auf dich': r===next?'Schaff die '+open[open.length-1]+'er-Insel, dann kommt diese':'Kommt später dran')+'</div>'
       +(isOpen&&!away&&window.KW?KW.badge(r):'');
     if(away && !(S.vacSaid&&S.vacSaid[r])){ S.vacSaid=S.vacSaid||{}; S.vacSaid[r]=true; newAway.push(r); }   // Ansage nur ein einziges Mal
     else if(isOpen) b.addEventListener('click',()=>openIsland(r));
@@ -2061,7 +2060,7 @@ function renderPath(){
   if(newAway.length){ save(); const t=newAway.length===1?vacationLine(newAway[0]):newAway.map(r=>FRIENDS[r][1]).join(' und ')+' machen Urlaub! Du kannst die '+newAway.join('er- und die ')+'er-Reihe schon so gut, dass sie am Strand liegen und Eis essen.'; setTimeout(()=>speak(t),900); }
 }
 const ANIMAL_LINES={
-  wait:['Hallo! Ich bin {n}. Übst du die {r}er-Reihe mit mir? Tipp mich an, dann sag ich dir, was noch fehlt.','Psst, ich warte hier auf dich. Schaffst du die {r}er-Reihe?','Die {r}er-Reihe macht mich ganz müde. Hilfst du mir?'],
+  wait:['Hallo! Ich bin {n}. Übst du die {r}er-Reihe mit mir? Tipp mich an, dann sag ich dir, was noch fehlt.','Hallo, ich warte hier auf dich. Schaffst du die {r}er-Reihe?','Die {r}er-Reihe macht mich ganz müde. Hilfst du mir?'],
   awake:['Juhu, du bist da! Die {r}er-Reihe kannst du schon! Tipp mich an, dann verrate ich dir die nächste Insel.','Reiten wir noch eine Runde? Ich liebe den Inselritt!','Schau dir meine Insel an! Hast du Sterne für etwas Neues?']
 };
 function islandLine(r){
@@ -2107,7 +2106,7 @@ function openIsland(r){
   const line=islandLine(r);
   $('islBubble').textContent=line;
   const facts=rowFacts(S,r), sure=facts.filter(f=>f.box>=3).length;
-  $('islProgress').innerHTML=facts.map(f=> f.box>=5?starSVG('#F2B83C') : f.box>=3?starSVG('#9A6AE8') : f.seen>0?starSVG('#D9CFF0'):starSVG('#EEE8F8')).join('')+'<span style="margin-left:6px">'+(()=>{ const op=unlockedRows(S), nx=nextLockedRow(S); return (r===op[op.length-1]&&nx!==null)? Math.min(sure,8)+' von 8 für die '+nx+'er-Insel' : sure+' von 10 sicher'; })()+(S.best.rows[r]?' · Rekord '+(S.best.rows[r]/1000).toFixed(1).replace('.',',')+' s':'')+'</span>';
+  $('islProgress').innerHTML=facts.map(f=> f.box>=5?starSVG('#F2B83C') : f.box>=3?starSVG('#9A6AE8') : f.seen>0?starSVG('#D9CFF0'):starSVG('#EEE8F8')).join('')+'<span style="margin-left:6px">'+(()=>{ const op=unlockedRows(S), nx=nextLockedRow(S); return (r===op[op.length-1]&&nx!==null)? Math.min(sure,8)+' / 8' : ''; })()+'</span>';
   const an=$('islStage').querySelector('.isl-animal');
   if(an){ an.style.cursor='pointer'; an.addEventListener('click',()=>{ an.classList.remove('hop'); void an.getBBox(); an.classList.add('hop'); smallSparkle(); sndGood(); const t=nextIslandLine(r); $('islBubble').textContent=t; speak(t); }); }
   renderShop(r);
@@ -2127,7 +2126,7 @@ function renderShop(r){
   });
   el.querySelectorAll('.shopbtn[data-id]').forEach(b=>b.addEventListener('click',()=>buyBuild(r,b.dataset.id,+b.dataset.cost)));
   const todo=starsToNextGift();
-  $('islGiftLine').textContent = todo===null?'' : '🎁 Bauen kostet keine Geschenk-Sterne. Noch '+plural(todo,'Stern','Sterne')+' bis zum nächsten Geschenk für Lumi.';
+  $('islGiftLine').textContent = '';
 }
 function buyBuild(r,id,cost){
   if(starsAvail()<cost) return;

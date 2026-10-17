@@ -36,6 +36,10 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 - Sterne: `S.stars` bleibt die Gesamtsumme (Lumis Extras hängen daran). `S.spent` zählt Ausgaben, verfügbar ist `starsAvail()`. Ausbauten kosten 8, 15, 25 Sterne je Insel und liegen in `S.islands[reihe]`.
 - Neue Ausbauten: in `BUILDS` zeichnen (80x80, Boden y=76) und in `ISLANDS[reihe].builds` eintragen. Es gibt genau drei Bauplätze je Insel.
 
+## Wenig Text (seit v59, Entscheidung Simon)
+- Was vorgelesen wird, steht nicht zusätzlich da. Sichtbar bleiben Namen, Zahlen, Sterne, Knöpfe. Keine Untertitel im Menü, keine Statuszeilen unter Inseln, keine Sprechblase auf dem Inselscreen (`#islBubble` hidden), keine Absätze im Kawumm-Ende, in der Begrüßung und in der Schatzkammer. Ausnahme: Kawumms Brief (Romy soll lesen).
+- Neue Hinweise immer als Sprache, nicht als Text.
+
 ## Urlaub für leichte Reihen (seit v57)
 - 1er und 10er (`VACATION_ROWS`) sind gesperrt, sobald sie sitzen (`onVacation`: Tier wach, 80 %). Inselkarte blass, ohne Tier, mit großem Schild "Im Urlaub", keine Interaktion (Karte ist ein div). Ansage `vacationLine` nur ein einziges Mal (`S.vacSaid`), mehrere neue in einem Satz. `openIsland` lässt nicht hinein. Kawumm überspringt diese Reihen in der Kette (`kwAvailable(kw, fwd, away)`), ihre Schatzkarte verschwindet. Entscheidung Simon.
 - Niveau zieht an (`pickTask`): Sitzt die 1er, fliegt alles mit 1 raus (1er-Reihe und jedes "mal 1", `isRetired`). Reihen mit wachem Tier `DONE_ROW_W` 0.6, neueste Insel `NEW_ROW_W` 1.4, Gold-Fakten Gewicht 0.2. Wiederholung läuft weiter über `isDue`. Reihen-Sprung lässt 10er im Urlaub aus.

@@ -521,7 +521,7 @@ button.kwwait:active{transform:none;}
 .kwvault > *{flex-shrink:0;}
 .kwhead{display:flex; align-items:center; gap:10px; width:100%; max-width:460px;}
 .kwhead img{height:90px; width:auto;}
-.kwhead .bub{flex:1; background:#fff; border:2px solid var(--line); border-radius:18px; padding:8px 12px; font-weight:700; font-size:15px;}
+.kwhead .bub{display:none; flex:1; background:#fff; border:2px solid var(--line); border-radius:18px; padding:8px 12px; font-weight:700; font-size:15px;}
 .kwshelf{display:grid; grid-template-columns:repeat(2,1fr); gap:12px; width:100%; max-width:460px; background:#EAD7B4; border:3px solid #C9A26B; border-radius:24px; padding:12px;}
 .kwslot{background:#FFF8EC; border:2px solid #E2C795; border-radius:18px; padding:6px 6px 8px; display:flex; flex-direction:column; align-items:center; gap:2px; text-align:center;}
 .kwslot svg{width:100%; max-width:120px; height:auto;}
@@ -828,10 +828,9 @@ function kwTreasure(ai){
         <g transform="translate(50 18)"><g class="kwfind"><circle cx="0" cy="0" r="17" fill="#FFF3B0" opacity=".7"/><g transform="scale(1.7)">${KW_ITEM[box.item](0,0,1)}</g></g></g>
       </svg>
       <h2>Schatz gefunden!</h2>
-      <p>${lines.slice(1).join(' ')}</p>
-      <div style="display:flex;align-items:center;gap:8px">${kwBoxSVG(r, rs.finds, 96, false, rs.level)}<b>${Math.min(rs.finds,KW_CAP)} von ${KW_CAP}</b></div>
-      <div class="pill">${KR.ok} von ${KR.steps} richtig · ${KR.ok} Sterne</div>
-      <div class="btnrow"><button class="kwbtn" id="kwEndVault">Zur Schatzkammer</button><button class="kwbtn sec" id="kwEndAgain">Nochmal</button><button class="kwbtn sec" id="kwEndBack">Fertig</button></div>`;
+      <div style="display:flex;align-items:center;gap:8px">${kwBoxSVG(r, rs.finds, 96, false, rs.level)}<b>${Math.min(rs.finds,KW_CAP)} / ${KW_CAP}</b></div>
+      <div class="pill">⭐ ${KR.ok}</div>
+      <div class="btnrow"><button class="kwbtn" id="kwEndVault">Schatzkammer</button><button class="kwbtn sec" id="kwEndAgain">Nochmal</button><button class="kwbtn sec" id="kwEndBack">Fertig</button></div>`;
     end.hidden=false;
     kwArm(end, 2000);
     kwSay(lines.join(' '));
@@ -890,7 +889,7 @@ function kwOpenVault(ret, popRow){
   for(const r of KW_ORDER){
     const rs=kw.rows[r], open=av.includes(r)||!!(rs&&rs.finds), n=rs?rs.finds:0, lv=rs?(rs.level||0):0;
     h+='<button class="kwslot'+(open?'':' locked')+(popRow===r?' pop':'')+'" data-r="'+r+'">'+kwBoxSVG(r,n,120,!open,lv)
-      +'<span class="nm">'+(open?kwBoxName(r,lv):'Noch geheim')+'</span><span class="ct">'+(open?Math.min(n,KW_CAP)+' von '+KW_CAP+(lv?' · Stufe '+(lv+1)+' von '+KW_LEVELS:'')+' · '+r+'er-Karte':'Kommt mit der '+r+'er-Karte')+'</span></button>';
+      +'<span class="ct">'+(open?Math.min(n,KW_CAP)+' / '+KW_CAP:'')+'</span></button>';
   }
   h+='</div>';
   w.innerHTML=h;
@@ -914,14 +913,15 @@ function kwIslandCard(r){
   const kw=kws(), av=kwAvail(), rs=kw.rows[r];
   if(av.includes(r)){
     const space=rs&&rs.stage==='space', due=kwIsDue(rs,Date.now());
-    el.innerHTML='<div class="kwcard"><img src="'+KW_IMG+'" alt=""><div class="tx"><b>'+(due?'Hier wartet noch ein Schatz!':'Schatzsuche mit Kawumm')+'</b>'+(due?'Weißt du die '+r+'er-Reihe rückwärts noch? ':'Die '+r+'er-Reihe rückwärts. ')+(space?'Ab ins Weltall!':'Im Meer.')+'<small>'+((rs&&rs.finds)||0)+' von '+KW_CAP+' Schätzen für '+artAcc(r)+' '+kwBoxName(r,rs&&rs.level)+'</small></div><button class="kwbtn" id="kwIslGo">Los!</button></div>';
+    el.innerHTML='<div class="kwcard"><img src="'+KW_IMG+'" alt=""><div class="tx"><b>'+(due?'Schatz wartet!':'Schatzkarte')+'</b>'+(space?'🚀':'⛵')+' '+r+' · '+(r*10)+' … 0</div><button class="kwbtn" id="kwIslGo">Los!</button></div>';
     $('kwIslGo').onclick=()=>kwStart(r,'island');
     kwArm(el);
   } else {
     const i=KW_ORDER.indexOf(r), prev=KW_ORDER[i-1], ps=kw.rows[prev];
     const prevOk=!!(ps&&ps.stage==='space'), have=Math.round(kwFwd(r)*10);
     const need=[]; if(!prevOk) need.push('die '+prev+'er-Schatzkarte im Meer schaffen'); if(have<5) need.push('hier '+(5-have)+' lila '+(5-have===1?'Stern':'Sterne')+' mehr sammeln');
-    el.innerHTML='<div class="kwcard wait"><img src="'+KW_IMG+'" alt=""><div class="tx"><b>Kawumms Schatzkarte</b>Hier liegt auch ein Schatz! Erst '+need.join(' und ')+'.</div></div>';
+    el.innerHTML='<div class="kwcard wait"><img src="'+KW_IMG+'" alt=""><div class="tx"><b>Schatzkarte 🔒</b></div></div>';
+    el.querySelector('.kwcard').onclick=()=>kwSay('Hier liegt auch ein Schatz! Erst '+need.join(' und ')+'.');
   }
 }
 function kwMapCard(list){
@@ -933,8 +933,8 @@ function kwMapCard(list){
   const dueIsl=due.filter(r=>open.includes(r)), dueShip=due.filter(r=>!open.includes(r));
   const dueLine = dueIsl.length ? 'Auf der '+dueIsl.map(r=>r+'er').join(' und der ')+'-Insel wartet noch ein Schatz!' : dueShip.length ? 'Hier am Schiff wartet noch ein Schatz! Die '+dueShip[0]+'er-Karte.' : '';
   const dueTxt = dueLine ? ' '+dueLine : '';
-  d.innerHTML='<img src="'+KW_IMG+'" alt=""><div class="tx"><b>Kawumms Schiff</b>Hier liegt die Schatzkammer.'+(loose.length?' Und eine Schatzkarte, die direkt am Schiff startet!':'')+dueTxt+'</div><div class="btns">'
-    +loose.map(r=>'<button class="kwbtn" data-kwr="'+r+'">'+r+'er rückwärts'+(due.includes(r)?' ★':'')+'</button>').join('')
+  d.innerHTML='<img src="'+KW_IMG+'" alt=""><div class="tx"><b>Kawumms Schiff</b></div><div class="btns">'
+    +loose.map(r=>'<button class="kwbtn" data-kwr="'+r+'">⛵ '+r+' · '+(r*10)+' … 0'+(due.includes(r)?' ★':'')+'</button>').join('')
     +'<button class="kwbtn sec" id="kwMapVault">Schatzkammer</button></div>';
   list.appendChild(d);
   kwArm(d);
@@ -985,7 +985,6 @@ function kwShowLetter(fromParent){
 function kwWelcome(fromParent){
   const box=$('overlayBox'), name=S.name||'Romy';
   box.innerHTML='<h2>Kawumm ist da!</h2>'+kwDuoHTML(150)
-    +'<p style="margin:0;font-weight:700">Kawumm ist Schatzjägerin. Sie segelt übers Meer und fliegt mit ihrem Schiff bis ins Weltall. Ihr Schiff liegt in der Inselwelt, ganz oben.</p>'
     +'<button class="cta" id="kwWelcomeGo" style="background:#E04A40;box-shadow:0 4px 0 #A8322B">Zum Schiff!</button>';
   bigKnall(); sndFanfare();
   kwArm(box, 2000);
@@ -1006,7 +1005,6 @@ function kwGoToShip(){
     t+='Und unsere erste Schatzkarte liegt auf der '+first+'er-Insel. Schau, da steht Schatzkarte!';
     const isl=$('pathList').querySelector('[data-row="'+first+'"]'); if(isl) isl.classList.add('kwhi');
   } else t+='Die erste Schatzkarte startet direkt hier am Schiff. Tipp auf den roten Knopf!';
-  card.querySelector('.tx').insertAdjacentHTML('beforeend','<span class="kwhint">'+t+'</span>');
   kwSay(t);
   setTimeout(()=>{ card.classList.remove('hi'); },9000);
 }
