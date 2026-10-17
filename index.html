@@ -594,9 +594,9 @@ button.ctawait:active{transform:none;}
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=60"></script>
-<script src="game.js?v=60"></script>
-<script src="kawumm.js?v=60"></script>
+<script src="islands.js?v=61"></script>
+<script src="game.js?v=61"></script>
+<script src="kawumm.js?v=61"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -2106,7 +2106,7 @@ function openIsland(r){
   const line=islandLine(r);
   $('islBubble').textContent=line;
   const facts=rowFacts(S,r), sure=facts.filter(f=>f.box>=3).length;
-  $('islProgress').innerHTML=facts.map(f=> f.box>=5?starSVG('#F2B83C') : f.box>=3?starSVG('#9A6AE8') : f.seen>0?starSVG('#D9CFF0'):starSVG('#EEE8F8')).join('')+'<span style="margin-left:6px">'+(()=>{ const op=unlockedRows(S), nx=nextLockedRow(S); return (r===op[op.length-1]&&nx!==null)? Math.min(sure,8)+' / 8' : ''; })()+'</span>';
+  $('islProgress').innerHTML=facts.map(f=> f.box>=5?starSVG('#F2B83C') : f.box>=3?starSVG('#9A6AE8') : f.seen>0?starSVG('#D9CFF0'):starSVG('#EEE8F8')).join('')+'<span style="margin-left:6px">'+(()=>{ const op=unlockedRows(S), nx=nextLockedRow(S); return (r===op[op.length-1]&&nx!==null)? Math.min(sure,8)+' / 8' : ''; })()+(S.best.rows[r]?' · 🏆 '+(S.best.rows[r]/1000).toFixed(1).replace('.',',')+' s':'')+'</span>';
   const an=$('islStage').querySelector('.isl-animal');
   if(an){ an.style.cursor='pointer'; an.addEventListener('click',()=>{ an.classList.remove('hop'); void an.getBBox(); an.classList.add('hop'); smallSparkle(); sndGood(); const t=nextIslandLine(r); $('islBubble').textContent=t; speak(t); }); }
   renderShop(r);
