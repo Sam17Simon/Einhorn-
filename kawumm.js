@@ -16,7 +16,7 @@ const KW_FAST_TYPE = 7000;    // beim Selbst-Eintippen gilt bis 7 s als schnell
 const KW_SAFE_BOX = 3;
 const KW_CAP = 10;            // Schätze pro Sammelbehälter
 const KW_LEVELS = 3;          // Stufen je Behälter: normal, Glitzer, Diamant (wie Lumis Extras)
-const KW_READ_MS = 15000;     // Lesezeit für den Brief, bevor "Ja, komm vorbei!" erscheint
+const KW_READ_MS = 3000;      // ab Öffnen des Briefs: spätestens dann ist "Ja, komm vorbei!" da (Entscheidung Simon)
 
 /* ================= KW-LOGIC-START ================= */
 function kwDefault(){ return {joined:false, rows:{}}; }
@@ -949,17 +949,17 @@ function kwShowLetter(fromParent){
       Ich wette, du kannst rückwärts. Darf ich kommen? Ich bring Kekse mit. Vielleicht.
       <div class="sig"><b>KAWUMM!</b> <img src="${KW_IMG}" alt=""></div>
       <div class="ps">PS: Sagst du Nein, schick ich dir eine Möwe.</div></div>
-    <button class="cta kwyes" id="kwYes">Ja, komm vorbei!</button>`;
+    <button class="cta kwyes" id="kwYes" data-noarm>Ja, komm vorbei!</button>`;
   $('overlay').classList.add('show');
   [523,659,523,784].forEach((f,i)=>tone(f,.14,i*0.12,'triangle',.08));
   speak('Post für '+name+'!');
   let shown=false;
+  setTimeout(()=>showYes(), KW_READ_MS);
   const showYes=()=>{ if(shown) return; shown=true; $('kwYes').classList.add('show'); };
   setTimeout(()=>{
     $('kwEnv').classList.add('open');
     setTimeout(()=>{ $('kwEnv').classList.add('away'); const p=$('kwPaper'); p.classList.add('show'); void p.offsetWidth; p.classList.add('in');
       // Den Brief liest Romy selbst. Nichts vorlesen, der Knopf kommt nach Lesezeit.
-      setTimeout(showYes, KW_READ_MS);
     },950);
   },1700);
   $('kwYes').onclick=()=>{ kws().joined=true; save(); kwWelcome(fromParent); };
