@@ -308,11 +308,12 @@ const KW_SPACE_FX=[
   `<svg viewBox="0 0 60 40"><circle cx="30" cy="20" r="10" fill="#EDE7F6" stroke="${KW_INK}" stroke-width="2.2"/><circle cx="26" cy="17" r="2.4" fill="#CFC7DC"/><circle cx="34" cy="24" r="1.8" fill="#CFC7DC"/></svg>`,
   `<svg viewBox="0 0 60 40">${'' }<g fill="#FFE27A">${[[14,10,4],[44,8,3],[30,26,5],[50,30,2.5]].map(([x,y,r])=>'<circle cx="'+x+'" cy="'+y+'" r="'+r+'" opacity=".85"/>').join('')}</g></svg>`
 ];
-function kwFxHTML(){
-  if(Math.random()<0.35) return '';
-  const pool=KR.space?KW_SPACE_FX:KW_SEA_FX, left=Math.random()<0.5;
-  return '<div class="kwfx" style="left:'+(left?10:90)+'%;top:'+(44+Math.random()*6)+'%">'+pool[Math.floor(Math.random()*pool.length)]+'</div>';
+function kwFxPick(){
+  if(Math.random()<0.35) return null;
+  const pool=KR.space?KW_SPACE_FX:KW_SEA_FX;
+  return {x:Math.random()<0.5?8:92, y:44+Math.random()*6, svg:pool[Math.floor(Math.random()*pool.length)]};
 }
+function kwFxHTML(fx, dy){ return fx ? '<div class="kwfx" style="left:'+fx.x+'%;top:'+(fx.y+(dy||0))+'%">'+fx.svg+'</div>' : ''; }
 function kwShipHTML(space){
   return `<div class="kwship${space?' fly':''}">
     <svg viewBox="0 0 120 100" class="kwsail" aria-hidden="true"><path d="M60 6 V70" stroke="#7A4E2A" stroke-width="4"/><path d="M62 10 Q96 26 92 58 L62 58 Z" fill="#FFF8EC" stroke="${KW_INK}" stroke-width="3" stroke-linejoin="round"/><circle cx="76" cy="34" r="6" fill="#E04A40"/><path d="M60 6 l14 4 -14 4 Z" fill="#E04A40"/></svg>
@@ -393,7 +394,9 @@ kwCSS.textContent=`
   background-size:120px 90px; transition:background-position 1s ease;}
 .kwmap.space{border-color:#4B3F86; background-color:#2A2150;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='120'%3E%3Cg fill='%23ffffff'%3E%3Ccircle cx='14' cy='20' r='1.6'/%3E%3Ccircle cx='70' cy='8' r='1.1'/%3E%3Ccircle cx='110' cy='40' r='1.8'/%3E%3Ccircle cx='40' cy='70' r='1.2'/%3E%3Ccircle cx='96' cy='96' r='1.4'/%3E%3Ccircle cx='20' cy='108' r='1'/%3E%3C/g%3E%3Cpath d='M58 52 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2 Z' fill='%23FFE27A' opacity='.8'/%3E%3C/svg%3E");}
-.kwlayer{position:absolute; inset:0; transition:transform 1s ease-in-out;}
+.kwlayer{position:absolute; inset:0; transition:transform 1.2s ease-in-out;}
+.kwopt.kwnext{opacity:0; pointer-events:none; transition:opacity 1s ease .2s;}
+.kwopt.kwnext.show{opacity:1;}
 .kwlayerin{position:absolute; inset:0;}
 .kwfx{position:absolute; width:16%; max-width:70px; transform:translate(-50%,-50%); pointer-events:none; animation:kwbob2 2.6s ease-in-out infinite; opacity:.95;}
 .kwfx svg{width:100%; height:auto; display:block;}
@@ -410,7 +413,7 @@ kwCSS.textContent=`
 @keyframes kwfog{0%{transform:translate(-50%,-50%)}20%{transform:translate(-56%,-50%)}40%{transform:translate(-44%,-50%)}60%{transform:translate(-53%,-50%)}100%{transform:translate(-50%,-50%); opacity:.25; filter:blur(3px) grayscale(1)}}
 .kwopt.glow .kwisl{filter:drop-shadow(0 0 10px #FFE27A) drop-shadow(0 0 4px #FFE27A);}
 .kwopt.gone{opacity:0;}
-.kwship{position:absolute; width:26%; max-width:130px; aspect-ratio:120/100; transform:translate(-50%,-92%); pointer-events:none; z-index:3; transition:left 1.1s ease-in-out, top 1.1s ease-in-out;}
+.kwship{position:absolute; width:26%; max-width:130px; aspect-ratio:120/100; transform:translate(-50%,-92%); pointer-events:none; z-index:3; transition:left 1.2s ease-in-out, top 1.2s ease-in-out;}
 .kwship svg{position:absolute; inset:0; width:100%; height:100%; overflow:visible;}
 .kwship .kwpirate{position:absolute; left:20%; bottom:22%; height:74%; width:auto;}
 .kwship.sway{animation:kwsway 2.4s ease-in-out infinite;}
@@ -585,7 +588,7 @@ function kwStart(r, ret){
   $('kwTitle').textContent=world.name+' · '+r+'er';
   $('kwStars').textContent=S.stars;
   $('kwEnd').hidden=true;
-  KR.seed=Math.floor(Math.random()*1e6)+1;
+  KR.seed=Math.floor(Math.random()*1e6)+1; KR.sx=KW_ST.x;
   { const p=$('kwPad'); if(p) p.remove(); }
   $('kwLayer').innerHTML='<div class="kwlayerin" id="kwLayerIn"></div>'+kwShipHTML(space);
   show('kw');
@@ -641,26 +644,29 @@ function kwRenderStrip(zip){
   el.innerHTML=h;
 }
 function kwStationHTML(n, treasure){ return KR.space ? kwPlanetSVG(n,treasure) : kwIslandSVG(n,treasure); }
-function kwRenderLayerAt(k, noOpts){
+/* Ruhige Fahrt (Entscheidung Simon): Das Schiff bleibt auf der Seite der gewählten Insel (KR.sx).
+   Die Karte rollt nur senkrecht. Die nächste Inselreihe liegt schon darunter und taucht beim Fahren auf. */
+const KW_DY=(KW_OPT_Y-KW_ST.y)*100;   // Abstand zweier Reihen in Prozent der Kartenhöhe
+function kwRowHTML(opts, fx, dy, pending){
+  return opts.map((v,i)=>'<button class="kwopt'+(pending?' kwnext':'')+'" data-i="'+i+'" style="left:'+(KW_OPT_X[i]*100)+'%;top:'+(KW_OPT_Y*100+dy)+'%" aria-label="'+v+'">'+kwStationHTML(v,false)+'</button>').join('')+kwFxHTML(fx, dy);
+}
+function kwRenderLayerAt(k, noOpts, pre){
   const L=$('kwLayer'), IN=$('kwLayerIn'); if(!L||!IN||!KR) return;
   L.style.transition='none'; L.style.transform='none';
-  const r=KR.r, cur=k*r;
-  let h='<svg class="kwpath" viewBox="0 0 100 100" preserveAspectRatio="none">';
-  // keine Linien zwischen den Inseln (Entscheidung Simon)
-  h+='</svg>';
-  h+='<div class="kwst" style="left:'+(KW_ST.x*100)+'%;top:'+(KW_ST.y*100)+'%">'+kwStationHTML(cur,false)+'</div>';
+  const r=KR.r, cur=k*r, sx=KR.sx==null?KW_ST.x:KR.sx;
+  let h='<div class="kwst" style="left:'+(sx*100)+'%;top:'+(KW_ST.y*100)+'%">'+kwStationHTML(cur,false)+'</div>';
   KR.opts=[];
   if(!noOpts && k>=1){
-    KR.opts=kwOptions(r,k);
-    KR.opts.forEach((v,i)=>{ h+='<button class="kwopt" data-i="'+i+'" style="left:'+(KW_OPT_X[i]*100)+'%;top:'+(KW_OPT_Y*100)+'%" aria-label="'+v+'">'+kwStationHTML(v,false)+'</button>'; });
+    KR.opts = pre ? pre.opts : kwOptions(r,k);
+    KR.fx = pre ? pre.fx : kwFxPick();
+    h+=kwRowHTML(KR.opts, KR.fx, 0, false);
   }
-  if(!noOpts) h+=kwFxHTML();
   IN.innerHTML=h;
-  kwPlaceShip(KW_ST.x, KW_ST.y, false);       // im selben Bild wie das Zurücksetzen der Karte: kein Sprung
+  kwPlaceShip(sx, KW_ST.y, false);       // im selben Bild wie das Zurücksetzen der Karte: kein Sprung
   IN.querySelectorAll('.kwopt').forEach(b=>b.addEventListener('click',()=>kwChoose(+b.dataset.i)));
   void L.offsetWidth; L.style.transition='';
 }
-function kwRenderLayer(){ kwRenderLayerAt(KR.k,false); }
+function kwRenderLayer(pre){ kwRenderLayerAt(KR.k,false,pre); }
 function kwStep(){
   if(!KR) return;
   const r=KR.r, cur=KR.k*r;
@@ -759,21 +765,30 @@ function kwSail(ai, delay){
   const my=KR.id;
   setTimeout(()=>{
     if(!KR||KR.id!==my) return;
-    const btns=$('kwLayerIn').querySelectorAll('.kwopt');
+    const IN=$('kwLayerIn'), btns=IN.querySelectorAll('.kwopt');
     btns.forEach((b,j)=>{ if(j!==ai) b.classList.add('gone'); });
-    kwPlaceShip(KW_OPT_X[ai], KW_OPT_Y, true);
+    const last = KR.k-1===0, tx=KW_OPT_X[ai];
+    let pre=null;
+    if(!last){
+      // nächste Reihe schon unten anlegen, sie taucht beim Fahren auf
+      pre={opts:kwOptions(KR.r, KR.k-1), fx:kwFxPick()};
+      IN.insertAdjacentHTML('beforeend', kwRowHTML(pre.opts, pre.fx, KW_DY, true));
+      void IN.offsetWidth;
+      IN.querySelectorAll('.kwnext').forEach(b=>b.classList.add('show'));
+      // Karte rollt nur nach oben, gleichzeitig fährt das Schiff zur Insel
+      const {h}=kwMapSize(), L=$('kwLayer');
+      L.style.transform='translateY('+(-KW_DY/100*h)+'px)';
+      const m=$('kwMap'), bp=(parseFloat((m.style.backgroundPosition||'0 0').split(' ')[1])||0)-(KW_DY/100*h);
+      m.style.backgroundPosition='0 '+bp+'px';
+    }
+    kwPlaceShip(tx, KW_OPT_Y, true);
     setTimeout(()=>{
       if(!KR||KR.id!==my) return;
-      KR.k--; KR.visited.push(KR.k);
-      if(KR.k===0){ kwRenderStrip(); kwTreasure(ai); return; }
-      // Karte rückt nach: gewählte Insel wird die neue Station oben
-      const {w,h}=kwMapSize(), L=$('kwLayer');
-      L.style.transform='translate('+((KW_ST.x-KW_OPT_X[ai])*w)+'px,'+((KW_ST.y-KW_OPT_Y)*h)+'px)';
-      const m=$('kwMap'), bp=(parseFloat((m.style.backgroundPosition||'0 0').split(' ')[1])||0)-((KW_OPT_Y-KW_ST.y)*h);
-      m.style.backgroundPosition='0 '+bp+'px';
+      KR.k--; KR.visited.push(KR.k); KR.sx=tx;
       kwRenderStrip();
-      setTimeout(()=>{ if(!KR||KR.id!==my) return; kwRenderLayer(); kwStep(); },1050);
-    },1150);
+      if(KR.k===0){ kwTreasure(ai); return; }
+      kwRenderLayer(pre); kwStep();
+    },1200);
   }, delay);
 }
 function kwTreasure(ai){
