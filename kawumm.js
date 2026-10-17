@@ -7,7 +7,7 @@
 'use strict';
 
 /* Für Romy sichtbar erst, wenn KW_LIVE = true. Bis dahin nur über den Elternbereich (Testmodus). */
-const KW_LIVE = false;
+const KW_LIVE = true;
 /* Reihenfolge der Schatzkarten: Kawumm startet mit der Einserreihe, dann die Inselreihenfolge */
 const KW_ORDER = [1,2,10,5,4,8,3,6,9,7];
 const KW_FWD_SHARE = 0.5;     // eigene Vorwärtsreihe halbwegs: 5 von 10 Aufgaben lila (Box 3+)
@@ -586,7 +586,7 @@ function kwStart(r, ret){
   map.style.setProperty('--kwring', world.ring||'#BFE7F7');
   map.style.backgroundPosition='0 0';
   $('kwTitle').textContent=world.name+' · '+r+'er';
-  $('kwStars').textContent=S.stars;
+  $('kwStars').textContent=kws().stars||0;
   $('kwEnd').hidden=true;
   KR.seed=Math.floor(Math.random()*1e6)+1; KR.sx=KW_ST.x;
   { const p=$('kwPad'); if(p) p.remove(); }
@@ -720,7 +720,7 @@ function kwTypedDone(){
   $('kwTyped').textContent=correct?String(val):ans;
   $('kwTyped').classList.add(correct?'good':'again');
   const IN=$('kwLayerIn'), opts=IN.querySelectorAll('.kwopt'), ai=KR.opts.indexOf(ans), blk=IN.querySelector('.kwblock'), pad=$('kwPad');
-  if(correct){ sndGood(); $('kwStars').textContent=S.stars; kwSayLine(kwPick(['Kawumm! Aus dem Kopf gewusst!','Ha! Da staunt '+B.c.name+'!','Richtig! Und tschüss, '+B.c.name+'!'])); }
+  if(correct){ sndGood(); $('kwStars').textContent=kws().stars||0; kwSayLine(kwPick(['Kawumm! Aus dem Kopf gewusst!','Ha! Da staunt '+B.c.name+'!','Richtig! Und tschüss, '+B.c.name+'!'])); }
   else { sndAgain(); kwSayLine('Fast! Es ist die '+ans+'. Tschüss, '+B.c.name+'!'); }
   setTimeout(()=>{
     if(!KR||KR.id!==my) return;
@@ -738,9 +738,9 @@ function kwRecord(val, rt){
   const r=KR.r, k=KR.k, ans=(k-1)*r, correct=val===ans;
   kwApplyStep(KR.rs.steps[k], correct, rt);
   KR.steps++;
-  if(correct){ KR.ok++; S.stars++; } else KR.clean=false;
+  if(correct){ KR.ok++; const kw=kws(); kw.stars=(kw.stars||0)+1; } else KR.clean=false;   // eigene Kawumm-Sterne, getrennt von Lumis Sternen (Entscheidung Simon)
   if(rt>KW_FAST) KR.clean=false;
-  logDay(S,Date.now(),0,1,correct?1:0); save();
+  save();   // nicht in die Mal-Statistik (Aufgaben und Trefferquote) zählen; die Spielzeit läuft über trackScreen weiter
   return correct;
 }
 function kwChoose(i){
@@ -750,7 +750,7 @@ function kwChoose(i){
   const correct=kwRecord(val, rt);
   const ai=KR.opts.indexOf(ans), btns=$('kwLayerIn').querySelectorAll('.kwopt');
   if(correct){
-    sndGood(); $('kwStars').textContent=S.stars;
+    sndGood(); $('kwStars').textContent=kws().stars||0;
     const b=btns[ai].getBoundingClientRect(); burst(18,(b.left+b.width/2)/innerWidth,(b.top+b.height/2)/innerHeight,6);
     if(Math.random()<0.4) kwSayLine(kwPick(KW_LINES.ok));
     kwSail(ai,0);
