@@ -131,10 +131,176 @@ function kwFinishRun(rs, st, now){
   else if(rs.level<KW_LEVELS-1){ rs.level++; rs.finds=1; res.find=true; res.levelUp=true; }   // voll: verwandelt sich und füllt sich neu
   return res;
 }
+/* ---------- Kawumm auf Reisen (seit v64) ----------
+   Abflug: nach 6 bis 8 Fahrten seit Start bzw. letzter Rückkehr, nur am Ende einer Fahrt, nur wenn es bei Lumi vorwärts etwas zu tun gibt.
+   Rückkehr: nach 2 bis 3 Spieltagen (Tage nach dem Abflug mit mindestens einer Lumi-Aufgabe in state.days). Kalendertage zählen nicht.
+   Briefe: Abschied, 1 bis 2 Reisebriefe (mal beim App-Start, mal am Rundenende nach 3 bis 6 Lumi-Runden), Rückkehrbrief.
+   Höchstens ein Brief pro Tag (lastLetterDay). Fällige Wiederholungen pausieren: rs.last rückt um die Reisezeit nach hinten. */
+const KW_TRIP_N=9;                 // so viele Reisen sind vorgeschrieben (KW_TRIPS)
+const KW_LEAVE_MIN=6, KW_LEAVE_MAX=8, KW_DAYS_MIN=2, KW_DAYS_MAX=3, KW_ROUNDS_MIN=3, KW_ROUNDS_MAX=6;
+function kwRandInt(rng,a,b){ return a+Math.floor(rng()*(b-a+1)); }
+function kwTripDefault(rng){
+  rng=rng||Math.random;
+  return {state:'home', idx:null, count:0, order:Array.from({length:KW_TRIP_N},(_,i)=>i), pos:0,
+    runsSince:0, nextAfter:kwRandInt(rng,KW_LEAVE_MIN,KW_LEAVE_MAX), leftDay:null, leftAt:null, needDays:0,
+    plan:0, sent:0, next:null, roundsSince:0, lastLetterDay:null};
+}
+/* Alte Stände und Sicherungsdateien: Reise, Briefe und Andenken mit Standardwerten nachrüsten */
+function kwTripEnsure(kw, rng){
+  if(!kw.trip || typeof kw.trip!=='object') kw.trip=kwTripDefault(rng);
+  const d=kwTripDefault(rng); for(const k in d) if(kw.trip[k]===undefined) kw.trip[k]=d[k];
+  if(!Array.isArray(kw.mail)) kw.mail=[];
+  if(!Array.isArray(kw.souvenirs)) kw.souvenirs=[];
+  return kw.trip;
+}
+function kwAway(kw){ return !!(kw && kw.trip && kw.trip.state==='away'); }
+/* Spieltage seit dem Abflug: nur Tage NACH dem Abflugtag, an denen Lumi-Aufgaben gelöst wurden (Kawumm zählt dort nicht mit) */
+function kwPlayDays(days, leftDay){
+  if(!days||!leftDay) return 0;
+  return Object.keys(days).filter(d=>d>leftDay && days[d] && days[d].tasks>0).length;
+}
+/* Nächster Reisebrief: beim App-Start oder am Rundenende nach 3 bis 6 Lumi-Runden */
+function kwPlanLetter(rng){ return rng()<0.5 ? {when:'start'} : {when:'round', rounds:kwRandInt(rng,KW_ROUNDS_MIN,KW_ROUNDS_MAX)}; }
+/* Feste Reihenfolge 1 bis 9, danach neu gemischt (nie dieselbe Reise zweimal hintereinander) */
+function kwNextTripIdx(t, rng){
+  if(t.pos>=t.order.length){
+    const last=t.order[t.order.length-1], o=Array.from({length:KW_TRIP_N},(_,i)=>i);
+    do{ o.sort(()=>rng()-0.5); } while(KW_TRIP_N>1 && o[0]===last);
+    t.order=o; t.pos=0;
+  }
+  return t.order[t.pos++];
+}
+/* Abflug wirklich ausführen. tip = Lumi-Tipp im Abschiedsbrief (aus guideMode). Gibt den Brief zurück. */
+function kwTripDepart(kw, today, now, rng, tip){
+  rng=rng||Math.random; const t=kwTripEnsure(kw, rng);
+  t.idx=kwNextTripIdx(t, rng); t.state='away'; t.leftDay=today; t.leftAt=now;
+  t.needDays=kwRandInt(rng,KW_DAYS_MIN,KW_DAYS_MAX); t.plan=kwRandInt(rng,1,2); t.sent=0;
+  t.next=kwPlanLetter(rng); t.roundsSince=0; t.lastLetterDay=today; t.runsSince=0;
+  const m={t:t.idx, k:'bye', d:today, read:false}; if(tip) m.tip=tip;
+  kw.mail.push(m); return m;
+}
+/* Am Ende jeder Fahrt aufrufen. true = Kawumm fliegt jetzt los (Abschiedsbrief steht dann in kw.mail).
+   fwdWork: bei Lumi gibt es vorwärts etwas zu tun (lumiWorkLeft in index.html). */
+function kwTripRunEnd(kw, o, rng){
+  rng=rng||Math.random; const t=kwTripEnsure(kw, rng);
+  if(t.state!=='home') return false;
+  t.runsSince++;
+  if(t.runsSince<t.nextAfter || !o.fwdWork || t.lastLetterDay===o.today) return false;
+  kwTripDepart(kw, o.today, o.now, rng, o.tip);
+  return true;
+}
+/* Was beim App-Start (nach dem Intro) dran ist, ohne etwas zu ändern: 'back', 'travel' oder null */
+function kwTripStartDue(kw, days, today){
+  const t=kw.trip; if(!t||t.state!=='away'||t.lastLetterDay===today) return null;
+  const pd=kwPlayDays(days, t.leftDay);
+  if(pd>=t.needDays && t.sent>=1) return 'back';
+  if(t.sent<t.plan && t.next && (t.next.when==='start' || pd>=t.needDays)) return 'travel';
+  return null;
+}
+/* Am Ende einer Lumi-Runde: Runde zählen (nur unterwegs). Kein Brief, nur Zähler. */
+function kwTripRound(kw){ const t=kw.trip; if(t&&t.state==='away') t.roundsSince++; }
+/* Darf jetzt am Rundenende ein Reisebrief kommen? (ohne etwas zu ändern) */
+function kwTripRoundDue(kw, today){
+  const t=kw.trip; if(!t||t.state!=='away'||t.lastLetterDay===today) return false;
+  return t.sent<t.plan && !!t.next && t.next.when==='round' && t.roundsSince>=t.next.rounds;
+}
+/* Reisebrief verschicken (Nummer 0 oder 1 der Reise) */
+function kwTripSendTravel(kw, today, rng){
+  rng=rng||Math.random; const t=kw.trip;
+  const m={t:t.idx, k:'travel', n:t.sent, d:today, read:false};
+  t.sent++; t.lastLetterDay=today; t.roundsSince=0; t.next = t.sent<t.plan ? kwPlanLetter(rng) : null;
+  kw.mail.push(m); return m;
+}
+/* Fällige Wiederholungen pausieren: jede Karte rückt um die Reisezeit nach hinten */
+function kwShiftDue(kw, ms){
+  if(!(ms>0)) return;
+  for(const r in kw.rows){ const rs=kw.rows[r]; if(rs && rs.last) rs.last+=ms; }
+}
+/* Rückkehr: Andenken in die Schatzkammer, Fälligkeit verschieben, Rückkehrbrief */
+function kwTripReturn(kw, today, now, rng){
+  rng=rng||Math.random; const t=kw.trip, idx=t.idx;
+  kwShiftDue(kw, now-(t.leftAt||now));
+  if(!kw.souvenirs.includes(idx)) kw.souvenirs.push(idx);
+  const m={t:idx, k:'back', d:today, read:false}; kw.mail.push(m);
+  t.state='home'; t.count++; t.lastLetterDay=today; t.runsSince=0; t.nextAfter=kwRandInt(rng,KW_LEAVE_MIN,KW_LEAVE_MAX);
+  t.next=null; t.roundsSince=0; t.leftAt=null;
+  return m;
+}
 /* ================= KW-LOGIC-END ================= */
 
+/* ---------- Reisebriefe (Texte, Romy liest selbst, nichts davon wird vorgelesen) ----------
+   Je Reise: Ort, Andenken, Abschied (bye), 1 bis 2 Reisebriefe (travel[0] kommt immer, travel[1] nur manchmal), Rückkehr (back).
+   {name} wird ersetzt. Im Abschied steht außerdem der Lumi-Tipp (kwTipLine) und immer: Ich melde mich. Und ich komme wieder!
+   Rätsel nur im PS des Abschieds (Reise 3, 6, 9), die Lösung steht im ersten Reisebrief (der kommt immer). */
+const KW_COMEBACK='Ich melde mich. Und ich komme wieder!';
+const KW_TRIPS=[
+  {place:'Glibber-Berg', from:'vom Glibber-Berg', souv:'jelly', souvName:'Wackelpudding-Glas',
+   bye:{l:['Ich muss los. Sofort!','Liese hat eine Karte gefunden. Da ist ein Berg drauf. Aus Wackelpudding!','Ein Berg zum Essen? Da MUSS ich hin.'], ps:'Pass gut auf Lumi auf. Sonst futtert sie meine Kekse.'},
+   travel:[{l:['Wir sind am Glibber-Berg. Er wackelt die ganze Zeit!','Berta ist hingefallen. Platsch! Mitten in den roten Teil.','Dann hat das Pupstierchen gepupst. Jetzt ist der Berg bunt wie ein Regenbogen.','Liese sagt: Nicht alles aufessen, sonst ist der Berg weg.','Ich hab trotzdem genascht. Nur ein bisschen. Ein großes bisschen.'], ps:'Wackelpudding mit Himbeere schmeckt am besten.'},
+           {l:['Oben auf dem Glibber-Berg wohnt ein Glibber-Wurm. Ganz grün und ganz lieb.','Er hat gesagt: Wer mich kitzelt, darf rutschen.','Also hab ich gekitzelt. Er hat so gelacht, dass der ganze Berg gewackelt hat.','Und dann sind wir alle runtergerutscht. Bis ganz unten!'], ps:'Rutschen auf Wackelpudding ist kalt am Po.'}],
+   back:{l:['Ich bin wieder da! Kawumm!','Ich hab dir ein Stück vom Glibber-Berg mitgebracht. Im Glas, damit es nicht wegwackelt.','Es steht in der Schatzkammer. Nicht aufessen!','Ich hab dich vermisst. Ein bisschen. Na gut, sehr.']}},
+  {place:'Planet Kitzel', from:'vom Planeten Kitzel', souv:'feather', souvName:'Kitzel-Feder',
+   bye:{l:['Gerade kam ein Ufo vorbei. Es hat gehupt. Dreimal!','Liese sagt, das heißt: Hilfe, wir brauchen Piraten!','Also fliege ich ins Weltall. Zum Planeten Kitzel.'], ps:'Siehst du heute Nacht einen Stern, der hupt? Das bin ich.'},
+   travel:[{l:['Auf dem Planeten Kitzel wohnen grüne Aliens. Sie haben zehn Arme. Alle kitzeln!','Ich hab so gelacht, dass mir der Hut runtergefallen ist.','Aber die Aliens haben ein Problem. Sie haben ihr Lachen verloren. Keiner weiß, wo.','Liese hat einen Plan. Liese hat immer einen Plan.'], ps:'Aliens riechen nach Pfefferminz. Echt wahr.'},
+           {l:['Wir haben das Lachen gefunden! Es lag unter einem Stein. Ganz klein und zusammengerollt.','Das Pupstierchen hat einen Regenbogen gepupst. Da hat das Lachen gekichert und ist rausgehüpft.','Jetzt lachen alle Aliens wieder. Laut! Die ganze Nacht!','Ich kann nicht schlafen. Aber egal.'], ps:'Rosi hat ein Alien gekitzelt. Es ist fast geplatzt vor Lachen.'}],
+   back:{l:['Ich bin wieder da! Mit Super-Speed nach Hause!','Die Aliens haben mir eine Kitzel-Feder geschenkt. Sie kitzelt ganz von allein.','Sie liegt in der Schatzkammer. Fass sie lieber nicht an. Oder doch. Hihi!','Hast du mich vermisst? Ich dich schon.']}},
+  {place:'Schnecken-Rennen', from:'vom Schnecken-Rennen', souv:'snail', souvName:'Glitzer-Schneckenhaus',
+   bye:{l:['Heute ist das große Schnecken-Rennen auf der Insel Kriechzu.','Liese hat uns angemeldet. Unsere Schnecke heißt Blitz. Sie ist sehr langsam.','Das wird ein Abenteuer! Ich muss sofort los.'], ps:'Ein Rätsel für dich: Was hat viele Zähne, kann aber nicht beißen? Die Lösung steht im nächsten Brief.'},
+   travel:[{l:['Das Rennen läuft. Seit drei Tagen! Die Schnecken sind erst bei der Hälfte.','Blitz hat geschlafen. Mitten auf der Strecke.','Liese hatte einen Plan: Wir legen Salat hinter die Ziellinie.','Jetzt kriecht Blitz los. Ganz schnell. Für eine Schnecke.'], ps:'Die Lösung vom Rätsel: ein Kamm! Hast du es gewusst?'},
+           {l:['Blitz hat gewonnen! Die anderen Schnecken haben unterwegs ein Picknick gemacht.','Wir haben getanzt. Berta wollte auf einer Schnecke reiten. Hat nicht geklappt.','Das Pupstierchen hat vor Freude einen Regenbogen gepupst. Quer über die Ziellinie.'], ps:'Schnecken können nicht klatschen. Sie winken mit den Fühlern.'}],
+   back:{l:['Ich bin wieder da! Und ich hab einen Pokal dabei!','Er ist so groß wie ein Schneckenhaus. Weil er ein Schneckenhaus ist. Mit Glitzer!','Er steht in der Schatzkammer. Ganz oben.','Blitz lässt dich grüßen. Langsam.']}},
+  {place:'Keks-Mond', from:'vom Keks-Mond', souv:'cookie', souvName:'Sternkeks',
+   bye:{l:['Weißt du, was ich gehört hab? Der Mond ist ein Keks! Ein riesiger!','Liese sagt, das stimmt nicht. Aber sie packt trotzdem Milch ein.','Wir fliegen hin und probieren. Nur ein Bissen. Versprochen.'], ps:'Sieht der Mond heute angeknabbert aus? Dann war ich das.'},
+   travel:[{l:['Wir sind auf dem Mond gelandet. Er ist kein Keks.','Er ist ein Käse! Voller Löcher. Und er riecht nach Socken.','Berta hält sich die Nase zu. Rosi auch.','Das Pupstierchen findet es toll. Klar.'], ps:'Im Weltall hört man keinen Pups. Aber den Regenbogen sieht man!'},
+           {l:['Hinter dem Mond wohnt ein Mondbäcker. Er backt Sternkekse. In echt!','Wir durften helfen. Ich hab den Teig geknetet. Mit den Füßen. Ups.','Liese hat schnell neuen Teig gemacht. Sie ist eben die Checkerin.'], ps:'Sternkekse leuchten im Bauch. Ich bin jetzt eine Nachtlampe.'}],
+   back:{l:['Ich bin wieder da! Kawumm!','Ich hab dir einen Sternkeks mitgebracht. Er leuchtet!','Er liegt in der Schatzkammer. Ich hab nur ein ganz kleines Stück abgebissen.','Na gut, zwei Stück.']}},
+  {place:'Fisch-Disco', from:'von der Fisch-Disco', souv:'shell', souvName:'Disco-Muschel',
+   bye:{l:['Unten im Meer ist heute Disco! Die Fische haben mich eingeladen.','Ich kann tauchen. Ein bisschen. Liese hat Taucherbrillen für alle.','Ich bin gleich weg. Platsch!'], ps:'Kannst du unter Wasser tanzen? Ich übe noch.'},
+   travel:[{l:['Die Fisch-Disco ist der Knaller! Ein Krake macht die Musik. Mit acht Armen!','Eine Qualle leuchtet bunt. Das ist das Disco-Licht.','Berta tanzt mit einem Seepferdchen. Rosi mit einem Hummer.','Ich tanze mit allen. Kawumm!'], ps:'Der Brief ist ein bisschen nass. Entschuldigung!'},
+           {l:['Plötzlich war die Musik aus! Die Muscheln hatten den Mund zu.','Liese hatte einen Plan: Wir kitzeln die Muscheln. Dann lachen sie und machen auf.','Hat geklappt! Und das Pupstierchen hat Regenbogen-Blasen gepupst.','Die schönste Disco der Welt!'], ps:'Fische können nicht klatschen. Sie blubbern.'}],
+   back:{l:['Ich bin wieder da! Und ganz trocken. Fast.','Ich hab dir eine Disco-Muschel mitgebracht. Sie glitzert in allen Farben.','Sie liegt in der Schatzkammer.','Mir ist noch ganz schwindelig vom Tanzen.']}},
+  {place:'Wolkenschloss', from:'vom Wolkenschloss', souv:'button', souvName:'Riesen-Knopf',
+   bye:{l:['Ganz oben in den Wolken steht ein Schloss. Da wohnt ein Riese.','Er schnarcht so laut, dass die Wolken wackeln. Keiner kann schlafen!','Liese hat ein bisschen Angst. Aber sie hat auch einen Plan. Wir fliegen hin!'], ps:'Ein Rätsel für dich: Der Riese zählt beim Verstecken rückwärts. 30, 27, 24. Welche Zahl kommt dann? Die Lösung steht im nächsten Brief.'},
+   travel:[{l:['Das Wolkenschloss ist riesig. Die Tür ist so groß wie zehn Schiffe.','Der Riese heißt Knut. Er ist ganz lieb. Nur sehr laut.','Er schnarcht, weil seine Nase kitzelt. Da steckt eine Feder drin!'], ps:'Die Lösung vom Rätsel: 21! Danach kommen 18, 15, 12. Hast du es gewusst?'},
+           {l:['Liese hatte einen Plan: Das Pupstierchen pupst einen Regenbogen. Direkt unter Knuts Nase.','Knut musste niesen. HATSCHI! Die Feder ist rausgeflogen. Bis zum Mond!','Jetzt schläft Knut ganz leise. Die Wolken auch.'], ps:'Vom Niesen sind wir ein Stück weggeflogen. Rosi sitzt noch auf einer Wolke. Sie findet es gemütlich.'}],
+   back:{l:['Ich bin wieder da! Kawumm!','Knut hat mir einen Knopf von seiner Jacke geschenkt. Er ist so groß wie ein Teller.','Er liegt in der Schatzkammer. Man kann damit auch Frisbee spielen.','Ich hab dich vermisst!']}},
+  {place:'Dino-Insel', from:'von der Dino-Insel', souv:'egg', souvName:'Schoko-Dino-Ei',
+   bye:{l:['Bei mir ist eine Flaschenpost gelandet. Von der Dino-Insel!','Da steht nur: HICKS. HICKS. HILFE.','Ein Dino hat Schluckauf! Seit einer Woche! Da muss Käpt\'n Kawumm ran.'], ps:'Weißt du, was gegen Schluckauf hilft? Ich nicht. Noch nicht.'},
+   travel:[{l:['Der Dino heißt Rumsi. Er ist so groß wie ein Haus. Und so lieb wie ein Kätzchen.','Bei jedem HICKS hüpft er hoch. Dann wackelt die ganze Insel.','Wir haben alles probiert. Wasser trinken. Luft anhalten. Kopfstand. Nichts!','Liese denkt nach. Sie hat schon die Denkfalte auf der Stirn.'], ps:'Berta hat jetzt auch Schluckauf. Vom Zugucken.'},
+           {l:['Liese hatte einen Plan: Wir überraschen Rumsi.','Das Pupstierchen hat sich hinter ihn geschlichen und einen RIESEN Regenbogen gepupst.','Rumsi hat so gestaunt, dass der Schluckauf weg war. Einfach weg!'], ps:'Jetzt will Rumsi jeden Tag einen Regenbogen. Das Pupstierchen braucht Urlaub.'}],
+   back:{l:['Ich bin wieder da! Ohne Schluckauf!','Rumsi hat mir ein Dino-Ei geschenkt. Keine Sorge, da ist kein Dino drin. Es ist aus Schokolade!','Es liegt in der Schatzkammer. Ich nasche nicht. Fast nicht.']}},
+  {place:'Planet Kuddelmuddel', from:'vom Planeten Kuddelmuddel', souv:'sock', souvName:'Glitzer-Socke',
+   bye:{l:['Weißt du, wo verlorene Socken hingehen? Ich weiß es jetzt!','Auf den Planeten Kuddelmuddel. Liese hat es im Fernrohr gesehen.','Da will ich meine Lieblingssocke zurückholen. Die mit den Ankern.'], ps:'Schau mal in deinen Schrank. Fehlt da auch eine Socke?'},
+   travel:[{l:['Der Planet Kuddelmuddel ist ganz aus Socken! Berge aus Socken. Bäume aus Socken.','Hier wohnen kleine Socken-Aliens. Sie tragen Socken als Mütze.','Ich suche meine Socke mit den Ankern. Das dauert. Hier liegen Millionen!'], ps:'Rosi hat eine rosa Socke gefunden. Ist das vielleicht deine?'},
+           {l:['Liese hatte einen Plan: Das Pupstierchen schnüffelt. Es hat die beste Nase.','Es hat geschnüffelt und geschnüffelt. Dann hat es vor Freude gepupst. Regenbogen!','Da lag sie, meine Anker-Socke! Ein Socken-Alien hat darin geschlafen.'], ps:'Ich hab sie dem Alien geschenkt. Es hat so süß geguckt.'}],
+   back:{l:['Ich bin wieder da! Kawumm!','Die Socken-Aliens haben mir eine Glitzer-Socke geschenkt. Sie passt auf keinen Fuß.','Darum liegt sie jetzt in der Schatzkammer. Sie riecht nach Weltall.','Ich hab dich vermisst!']}},
+  {place:'Bonbon-Vulkan', from:'vom Bonbon-Vulkan', souv:'candy', souvName:'Riesen-Bonbon',
+   bye:{l:['Auf der Insel Zuckerbums steht ein Vulkan. Er spuckt Bonbons!','Aber nur einmal im Jahr. Und das ist morgen!','Liese hat Taschen genäht. Große! Wir fahren sofort los.'], ps:'Ein Rätsel für dich: Liese hat 3 Taschen. In jede passen 5 Bonbons. Wie viele Bonbons sind das zusammen? Die Lösung steht im nächsten Brief.'},
+   travel:[{l:['Der Vulkan hat gerumpelt. Dann: BUMM! Bonbons überall! Rote, gelbe, grüne!','Wir sind rumgerannt und haben gesammelt.','Berta hat ein Bonbon auf den Kopf gekriegt. Es war ganz weich. Alles gut.','Das Pupstierchen hat so viele Bonbons gegessen. Jetzt pupst es nach Erdbeere.'], ps:'Die Lösung vom Rätsel: 15 Bonbons! 3 mal 5 ist 15. Hast du es gewusst?'},
+           {l:['Ein paar Bonbons sind ins Meer gefallen. Jetzt ist das Meer süß!','Die Fische finden das super. Sie haben ganz bunte Zungen.','Liese hat einen Plan: Wir bringen allen Bonbons mit. Dir auch!'], ps:'Ich hab ein bisschen Bauchweh. Zu viele Bonbons.'}],
+   back:{l:['Ich bin wieder da! Mit vollen Taschen!','Ich hab dir das größte Bonbon mitgebracht. Es ist so groß wie mein Kopf.','Es liegt in der Schatzkammer. Lutschen dauert bestimmt ein Jahr.','Ich hab dich vermisst!']}}
+];
+/* Lumi-Tipp im Abschiedsbrief: dieselbe Regel wie der Wegweiser (guideMode), keine Bedingung für die Rückkehr */
+function kwTipLine(gm){
+  if(!gm) return '';
+  if(gm.mode==='island') return 'Mein Tipp: Reite mit Lumi den Inselritt auf der '+gm.row+'er-Insel!';
+  if(gm.mode==='practice') return gm.why==='speed' ? 'Mein Tipp: Tipp im Zaubertraining ganz schnell ein. Dann werden die Sterne lila!' : 'Mein Tipp: Üb mit Lumi im Zaubertraining. Ganz in Ruhe!';
+  return 'Mein Tipp: Flieg mit Lumi im Wolkenflug!';
+}
+/* Brieftext als Zeilen: {head, lines, ps}. m = Eintrag aus kw.mail */
+function kwMailText(m, name){
+  const T=KW_TRIPS[m.t]; if(!T) return null;
+  const part = m.k==='bye' ? T.bye : m.k==='back' ? T.back : T.travel[Math.min(m.n||0, T.travel.length-1)];
+  const lines=part.l.slice();
+  if(m.k==='bye'){ lines.push(KW_COMEBACK); if(m.tip) lines.push(m.tip); }
+  if(m.k==='back') lines.push('Komm zum Schiff!');
+  const sub=s=>s.replace(/\{name\}/g, name||'Romy');
+  return {head:'AHOI '+(name||'Romy')+'!', lines:lines.map(sub), ps:part.ps?sub(part.ps):''};
+}
+
 if(typeof module!=='undefined' && module.exports){
-  module.exports={KW_ORDER,KW_CAP,KW_LEVELS,kwDefault,kwRowState,kwRowSafe,kwAvailable,kwHelpMode,kwHelpOff,kwPlanRun,kwOptions,kwApplyStep,kwFinishRun,kwIsDue,kwDueIn,kwCoverWeight};
+  module.exports={KW_ORDER,KW_CAP,KW_LEVELS,kwDefault,kwRowState,kwRowSafe,kwAvailable,kwHelpMode,kwHelpOff,kwPlanRun,kwOptions,kwApplyStep,kwFinishRun,kwIsDue,kwDueIn,kwCoverWeight,
+    KW_TRIP_N,KW_TRIPS,KW_COMEBACK,kwTripDefault,kwTripEnsure,kwAway,kwPlayDays,kwPlanLetter,kwNextTripIdx,kwTripDepart,kwTripRunEnd,kwTripStartDue,kwTripRound,kwTripRoundDue,kwTripSendTravel,kwShiftDue,kwTripReturn,kwTipLine,kwMailText};
 }
 
 /* ===================== Oberfläche ===================== */
@@ -148,7 +314,8 @@ let KR=null;                                         // laufende Schatzsuche
 let kwVaultRet='path';
 let kwDueSaid=false;
 
-function kws(){ if(!S.kw) S.kw=kwDefault(); return S.kw; }
+function kws(){ if(!S.kw) S.kw=kwDefault(); if(!S.kw.trip||!S.kw.mail||!S.kw.souvenirs) kwTripEnsure(S.kw); return S.kw; }
+function kwIsAway(){ return kwAway(kws()); }
 function kwActive(){ return kwTest || (KW_LIVE && kws().joined); }
 function kwFwd(r){ return rowMastery(S,r); }
 function kwAvail(){ return kwAvailable(kws(), kwFwd, r=>typeof onVacation==='function'&&onVacation(S,r)); }
@@ -550,6 +717,34 @@ button.kwwait:active{transform:none;}
 .kwduo-kaw{height:150px; width:auto; transform:scaleX(-1); animation:kwhopm .9s ease-in-out .45s infinite;}
 @keyframes kwhop{0%,100%{transform:translateY(0)}40%{transform:translateY(-28px)}60%{transform:translateY(-28px)}80%{transform:translateY(0) scaleY(.94)}}
 @keyframes kwhopm{0%,100%{transform:scaleX(-1) translateY(0)}40%{transform:scaleX(-1) translateY(-34px) rotate(6deg)}60%{transform:scaleX(-1) translateY(-34px)}80%{transform:scaleX(-1) translateY(0) scaleY(.94)}}
+/* Kawumm auf Reisen: Briefkasten, Anleger, Andenken */
+#btnMail{position:relative;}
+#btnMail .kwmailbadge{position:absolute; top:-6px; right:-6px; min-width:22px; height:22px; border-radius:999px; background:#E04A40; color:#fff; font-family:var(--font-disp); font-size:14px; line-height:22px; padding:0 5px; box-shadow:0 0 0 2px #fff; animation:kwduepulse 1.6s ease-in-out infinite;}
+.kwmails{display:flex; flex-direction:column; gap:8px; width:100%; max-height:52vh; overflow-y:auto; padding:2px;}
+.kwmailitem{position:relative; display:flex; align-items:center; gap:10px; width:100%; background:#fff; border:2px solid #E2C795; border-radius:16px; padding:8px 12px; text-align:left; font-family:var(--font-disp); font-weight:700; font-size:18px; color:${KW_INK}; flex-shrink:0;}
+.kwmailitem .ic{font-size:22px;}
+.kwmailitem.new{border-color:#E04A40;}
+.kwmailitem .dot{position:absolute; right:12px; top:50%; width:12px; height:12px; margin-top:-6px; border-radius:50%; background:#E04A40;}
+.kwawaycard .kwdock{width:96px; flex:0 0 auto;}
+.kwawaycard .kwdock svg{width:100%; height:auto; display:block;}
+.kwbottle{animation:kwbottle 2.4s ease-in-out infinite;}
+@keyframes kwbottle{50%{transform:translateY(-3px) rotate(4deg)}}
+.kwmailmini{font-size:22px; padding:6px 12px;}
+.kwsouvshelf{width:100%; max-width:460px; background:#DCEAF5; border:3px solid #9ED3EA; border-radius:24px; padding:10px 12px 12px;}
+.kwsouvtitle{font-family:var(--font-disp); font-weight:700; font-size:18px; text-align:center; margin-bottom:6px; color:${KW_INK};}
+.kwsouvgrid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
+.kwsouv{background:#fff; border:2px solid #BFE0F2; border-radius:16px; padding:6px 4px; display:flex; flex-direction:column; align-items:center; gap:2px; min-height:96px; justify-content:center;}
+.kwsouv svg{width:72%; max-width:80px; height:auto;}
+.kwsouv .nm{font-family:var(--font-disp); font-weight:700; font-size:12px; line-height:1.1; text-align:center;}
+.kwsouv.locked{background:#F2F7FB; border-style:dashed;}
+.kwsouv .q{font-family:var(--font-disp); font-weight:700; font-size:30px; color:#B8C8D8;}
+.kwsouv.pop{animation:pop .6s ease 2;}
+#overlay .box.kwletterbox{max-height:calc(100vh - 40px); overflow-y:auto;}
+.kwallmail{text-align:left; width:100%;}
+.kwallmail h3{font-family:var(--font-disp); margin:14px 0 4px; font-size:20px;}
+.kwallmail .lbl{margin:8px 0 4px; font-size:12px; font-weight:800; color:var(--muted);}
+.kwallmail .kwpaper{font-size:16px;}
+.kwsouvrow{display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700;}
 /* Elternbereich */
 .kwtable{width:100%; border-collapse:collapse; font-size:13px; max-width:520px;}
 .kwtable th,.kwtable td{text-align:left; padding:4px 6px; border-bottom:1px solid var(--line);}
@@ -806,7 +1001,10 @@ function kwTreasure(ai){
   const btns=$('kwLayerIn').querySelectorAll('.kwopt'); if(btns[ai]) btns[ai].innerHTML=kwStationHTML(0,true);
   const wasDue=kwIsDue(rs, Date.now());
   const res=kwFinishRun(rs, {clean:KR.clean, errors:KR.steps-KR.ok, mode:KR.mode}, Date.now());
-  bumpStreak(S,Date.now()); save();
+  bumpStreak(S,Date.now());
+  // Kawumm auf Reisen: nur am Ende einer Fahrt entscheiden (nie mittendrin). Fahrten aus dem Elternbereich zählen nicht.
+  const leaving = KW_LIVE && kws().joined && KR.ret!=='parent' && kwTripRunEnd(kws(), {fwdWork:lumiWorkLeft(S,Date.now()), today:todayStr(Date.now()), now:Date.now(), tip:kwTipLine(guideMode(S,false))});
+  save();
   const after=kwAvail(), newRow=after.find(x=>!before.includes(x));
   const box=KW_BOX[r];
   bigKnall(); sndFanfare();
@@ -835,8 +1033,14 @@ function kwTreasure(ai){
       </svg>
       <h2>Schatz gefunden!</h2>
       <div style="display:flex;align-items:center;gap:8px">${kwBoxSVG(r, rs.finds, 96, false, rs.level)}<b>${Math.min(rs.finds,KW_CAP)} / ${KW_CAP}</b></div>
-      <div class="btnrow"><button class="kwbtn" id="kwEndVault">Schatzkammer</button><button class="kwbtn sec" id="kwEndAgain">Nochmal</button><button class="kwbtn sec" id="kwEndBack">Fertig</button></div>`;
+      `+(leaving?'':`<div class="btnrow"><button class="kwbtn" id="kwEndVault">Schatzkammer</button><button class="kwbtn sec" id="kwEndAgain">Nochmal</button><button class="kwbtn sec" id="kwEndBack">Fertig</button></div>`);
     end.hidden=false;
+    if(leaving){
+      // Abschied: Kawumm wittert ein Abenteuer. Der Brief kommt, wenn sie fertig gesprochen hat. Kein Nochmal.
+      const t0=Date.now();   // auch ohne Ton erst den Schatz zeigen, dann den Brief
+      kwSay(lines.join(' ')+' Und jetzt hör mal! Ich hab dir einen Brief geschrieben.', ()=>setTimeout(()=>kwShowBye(), Math.max(800, 4500-(Date.now()-t0))));
+      return;
+    }
     kwArm(end, 2000);
     kwSay(lines.join(' '));
     const ret=KR.ret;
@@ -885,7 +1089,8 @@ function kwLeave(){
 }
 
 /* ---------- Schatzkammer ---------- */
-function kwOpenVault(ret, popRow){
+function kwOpenVault(ret, popRow, o){
+  o=o||{};
   kwVaultRet=ret||'path';
   const kw=kws(), av=kwAvail();
   const total=KW_ORDER.reduce((s,r)=>s+(kw.rows[r]?(kw.rows[r].level||0)*KW_CAP+kw.rows[r].finds:0),0);
@@ -897,8 +1102,21 @@ function kwOpenVault(ret, popRow){
       +'<span class="ct">'+(open?Math.min(n,KW_CAP)+' / '+KW_CAP:'')+'</span></button>';
   }
   h+='</div>';
+  // Andenken von Kawumms Reisen: eigenes Regal (seit v64)
+  h+='<div class="kwsouvshelf"><div class="kwsouvtitle">Andenken</div><div class="kwsouvgrid">';
+  for(let i=0;i<KW_TRIP_N;i++){
+    const have=kw.souvenirs.includes(i), T=KW_TRIPS[i];
+    h+='<button class="kwsouv'+(have?'':' locked')+(o.popSouv===i?' pop':'')+'" data-souv="'+i+'">'+(have?kwSouvSVG(T.souv):'<span class="q">?</span>')+(have?'<span class="nm">'+T.souvName+'</span>':'')+'</button>';
+  }
+  h+='</div></div>';
   w.innerHTML=h;
-  const hello = total===0 ? 'Willkommen in meiner Schatzkammer! Noch ist alles leer. Finden wir Schätze?' : total>=KW_CAP*10 ? 'Alle Behälter sind voll! Du bist die beste Schatzjägerin der Welt!' : kwPick(['Meine Schatzkammer! Schon '+total+' Schätze. Tipp einen Behälter an!','Kawumm, so viele Schätze! Tipp einen an, dann erzähle ich dir was.']);
+  w.querySelectorAll('.kwsouv').forEach(b=>b.addEventListener('click',()=>{
+    const i=+b.dataset.souv, T=KW_TRIPS[i], have=!b.classList.contains('locked');
+    kwSay(have ? 'Das ist mein Andenken '+T.from+'! '+T.souvName+'.' : 'Hier kommt ein Andenken von meiner nächsten Reise hin!');
+    b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
+  }));
+  if(o.popSouv!=null){ const el=w.querySelector('[data-souv="'+o.popSouv+'"]'); if(el) setTimeout(()=>el.scrollIntoView({block:'center',behavior:'smooth'}),400); }
+  const hello = o.say ? o.say : total===0 ? 'Willkommen in meiner Schatzkammer! Noch ist alles leer. Finden wir Schätze?' : total>=KW_CAP*10 ? 'Alle Behälter sind voll! Du bist die beste Schatzjägerin der Welt!' : kwPick(['Meine Schatzkammer! Schon '+total+' Schätze. Tipp einen Behälter an!','Kawumm, so viele Schätze! Tipp einen an, dann erzähle ich dir was.']);
   $('kwVaultBub').textContent=hello;
   w.querySelectorAll('.kwslot').forEach(b=>b.addEventListener('click',()=>{
     const r=+b.dataset.r, rs=kw.rows[r], open=!b.classList.contains('locked');
@@ -913,7 +1131,7 @@ function kwOpenVault(ret, popRow){
 /* ---------- Einhänger für Insel und Karte ---------- */
 function kwIslandCard(r){
   const el=$('islKw'); if(!el) return;
-  if(!kwActive()){ el.innerHTML=''; el.hidden=true; return; }
+  if(!kwActive()||kwIsAway()){ el.innerHTML=''; el.hidden=true; return; }   // unterwegs: keine Schatzkarte auf der Insel
   el.hidden=false;
   const kw=kws(), av=kwAvail(), rs=kw.rows[r];
   if(av.includes(r)){
@@ -931,6 +1149,7 @@ function kwIslandCard(r){
 }
 function kwMapCard(list){
   if(!kwActive()) return;
+  if(kwIsAway()){ kwAwayCard(list); return; }
   const av=kwAvail(), open=unlockedRows(S);
   const loose=av.filter(r=>!open.includes(r));     // Karte ohne offene Insel (z. B. die Einser zu Beginn)
   const d=document.createElement('div'); d.className='kwcard kwmapcard';
@@ -948,30 +1167,32 @@ function kwMapCard(list){
   d.querySelectorAll('[data-kwr]').forEach(b=>b.addEventListener('click',()=>kwStart(+b.dataset.kwr,'path')));
   d.querySelector('#kwMapVault').addEventListener('click',()=>kwOpenVault('path'));
 }
-function kwDueRows(){ const kw=kws(), now=Date.now(); return kwAvail().filter(r=>kwIsDue(kw.rows[r],now)); }
-function kwMapBadge(r){ if(!kwActive()||!kwAvail().includes(r)) return ''; return kwDueRows().includes(r) ? '<span class="kwbadge due">Schatz wartet!</span>' : '<span class="kwbadge">Schatzkarte</span>'; }
+function kwDueRows(){ const kw=kws(), now=Date.now(); if(kwAway(kw)) return []; return kwAvail().filter(r=>kwIsDue(kw.rows[r],now)); }   // unterwegs pausiert die Wiederholung
+function kwMapBadge(r){ if(!kwActive()||kwIsAway()||!kwAvail().includes(r)) return ''; return kwDueRows().includes(r) ? '<span class="kwbadge due">Schatz wartet!</span>' : '<span class="kwbadge">Schatzkarte</span>'; }
 
 /* ---------- Brief: Kawumm fragt, ob sie kommen darf ---------- */
-function kwShowLetter(fromParent){
-  const name=S.name||'Romy';
-  const box=$('overlayBox');
-  box.classList.add('kwletterbox');
-  box.innerHTML=`<h2>Post für ${name}!</h2>
-    <div class="kwenv" id="kwEnv"><svg viewBox="0 0 220 150" aria-hidden="true">
+/* Briefumschlag (Brief-Optik für alle Briefe) */
+const KW_ENV=`<div class="kwenv" id="kwEnv"><svg viewBox="0 0 220 150" aria-hidden="true">
       <rect x="6" y="10" width="208" height="134" rx="12" fill="#F6E7C1" stroke="${KW_INK}" stroke-width="4"/>
       <path d="M6 140 L90 76 M214 140 L130 76" stroke="#D9B77A" stroke-width="4"/>
       <path class="flap" d="M8 12 L110 92 L212 12 Z" fill="#EBD3A0" stroke="${KW_INK}" stroke-width="4" stroke-linejoin="round"/>
       <circle cx="110" cy="88" r="16" fill="#E04A40" stroke="${KW_INK}" stroke-width="3"/>
       <circle cx="110" cy="85" r="6" fill="#fff"/><path d="M103 94 l14 -6 M103 88 l14 6" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>
-    </svg></div>
-    <div class="kwpaper" id="kwPaper"><b>AHOI ${name}!</b><br>
-      Rate mal, wer schreibt. Genau. ICH!<br>
-      Du rettest mit Lumi die Inseln? Ohne mich?! Frechheit!<br>
-      Ich hab Schatzkarten. Total verrückte. Die liest man rückwärts. Wie ein Krebs!<br>
-      Lumi zählt immer nur vorwärts. Gähn!<br>
-      Ich wette, du kannst rückwärts. Darf ich kommen? Ich bring Kekse mit. Vielleicht.
-      <div class="sig"><b>KAWUMM!</b> <img src="${KW_IMG}" alt=""></div>
-      <div class="ps">PS: Sagst du Nein, schick ich dir eine Möwe.</div></div>
+    </svg></div>`;
+/* Der allererste Brief (Einladung). Liegt auch im Briefkasten. */
+function kwInviteText(name){
+  return {head:'AHOI '+name+'!', lines:['Rate mal, wer schreibt. Genau. ICH!','Du rettest mit Lumi die Inseln? Ohne mich?! Frechheit!','Ich hab Schatzkarten. Total verrückte. Die liest man rückwärts. Wie ein Krebs!','Lumi zählt immer nur vorwärts. Gähn!','Ich wette, du kannst rückwärts. Darf ich kommen? Ich bring Kekse mit. Vielleicht.'], ps:'Sagst du Nein, schick ich dir eine Möwe.'};
+}
+function kwPaperHTML(x){
+  return '<b>'+x.head+'</b><br>'+x.lines.join('<br>')+'<div class="sig"><b>KAWUMM!</b> <img src="'+KW_IMG+'" alt=""></div>'+(x.ps?'<div class="ps">PS: '+x.ps+'</div>':'');
+}
+function kwShowLetter(fromParent){
+  const name=S.name||'Romy';
+  const box=$('overlayBox');
+  box.classList.add('kwletterbox');
+  box.innerHTML=`<h2>Post für ${name}!</h2>
+    ${KW_ENV}
+    <div class="kwpaper" id="kwPaper">${kwPaperHTML(kwInviteText(name))}</div>
     <button class="cta kwyes" id="kwYes" data-noarm>Ja, komm vorbei!</button>`;
   $('overlay').classList.add('show');
   [523,659,523,784].forEach((f,i)=>tone(f,.14,i*0.12,'triangle',.08));
@@ -1014,8 +1235,226 @@ function kwGoToShip(){
   setTimeout(()=>{ card.classList.remove('hi'); },9000);
 }
 function kwMaybeLetter(){
-  if(!KW_LIVE || kws().joined) return;
-  setTimeout(()=>kwShowLetter(false), 800);
+  if(!KW_LIVE) return;
+  if(!kws().joined){ setTimeout(()=>kwShowLetter(false), 800); return; }
+  setTimeout(()=>kwStartMail(0), 800);       // Kawumm auf Reisen: Reisebrief oder Rückkehr beim App-Start
+}
+
+/* =====================================================================
+   Kawumm auf Reisen (seit v64). Logik oben im KW-LOGIC-Block (kwTrip...), Texte in KW_TRIPS.
+   Briefe werden nie vorgelesen (Romy liest selbst). Höchstens ein Brief pro Tag, nie mitten im Spiel.
+   ===================================================================== */
+const KW_GAME_SCREENS=['practice','run','ride','blitz','kw'];
+function kwOverlayBusy(){ return $('overlay').classList.contains('show'); }
+function kwToday(){ return todayStr(Date.now()); }
+/* Ein Brief aus kw.mail (oder 'invite') im Briefumschlag. o.reread: aus dem Briefkasten (ohne Umschlag), o.quiet: nichts sagen */
+function kwShowMail(m, o){
+  o=o||{};
+  const name=S.name||'Romy', x = m==='invite' ? kwInviteText(name) : kwMailText(m,name);
+  if(!x) return;
+  if(m!=='invite' && !m.read){ m.read=true; save(); }
+  const box=$('overlayBox');
+  box.classList.add('kwletterbox');
+  const label = o.btn || (o.reread ? 'Fertig' : m.k==='bye' ? 'Tschüss, Kawumm!' : m.k==='back' ? 'Hallo, Kawumm!' : 'Danke, Kawumm!');
+  box.innerHTML=(o.reread ? '' : '<h2>Post für '+name+'!</h2>'+KW_ENV)
+    +'<div class="kwpaper'+(o.reread?' show in':'')+'" id="kwPaper">'+kwPaperHTML(x)+'</div>'
+    +'<button class="cta kwyes" id="kwMailOk" data-noarm>'+label+'</button>';
+  $('overlay').classList.add('show');
+  let shown=false; const showBtn=()=>{ if(shown) return; shown=true; const b=$('kwMailOk'); if(b) b.classList.add('show'); };
+  if(o.reread){ setTimeout(showBtn, 1500); }
+  else {
+    [523,659,523,784].forEach((f,i)=>tone(f,.14,i*0.12,'triangle',.08));
+    if(!o.quiet) speak('Post für '+name+'!');
+    setTimeout(showBtn, KW_READ_MS);
+    setTimeout(()=>{ const e=$('kwEnv'); if(!e) return; e.classList.add('open');
+      setTimeout(()=>{ const e2=$('kwEnv'), p=$('kwPaper'); if(!e2||!p) return; e2.classList.add('away'); p.classList.add('show'); void p.offsetWidth; p.classList.add('in'); },950);
+    },1700);
+  }
+  $('kwMailOk').onclick=()=>{
+    $('overlay').classList.remove('show'); box.classList.remove('kwletterbox');
+    kwMailBtn();
+    if(o.onClose) o.onClose();
+  };
+}
+/* Abschied am Ende einer Fahrt: Brief, danach zurück zur Startseite (dort zeigt der Wegweiser, was bei Lumi hilft) */
+function kwShowBye(o){
+  o=o||{};
+  const kw=kws(), m=[...kw.mail].reverse().find(x=>x.k==='bye'); if(!m) return;
+  if(kwOverlayBusy()) return;                                  // Brief liegt dann ungelesen im Briefkasten
+  if(!o.parent && KW_GAME_SCREENS.includes(current) && current!=='kw') return;
+  kwShowMail(m, {quiet:true, onClose:()=>{
+    if(o.parent){ renderParent(); show('parent'); return; }
+    kwStop(); show('home');
+    setTimeout(()=>kwSay('Tschüss! Bis bald! Kawumm!'), 600);
+  }});
+}
+/* App-Start nach dem Intro: Rückkehr oder Reisebrief */
+function kwStartMail(tries){
+  const kw=kws(), due=kwTripStartDue(kw, S.days, kwToday());
+  if(!due) return;
+  if(kwOverlayBusy() || current!=='home'){ if(tries<6) setTimeout(()=>kwStartMail(tries+1),1500); return; }
+  if(due==='back') kwComeBack();
+  else { const m=kwTripSendTravel(kw, kwToday()); save(); kwShowMail(m); }
+}
+/* Rundenende bei Lumi (show('end')): Runde zählen, nach 3 bis 6 Runden kann ein Reisebrief kommen */
+function kwRoundEnd(){
+  if(!KW_LIVE || !kws().joined || !kwIsAway()) return;
+  kwTripRound(kws()); save();
+  kwRoundTry(0);
+}
+function kwRoundTry(tries){
+  setTimeout(()=>{
+    if(current!=='end') return;                                  // weitergespielt: Brief wartet auf das nächste Rundenende
+    const kw=kws(); if(!kwTripRoundDue(kw, kwToday())) return;
+    if(kwOverlayBusy()){ if(tries<8) kwRoundTry(tries+1); return; }   // erst Geschenk oder Inselfest zu Ende
+    const m=kwTripSendTravel(kw, kwToday()); save(); kwShowMail(m);
+  }, tries?1200:3500);
+}
+/* Rückkehr: Brief, dann spricht Kawumm und zeigt ihr Andenken in der Schatzkammer */
+function kwComeBack(o){
+  o=o||{};
+  const kw=kws(), m=kwTripReturn(kw, kwToday(), Date.now()); save();
+  const T=KW_TRIPS[m.t], name=S.name||'Romy';
+  kwShowMail(m, {onClose:()=>{
+    bigKnall(); sndFanfare();
+    kwOpenVault(o.parent?'parent':'path', null, {popSouv:m.t, say:'Kawumm! Da bin ich wieder, '+name+'! Schau mal, mein Andenken '+T.from+': '+T.souvName+'! Es steht jetzt in der Schatzkammer.'});
+  }});
+}
+/* Inselwelt, während Kawumm unterwegs ist: leerer Anleger mit Flaschenpost, nur der Briefkasten */
+let kwAwaySaid=false;
+function kwAwayCard(list){
+  const d=document.createElement('div'); d.className='kwcard kwmapcard kwawaycard';
+  d.innerHTML='<div class="kwdock">'+KW_DOCK_SVG+'</div><div class="tx"><b>Kawumms Anleger</b></div><div class="btns"><button class="kwbtn sec kwmailmini" id="kwMapMail" aria-label="Briefkasten">📬</button></div>';
+  list.appendChild(d);
+  d.querySelector('#kwMapMail').addEventListener('click',e=>{ e.stopPropagation(); kwShowMailbox(); });
+  const line='Kawumm ist auf Reisen. Sie schreibt dir Briefe. Und sie kommt wieder!';
+  d.addEventListener('click',()=>speak(line));
+  if(!kwAwaySaid){ kwAwaySaid=true; setTimeout(()=>{ if(current==='path' && !kwOverlayBusy()) speak(line); },1200); }
+}
+/* Briefkasten auf der Startseite: alle Briefe zum Nochmal-Lesen, ungelesene mit Abzeichen */
+function kwMailBtn(){
+  const b=$('btnMail'); if(!b) return;
+  const on=kwActive() && kws().joined;
+  b.hidden=!on; if(!on) return;
+  const n=kws().mail.filter(m=>!m.read).length, badge=b.querySelector('.kwmailbadge');
+  if(badge){ badge.textContent=n; badge.hidden=!n; }
+}
+const KW_MAIL_ICON={bye:'👋', travel:'✉️', back:'🎁'};
+function kwShowMailbox(o){
+  o=o||{};
+  const kw=kws(), box=$('overlayBox');
+  box.classList.add('kwletterbox');
+  const items=kw.mail.map((m,i)=>({m,i})).reverse();
+  let h='<h2>Briefkasten</h2><div class="kwmails">';
+  for(const {m,i} of items){
+    const T=KW_TRIPS[m.t]; if(!T) continue;
+    h+='<button class="kwmailitem'+(m.read?'':' new')+'" data-mi="'+i+'"><span class="ic">'+KW_MAIL_ICON[m.k]+'</span><span class="pl">'+T.place+'</span>'+(m.read?'':'<i class="dot"></i>')+'</button>';
+  }
+  if(kw.joined) h+='<button class="kwmailitem" data-mi="invite"><span class="ic">⭐</span><span class="pl">Kawumm</span></button>';
+  h+='</div><button class="cta" id="kwMailClose">Fertig</button>';
+  box.innerHTML=h;
+  $('overlay').classList.add('show');
+  box.querySelectorAll('[data-mi]').forEach(b=>b.addEventListener('click',()=>{
+    const v=b.dataset.mi, m = v==='invite' ? 'invite' : kw.mail[+v];
+    kwShowMail(m, {reread:true, onClose:()=>kwShowMailbox(o)});
+  }));
+  $('kwMailClose').onclick=()=>{ $('overlay').classList.remove('show'); box.classList.remove('kwletterbox'); kwMailBtn(); if(o.onClose) o.onClose(); };
+}
+/* ---------- Andenken (100x100, Stil wie die Behälter) ---------- */
+function kwStarD(x,y,r,ri){ let d=''; for(let i=0;i<10;i++){ const rr=i%2?r*(ri||0.5):r, a=i*Math.PI/5-Math.PI/2; d+=(i?'L':'M')+(x+Math.cos(a)*rr).toFixed(1)+' '+(y+Math.sin(a)*rr).toFixed(1); } return d+'Z'; }
+const KW_SOUV={
+  jelly:()=>`<rect x="24" y="20" width="52" height="12" rx="4" fill="#E04A40" stroke="${KW_INK}" stroke-width="3"/>
+    <path d="M31 70 Q40 64 50 70 Q60 76 69 70 V84 Q69 89 64 89 H36 Q31 89 31 84 Z" fill="#F96D6D"/>
+    <path d="M31 56 Q40 50 50 56 Q60 62 69 56 V70 Q60 76 50 70 Q40 64 31 70 Z" fill="#F2B83C"/>
+    <path d="M31 44 Q40 38 50 44 Q60 50 69 44 V56 Q60 62 50 56 Q40 50 31 56 Z" fill="#8EDB6E"/>
+    <path d="M28 32 H72 V84 Q72 92 64 92 H36 Q28 92 28 84 Z" fill="#E8F4FD" fill-opacity=".35" stroke="${KW_INK}" stroke-width="3"/>
+    <path d="M35 40 V82" stroke="#fff" stroke-width="3" opacity=".7" stroke-linecap="round"/>
+    <path d="M78 52 q5 4 0 8 M84 48 q5 6 0 12" stroke="${KW_INK}" stroke-width="2" fill="none" stroke-linecap="round"/>`,
+  feather:()=>`<path d="M30 86 Q34 50 70 14 Q82 30 66 52 Q56 70 30 86 Z" fill="#F8A8D0" stroke="${KW_INK}" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M30 86 Q46 56 68 20" stroke="${KW_INK}" stroke-width="2" fill="none"/>
+    <path d="M44 66 l-6 -7 M50 56 l-6 -8 M56 46 l-4 -8 M48 70 l9 -2 M54 60 l9 -3 M60 50 l8 -4" stroke="#E58AB8" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M30 86 L22 95" stroke="${KW_INK}" stroke-width="3" stroke-linecap="round"/>
+    <path d="M76 62 q4 3 0 6 M82 55 q5 4 0 8" stroke="${KW_INK}" stroke-width="2" fill="none" stroke-linecap="round"/>`,
+  snail:()=>`<circle cx="50" cy="56" r="32" fill="#F6D98B" stroke="${KW_INK}" stroke-width="3"/>
+    <path d="M50 56 q8 -2 8 -10 q0 -12 -14 -12 q-18 0 -18 18 q0 22 24 22 q26 0 28 -26" fill="none" stroke="#C98A4E" stroke-width="4" stroke-linecap="round"/>
+    ${kwStar(20,24,7,'#FFE27A')}${kwStar(82,22,6,'#FFE27A')}${kwStar(86,84,5,'#FFE27A')}<circle cx="34" cy="80" r="2.4" fill="#fff"/><circle cx="64" cy="34" r="2" fill="#fff"/>`,
+  cookie:()=>`<circle cx="50" cy="52" r="42" fill="#FFF3B0" opacity=".6"/>
+    <path d="${kwStarD(50,54,40,0.5)}" fill="#E9B96E" stroke="${KW_INK}" stroke-width="3" stroke-linejoin="round"/>
+    <circle cx="50" cy="16" r="7" fill="#FFF8EC"/>
+    <g fill="#F96D9B"><circle cx="44" cy="50" r="2.6"/><circle cx="58" cy="60" r="2.6"/></g><g fill="#58A6F0"><circle cx="54" cy="44" r="2.6"/><circle cx="40" cy="64" r="2.6"/></g><g fill="#8EDB6E"><circle cx="62" cy="50" r="2.4"/><circle cx="50" cy="68" r="2.4"/></g>`,
+  shell:()=>`<path d="M50 90 L14 44 Q20 18 50 14 Q80 18 86 44 Z" fill="#F8C7DF" stroke="${KW_INK}" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M22 38 Q50 20 78 38" stroke="#F96D6D" stroke-width="4" fill="none"/><path d="M28 50 Q50 34 72 50" stroke="#F2B83C" stroke-width="4" fill="none"/><path d="M34 62 Q50 50 66 62" stroke="#8EDB6E" stroke-width="4" fill="none"/><path d="M40 73 Q50 66 60 73" stroke="#58A6F0" stroke-width="4" fill="none"/>
+    <path d="M50 90 L30 22 M50 90 L50 14 M50 90 L70 22" stroke="${KW_INK}" stroke-width="1.6" opacity=".45"/>
+    <rect x="40" y="84" width="20" height="9" rx="3" fill="#F8C7DF" stroke="${KW_INK}" stroke-width="3"/>${kwStar(86,16,6,'#FFE27A')}${kwStar(14,20,5,'#FFE27A')}`,
+  button:()=>`<circle cx="50" cy="52" r="38" fill="#58A6F0" stroke="${KW_INK}" stroke-width="3"/><circle cx="50" cy="52" r="28" fill="none" stroke="#3E86D0" stroke-width="3"/>
+    <path d="M42 44 L58 60 M58 44 L42 60" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+    <g fill="#2A2150"><circle cx="42" cy="44" r="5"/><circle cx="58" cy="44" r="5"/><circle cx="42" cy="60" r="5"/><circle cx="58" cy="60" r="5"/></g>
+    <path d="M24 38 Q30 24 44 20" stroke="#fff" stroke-width="3" fill="none" opacity=".7" stroke-linecap="round"/>`,
+  egg:()=>`<path d="M50 12 Q78 14 80 58 Q80 90 50 90 Q20 90 20 58 Q22 14 50 12 Z" fill="#8A5530" stroke="${KW_INK}" stroke-width="3"/>
+    <path d="M21 56 l8 -6 8 6 8 -6 8 6 8 -6 8 6 8 -6 6 4" stroke="#F2B83C" stroke-width="4" fill="none" stroke-linejoin="round"/>
+    <g><circle cx="38" cy="32" r="4" fill="#F96D9B"/><circle cx="60" cy="28" r="3.5" fill="#8EDB6E"/><circle cx="50" cy="40" r="3" fill="#58A6F0"/><circle cx="36" cy="72" r="4" fill="#8EDB6E"/><circle cx="62" cy="74" r="4" fill="#F96D9B"/><circle cx="50" cy="80" r="3" fill="#FFE27A"/></g>
+    <path d="M32 24 Q38 16 46 15" stroke="#C98A4E" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+  sock:()=>`<path d="M38 14 H64 V56 Q64 62 70 66 L82 74 Q90 80 84 88 Q78 94 68 88 L40 72 Q34 68 36 60 Z" fill="#B493F0" stroke="${KW_INK}" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M37 28 H64 M37 40 H64 M37 52 H64" stroke="#FFE27A" stroke-width="5"/>
+    <rect x="34" y="8" width="34" height="11" rx="4" fill="#fff" stroke="${KW_INK}" stroke-width="3"/>
+    <path d="M70 78 Q76 84 82 82" stroke="#fff" stroke-width="3" fill="none" opacity=".6" stroke-linecap="round"/>${kwStar(20,30,6,'#FFE27A')}${kwStar(84,40,5,'#FFE27A')}${kwStar(18,74,4,'#FFE27A')}`,
+  candy:()=>`<path d="M28 50 L8 36 L12 50 L8 64 Z M72 50 L92 36 L88 50 L92 64 Z" fill="#F96D9B" stroke="${KW_INK}" stroke-width="3" stroke-linejoin="round"/>
+    <circle cx="50" cy="50" r="26" fill="#F96D9B" stroke="${KW_INK}" stroke-width="3"/>
+    <path d="M34 50 a16 16 0 0 1 32 0 a12 12 0 0 1 -24 0 a8 8 0 0 1 16 0" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round"/>`
+};
+function kwSouvSVG(key, size){ return '<svg viewBox="0 0 100 100" width="'+(size||80)+'" height="'+(size||80)+'" class="kwsouvsvg" aria-hidden="true">'+(KW_SOUV[key]?KW_SOUV[key]():'')+'</svg>'; }
+const KW_DOCK_SVG=`<svg viewBox="0 0 120 80" aria-hidden="true">
+  <rect x="0" y="48" width="120" height="32" rx="12" fill="#9ED3EA"/>
+  <path d="M6 62 q8 -5 16 0 t16 0 M58 72 q8 -5 16 0 t16 0" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" opacity=".8"/>
+  <path d="M18 44 V66 M42 44 V66 M66 44 V66" stroke="#8A5530" stroke-width="5" stroke-linecap="round"/>
+  <rect x="8" y="36" width="68" height="9" rx="2" fill="#C98A4E" stroke="${KW_INK}" stroke-width="2.4"/>
+  <path d="M28 36 V45 M48 36 V45" stroke="#A06A36" stroke-width="1.6"/>
+  <rect x="70" y="22" width="9" height="22" rx="2" fill="#A0663A" stroke="${KW_INK}" stroke-width="2.4"/>
+  <path d="M75 30 q12 6 16 24" stroke="#EBCB94" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+  <g class="kwbottle"><g transform="translate(96 56) rotate(-18)"><rect x="-8" y="-5" width="18" height="11" rx="5" fill="#BFE7F7" stroke="${KW_INK}" stroke-width="2"/><rect x="9" y="-2.5" width="6" height="6" rx="1" fill="#BFE7F7" stroke="${KW_INK}" stroke-width="2"/><rect x="14" y="-2.5" width="3.5" height="6" rx="1" fill="#A0663A"/><rect x="-4" y="-2" width="10" height="5" rx="1" fill="#FFF8EC" stroke="#E2C795" stroke-width="1"/></g></g>
+</svg>`;
+/* ---------- Elternbereich: Reisen ---------- */
+function kwTripParentHTML(){
+  const kw=kws(), t=kw.trip;
+  let st;
+  if(t.state==='away'){
+    const T=KW_TRIPS[t.idx], pd=kwPlayDays(S.days, t.leftDay);
+    const nx = !t.next ? 'keiner mehr geplant' : t.next.when==='start' ? 'beim App-Start' : 'am Rundenende nach '+t.next.rounds+' Lumi-Runden (bisher '+t.roundsSince+')';
+    st='<b>Unterwegs:</b> '+T.place+' (Reise '+(t.idx+1)+' von '+KW_TRIP_N+', abgeflogen '+t.leftDay+'). Spieltage seit Abflug: <b>'+pd+' von '+t.needDays+'</b>'+(pd>=t.needDays?' (Rückkehr beim nächsten App-Start, sobald ein Reisebrief da war)':' (noch '+(t.needDays-pd)+')')+'. Reisebriefe: '+t.sent+' von '+t.plan+'. Nächster Brief: '+nx+'. Letzter Brief: '+(t.lastLetterDay||'nie')+'. Fällige Schatzkarten pausieren.';
+  } else {
+    st='<b>Zuhause.</b> Fahrten seit Rückkehr bzw. Start: <b>'+t.runsSince+'</b>, Abflug frühestens nach '+t.nextAfter+' Fahrten und nur, wenn es bei Lumi vorwärts etwas zu tun gibt (gerade: '+(lumiWorkLeft(S,Date.now())?'ja':'nein')+'). Reisen bisher: '+t.count+'.';
+  }
+  return '<h3 style="margin:10px 0 2px;font-size:16px">Kawumm auf Reisen</h3><p style="margin:2px 0;font-size:13px">'+st+'</p>'
+    +'<div class="btnrow" style="justify-content:flex-start"><button class="smallbtn" id="kwTripGo">Reise jetzt starten</button><button class="smallbtn" id="kwTripMail">Nächsten Brief jetzt</button><button class="smallbtn" id="kwTripBack">Zurückkommen lassen</button><button class="smallbtn" id="kwTripAll">Alle Reisebriefe ansehen</button><button class="smallbtn" id="kwTripBox">Briefkasten</button></div>';
+}
+function kwTripParentWire(){
+  const kw=kws(), msg=t=>{ const e=$('kwMsg'); if(e) e.textContent=t; }, back=()=>{ renderParent(); show('parent'); };
+  $('kwTripGo').onclick=()=>{
+    if(!kw.joined){ msg('Erst muss der Brief angenommen sein.'); return; }
+    if(kwAway(kw)){ msg('Kawumm ist schon unterwegs.'); return; }
+    kwTripDepart(kw, kwToday(), Date.now(), Math.random, kwTipLine(guideMode(S,false))); save();
+    kwShowBye({parent:true});
+  };
+  $('kwTripMail').onclick=()=>{
+    if(!kwAway(kw)){ msg('Kawumm ist zuhause. Erst eine Reise starten.'); return; }
+    if(kw.trip.sent<kw.trip.plan){ const m=kwTripSendTravel(kw, kwToday()); save(); kwShowMail(m,{onClose:back}); }
+    else kwComeBack({parent:true});
+  };
+  $('kwTripBack').onclick=()=>{ if(!kwAway(kw)){ msg('Kawumm ist schon zuhause.'); return; } kwComeBack({parent:true}); };
+  $('kwTripBox').onclick=()=>kwShowMailbox();
+  $('kwTripAll').onclick=()=>{
+    const name=S.name||'Romy', tip=kwTipLine(guideMode(S,false)), box=$('overlayBox');
+    let h='<h2>Alle Reisebriefe</h2><div class="kwallmail">';
+    KW_TRIPS.forEach((T,i)=>{
+      h+='<h3>Reise '+(i+1)+': '+T.place+'</h3><div class="kwsouvrow">'+kwSouvSVG(T.souv,56)+'<span>Andenken: '+T.souvName+'</span></div>';
+      [{t:i,k:'bye',tip},{t:i,k:'travel',n:0},{t:i,k:'travel',n:1},{t:i,k:'back'}].forEach((m,j)=>{
+        h+='<p class="lbl">'+['Abschied (Tipp je nach Lernstand)','Reisebrief 1 (kommt immer)','Reisebrief 2 (nur manchmal)','Rückkehr'][j]+'</p><div class="kwpaper show in">'+kwPaperHTML(kwMailText(m,name))+'</div>';
+      });
+    });
+    h+='</div><button class="cta" id="kwAllClose">Fertig</button>';
+    box.classList.add('kwletterbox'); box.innerHTML=h; $('overlay').classList.add('show');
+    $('kwAllClose').onclick=()=>{ $('overlay').classList.remove('show'); box.classList.remove('kwletterbox'); };
+  };
 }
 
 /* ---------- Elternbereich: testen, bevor es live ist ---------- */
@@ -1024,7 +1463,7 @@ function kwParentHTML(){
   let rows='';
   for(const r of KW_ORDER){
     const rs=kw.rows[r], a=av.includes(r);
-    const dueIn=kwDueIn(rs,Date.now()), stg=a?(rs&&rs.stage==='space'?'Weltall'+(dueIn===0?' · fällig':dueIn!==null?' · in '+dueIn+' T':''):(rs&&kwHelpOff(rs)?'Meer ohne Hilfe':'Meer')):'zu';
+    const dueIn=kwDueIn(rs,Date.now()), stg=a?(rs&&rs.stage==='space'?'Weltall'+(kwAway(kw)?' · pausiert (Reise)':dueIn===0?' · fällig':dueIn!==null?' · in '+dueIn+' T':''):(rs&&kwHelpOff(rs)?'Meer ohne Hilfe':'Meer')):'zu';
     rows+='<tr><td>'+r+'er</td><td>'+stg+'</td><td>'+(rs?kwRowSafe(rs)+' / 10':'–')+'</td><td>'+(rs?rs.finds+((rs.level||0)?' (Stufe '+((rs.level||0)+1)+')':''):0)+'</td><td>'+(rs?rs.runs:0)+'</td><td>'+(a?'<button class="smallbtn" data-kwgo="'+r+'">Starten</button> <button class="smallbtn" data-kwst="'+r+'">'+(rs&&rs.stage==='space'?'→ Meer':'→ Weltall')+'</button>'+(rs&&rs.stage==='space'?' <button class="smallbtn" data-kwdue="'+r+'">fällig machen</button>':''):'')+'</td></tr>';
   }
   return '<p style="margin:2px 0;font-size:13px;color:var(--muted)">'+(KW_LIVE?'Live: Romy sieht Kawumm, sobald der Brief angenommen ist.':'Noch nicht live: Romy sieht davon nichts. Testmodus gilt nur bis zum Neustart der App.')+' Brief angenommen: <b>'+(kw.joined?'ja':'nein')+'</b>.</p>'
@@ -1032,6 +1471,7 @@ function kwParentHTML(){
     +'<div class="btnrow" style="justify-content:flex-start"><button class="smallbtn" id="kwLetterBtn">Brief ansehen</button><button class="smallbtn" id="kwVaultBtn">Schatzkammer öffnen</button><button class="smallbtn" id="kwVoiceBtn">Kawumms Stimme</button><button class="smallbtn" id="kwLetterReset">Brief zurücksetzen</button><button class="smallbtn danger" id="kwReset">Kawumm-Stand löschen</button></div>'
     +'<table class="kwtable"><tr><th>Reihe</th><th>Stufe</th><th>sicher</th><th>Schätze</th><th>Fahrten</th><th></th></tr>'+rows+'</table>'
     +'<p style="margin:4px 0;font-size:12px;color:var(--muted)">Meer mit Hilfe: Fahrt mit höchstens 1 Fehler, dann ohne Hilfe. Ins Weltall: 2 Fahrten am Stück ohne Hilfe, ohne Fehler, alle Antworten unter 4 s. Neue Karte kommt, wenn die Karte davor im Weltall ist und die eigene Vorwärtsreihe 5 von 10 lila Sterne hat. Weltall-Karten kommen zur Wiederholung nach 2, 4, 8, 16, 30 Tagen.</p>'
+    +kwTripParentHTML()
     +'<div id="kwMsg" style="font-size:13px;color:var(--muted);font-weight:700;"></div>';
 }
 function kwParentWire(){
@@ -1046,6 +1486,7 @@ function kwParentWire(){
     S.kw=kwDefault(); save(); renderParent(); };
   document.querySelectorAll('[data-kwgo]').forEach(b=>b.onclick=()=>kwStart(+b.dataset.kwgo,'parent'));
   document.querySelectorAll('[data-kwdue]').forEach(x=>x.onclick=()=>{ const rs=kw.rows[+x.dataset.kwdue]; rs.last=Date.now()-31*86400000; save(); renderParent(); });
+  kwTripParentWire();
   document.querySelectorAll('[data-kwst]').forEach(b=>b.onclick=()=>{ const rs=kwRowState(kw,+b.dataset.kwst); rs.stage=rs.stage==='space'?'sea':'space'; rs.clean=0; rs.helpOff=rs.stage==='space'; rs.last=Date.now(); rs.reviews=0; save(); renderParent(); });
 }
 
@@ -1060,5 +1501,7 @@ function kwSetup(){
 }
 
 window.KW={setup:kwSetup, islandCard:kwIslandCard, mapCard:kwMapCard, badge:kwMapBadge, maybeLetter:kwMaybeLetter, parentHTML:kwParentHTML, parentWire:kwParentWire, stop:kwStop, active:kwActive,
-  dueRows:kwDueRows, voice:KW_VOICE, img:KW_IMG, say:kwSay};   // dueRows: Wegweiser; voice/img/say: Blockade im Wolkenflug
+  dueRows:kwDueRows, voice:KW_VOICE, img:KW_IMG, say:kwSay,   // dueRows: Wegweiser; voice/img/say: Blockade im Wolkenflug
+  away:kwIsAway, mailBtn:kwMailBtn, mailbox:kwShowMailbox, roundEnd:kwRoundEnd,   // Kawumm auf Reisen (seit v64)
+  run:()=>KR};   // laufende Schatzsuche (nur zum Prüfen)
 }

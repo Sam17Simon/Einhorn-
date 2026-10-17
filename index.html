@@ -447,6 +447,7 @@ button.ctawait:active{transform:none;}
     <div class="bar">
       <div class="starchip" id="starChip"><svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 16.9 5.9 20.4l1.5-6.8L2.2 9l6.9-.7z" fill="#F2B83C"/></svg><span id="starCount">0</span></div>
       <div class="spacer"></div>
+      <button class="iconbtn" id="btnMail" aria-label="Briefkasten" hidden>📬<span class="kwmailbadge" hidden></span></button>
       <button class="iconbtn" id="btnSound" aria-label="Ton an oder aus">🔊</button>
       <button class="iconbtn" id="btnParent" aria-label="Elternbereich">⚙</button>
     </div>
@@ -630,9 +631,9 @@ button.ctawait:active{transform:none;}
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=63"></script>
-<script src="game.js?v=63"></script>
-<script src="kawumm.js?v=63"></script>
+<script src="islands.js?v=64"></script>
+<script src="game.js?v=64"></script>
+<script src="kawumm.js?v=64"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -830,6 +831,13 @@ function guideMode(state, kwDue){
   if(fast>0) return Object.assign({mode:'practice', why:'speed'},c);
   return Object.assign({mode:'run', why:'fun'},c);
 }
+/* Gibt es bei Lumi vorwärts etwas zu tun? (Kawumm auf Reisen fliegt nur dann los)
+   Ja, wenn die neueste offene Insel noch nicht 8 von 10 lila hat oder eine Lumi-Wiederholung fällig ist. */
+function lumiWorkLeft(state, now){
+  const open=unlockedRows(state), row=open[open.length-1];
+  if(rowMastery(state,row)<ROW_UNLOCK_SHARE) return true;
+  return open.some(r=>!onVacation(state,r) && rowFacts(state,r).some((f,i)=>!isRetired(state,r,i+1) && f.seen>0 && isDue(f,now)));
+}
 function avgRt(f){ return f.rt.length? Math.round(f.rt.reduce((s,x)=>s+x,0)/f.rt.length) : null; }
 
 function logDay(state, now, addSec, addTasks, addOk){
@@ -959,6 +967,7 @@ function upgradeState(p){
   if(!p.gear){ p.gear=gearOf(p.items||0); p.rewards=p.items||0; }   // alte Speicherung: jedes Extra auf Stufe 1
   if(!Array.isArray(p.unlocked)) rememberUnlocks(p);               // alter Stand: heutige Inseln merken
   for(const k in p.facts){ const f=p.facts[k]; if(f && typeof f.typed!=='number') f.typed=0; }   // seit Paket B: selbst eingetippt (alte Stände: noch nie)
+  if(p.kw && typeof kwTripEnsure==='function') kwTripEnsure(p.kw);   // seit v64: Kawumm auf Reisen (Reise, Briefe, Andenken)
   return p;
 }
 function load(){
@@ -1454,7 +1463,7 @@ function armCTAs(root, ms){
 }
 function show(name){
   current=name;
-  if(name==='end') armCTAs($('scr-end'));
+  if(name==='end'){ armCTAs($('scr-end')); if(window.KW) setTimeout(()=>KW.roundEnd(),0); }   // Kawumm auf Reisen: Runde zählen, evtl. Reisebrief
   if(name==='island') armCTAs($('scr-island').querySelector('.islwrap'));
   screens.forEach(s=>s.classList.toggle('active', s.id==='scr-'+name));
   if(name==='home') renderHome();
@@ -1519,6 +1528,7 @@ function renderHome(){
   // Wegweiser: der Modus, der jetzt am meisten hilft, leuchtet sanft (kein Zwang)
   const gm=guideMode(S, kwDueNow());
   for(const id of ['btnRun','btnPractice','btnPath']) $(id).classList.toggle('guide', id===GUIDE_BTN[gm.mode]);
+  if(window.KW) KW.mailBtn();   // Briefkasten (Kawumm auf Reisen): nur sichtbar, wenn Kawumm da ist, Abzeichen für ungelesene Briefe
 }
 /* ---------- Wegweiser (Startseite) ----------
    Regel: guideMode im LOGIC-Block. Lumi sagt höchstens einmal pro App-Start einen Satz dazu, nur auf der Startseite. */
@@ -1544,6 +1554,7 @@ function maybeGuideSay(tries){
 }
 $('btnSound').addEventListener('click',()=>{ S.sound=!S.sound; save(); renderHome(); if(S.sound) speak('Ton an!'); });
 $('btnParent').addEventListener('click',openGate);
+$('btnMail').addEventListener('click',()=>{ if(window.KW) KW.mailbox(); });
 $('btnRun').addEventListener('click',()=>startRun());
 $('btnPractice').addEventListener('click',()=>startPractice());
 $('btnBlitz').addEventListener('click',()=>{ if(!$('btnBlitz').disabled) startBlitz(); });
@@ -2197,7 +2208,7 @@ function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
 /* ---------- Blockade im Wolkenflug (Paket B) ----------
    Eine Figur legt sich über die Tore, die Tore bleiben stehen (hold, kein Ablaufen, kein Timeout).
    Romy tippt die Lösung ein, das zählt als getippt (applyResult 'typed', kann lila machen).
-   Kawumm, wenn sie schon da ist (KW.active), sonst Alien Plopp. Tor-Taps sind gesperrt (eng.blocked und RN.block). */
+   Kawumm, wenn sie schon da und nicht auf Reisen ist (KW.active, KW.away), sonst Alien Plopp. Tor-Taps sind gesperrt (eng.blocked und RN.block). */
 let forceBlockNext=0;                       // Elternbereich / Ausprobieren: so viele Blockaden im nächsten Ritt erzwingen
 window.forceBlock=(n)=>{ forceBlockNext=n===undefined?BLOCK_MAX:n; return forceBlockNext; };
 const ALIEN_SVG=(()=>{ const I='#3B2A52', eye=(x,y,r)=>'<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="#fff" stroke="'+I+'" stroke-width="2.6"/><circle cx="'+(x+r*.2)+'" cy="'+(y+r*.1)+'" r="'+(r*.5)+'" fill="'+I+'"/><circle cx="'+(x+r*.4)+'" cy="'+(y-r*.2)+'" r="'+(r*.18)+'" fill="#fff"/>';
@@ -2218,7 +2229,7 @@ const ALIEN_SVG=(()=>{ const I='#3B2A52', eye=(x,y,r)=>'<circle cx="'+x+'" cy="'
 const KW_BAR_SVG='<svg viewBox="0 0 220 26" aria-hidden="true"><rect x="4" y="4" width="212" height="18" rx="9" fill="#fff" stroke="#3B2A52" stroke-width="3"/>'
   +[0,1,2,3,4,5].map(i=>'<path d="M'+(22+i*34)+' 5.5 h14 l-10 15 h-14 Z" fill="#E04A40"/>').join('')+'<circle cx="11" cy="13" r="7" fill="#F2B83C" stroke="#3B2A52" stroke-width="2.6"/></svg>';
 function blockFigure(){
-  if(window.KW && KW.active && KW.active()) return {id:'kawumm', voice:KW.voice,
+  if(window.KW && KW.active && KW.active() && !(KW.away && KW.away())) return {id:'kawumm', voice:KW.voice,
     html:'<div class="kwfig"><div class="bar">'+KW_BAR_SVG+'</div><img src="'+KW.img+'" alt=""></div>',
     say:['Halt! Piratenkontrolle! Wer durch will, muss die Zahl wissen.','Kawumm! Hier ist zu! Nur mit der richtigen Zahl geht die Schranke auf.','Ahoi Lumi! Heute bin ich der Torwächter. Weißt du die Zahl?'],
     ok:['Kawumm! Aus dem Kopf gewusst! Schranke auf!','Ha! Richtig! Ihr dürft durch.','Stimmt genau! Gute Fahrt, ihr zwei!'],
@@ -2481,7 +2492,7 @@ function renderParent(){
     +heat
     +'<h2>Bestzeiten Inselritt</h2><div class="besttimes">'+bests+'</div>'
     +'<h2>Kawumm (Rückwärtsreihen)</h2>'+(window.KW?KW.parentHTML():'')
-    +'<div class="setrow"><label>Wolkenflug: Blockade im nächsten Ritt (bis zu 3, ab dem 2. Tor). Figur: '+(window.KW&&KW.active()?'Kawumm':'Alien Plopp')+'</label><button class="smallbtn" id="setForceBlock">'+(forceBlockNext?'kommt':'erzwingen')+'</button></div>'
+    +'<div class="setrow"><label>Wolkenflug: Blockade im nächsten Ritt (bis zu 3, ab dem 2. Tor). Figur: '+(window.KW&&KW.active()&&!KW.away()?'Kawumm':'Alien Plopp')+'</label><button class="smallbtn" id="setForceBlock">'+(forceBlockNext?'kommt':'erzwingen')+'</button></div>'
     +'<h2>Einstellungen</h2>'
     +'<div class="setrow"><label>Name des Kindes</label><input type="text" id="setName" value="'+S.name.replace(/"/g,'&quot;')+'"></div>'
     +'<div class="setrow"><label>Ton und Vorlesen</label><button class="toggle'+(S.sound?' on':'')+'" id="setSound" role="switch" aria-checked="'+S.sound+'" aria-label="Ton"><i></i></button></div>'
