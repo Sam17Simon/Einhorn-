@@ -22,7 +22,7 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 - Startseite, Intro und Wolkenritt zeigen dieselbe Lumi.
 - Tor-Taps werden in `onTap` (game.js) über die Position ausgewertet. Pixi trifft die Tor-Objekte selbst nicht zuverlässig.
 - Am Weltentor kommt nur eine Malaufgabe, kein Reihen-Sprung und kein Rätsel.
-- Rätselstopps im Wolkenflug zeigen keine Bilder zum Abzählen (`showFriend(..., null)`). Romy hat dort gezählt statt gerechnet. Das Punktefeld im Zaubertraining bleibt, es kommt nur nach einem Fehler mit der Lösung.
+- Rätselstopps im Wolkenflug zeigen keine Bilder zum Abzählen (`showFriend(..., null)`). Romy hat dort gezählt statt gerechnet. Das Punktefeld im Zaubertraining bleibt, es kommt nur nach einem Fehler mit der Lösung (seit v66 in Fünfergruppen mit Rechenweg, siehe Rechenwege nach Fehlern).
 - Eintippen ohne Ratelücke (seit v62): Sind so viele Ziffern getippt, wie die Lösung hat, wird nach 180 ms immer gewertet, richtig oder falsch (`handleKey` für Zaubertraining und Sternschnuppe, `rideKey` im Inselritt, wie `kwType`). ✓ nur für kürzere Eingaben. Während der 180 ms sperrt `pending` weitere Tasten.
 - Inseln gehen nie wieder zu (seit v62): `S.unlocked` merkt sich jede je offene Reihe, `rememberUnlocks` läuft in jedem `save()`. `unlockedRows(state)` = gemerkte Reihen plus Kette über 80 %. Alte Stände ohne `unlocked` bekommen den heutigen Stand (`upgradeState`, gilt auch für Sicherungsdateien). Urlaub (`onVacation`) hängt weiter an der aktuellen Beherrschung.
 - Reihen-Sprünge (`seqQuestion`) sind Weiterzählen, keine Malaufgabe: kein `applyResult`/`applyTimeout`, kein `logDay`. Sterne und Combo bleiben.
@@ -139,3 +139,24 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 - Unterwegs (`kwAway`/`KW.away()`): keine Schatzkarten (Inselkarte versteckt, `kwMapBadge` leer), Inselwelt zeigt `kwAwayCard` (leerer Anleger mit Flaschenpost, nur Briefkasten-Knopf, Lumi sagt einmal, dass Kawumm auf Reisen ist), `kwDueRows` liefert [] (Wegweiser zeigt nie aufs Schiff), Blockade im Wolkenflug macht Plopp. Fälligkeit pausiert: bei Rückkehr rückt jedes `rs.last` um die Reisezeit (`kwShiftDue`).
 - Rückkehr (`kwComeBack`): Rückkehrbrief, dann Schatzkammer mit eigenem Regal "Andenken" (`kwsouvshelf`, 9 Plätze, leere mit ?), Kawumm sagt es mit `KW_VOICE`.
 - Elternbereich, Abschnitt Kawumm: Reisestand (wo, Spieltage x von y, Briefe, nächster Brief), "Reise jetzt starten", "Nächsten Brief jetzt" (ohne Tagesgrenze, danach Rückkehr), "Zurückkommen lassen", "Alle Reisebriefe ansehen", "Briefkasten".
+
+## Rechenwege nach Fehlern (seit v66)
+- `rechenweg(state, task)` im LOGIC-Block (Node-testbar) liefert nach einer falschen Antwort einen kurzen Weg über einen Fakt, den Romy schon kann: `{op, sure, base, say, short, show, dots}`. Reihenfolge: Tauschaufgabe lila (`swap`) > Regel mal 1/2/10 (`rule1`, `rule2`, `rule10`) > Kernaufgabe 5er/10er (5n+n, 5n−n, 10n−n, Hälfte von 10n) > Verdoppeln > Nachbaraufgabe (n±1), jeweils nur mit lila Bezugsfakt (`mulSure`, beide Richtungen). Sonst Fallback ohne "kennst du": Kernaufgabe, sonst 2er-Nachbar, bei 7 `split` (5n+2n), bei 8 verdoppeln. Innerhalb einer Stufe Plus vor Verdoppeln vor Minus vor Halbieren.
+- Geteilt: `divBridge` über die Mal-Aufgabe ("7 mal wie viel ist 42? 7 mal 6 ist 42.").
+- Zaubertraining: Lösung + `say` gesprochen, die nächste Aufgabe kommt erst nach dem Satz (mindestens 3,4 s, sonst würde `nextTask` ihn abschneiden). Sichtbar nur `show` (Zahlen, z. B. "5·7 = 35, +7 = 42") unter dem Punktefeld.
+- Punktefeld (`renderDots(el, rows, cols, caption, rw.dots)`): Fünfergruppen (Lücke nach 5 Reihen und 5 Spalten), Kernaufgabe lila (`--accent`), Rest gold (`.rest`), Weggenommenes nur als goldener Ring (`.ghost`, z. B. 10·6 − 6).
+- Wolkenflug: nur gesprochen, ein Satz (`short`) hinter "x mal y ist z.". Nicht beim Vorbeireiten (Timeout), nicht am Weltentor, nicht bei Reihen-Sprüngen. Rätsel: nur gesprochen, kein Bild. Blockade: erst der Satz der Figur, dann Lumis `short` (`blockReact(good,t,rw)`, nur wenn inzwischen nichts anderes gesprochen wurde, `speakSeq`). Spieltempo unverändert.
+- Sternschnuppe: Rechenweg nur als Zahlen (`.fbway`), nicht gesprochen, weil dort das Mikro mithört und gesprochene Zahlen als Antwort zählen würden.
+
+## Tauschaufgaben (seit v66)
+- 7x4 und 4x7 bleiben getrennte Lernstände (Schlüssel Reihe x Zahl, `factKey`), nichts zusammenlegen.
+- `seedSwaps(state)` (läuft in `rememberUnlocks`, also bei jedem `save()`): Für jede neu offene Insel genau einmal (`S.swapDone`) starten die Fakten, deren Tauschaufgabe lila ist (`swapKnown`), in Fach 1, bei schon selbst getippter Tauschaufgabe in Fach 2. Nie lila. Markiert mit `f.swap=1`, `seen` bleibt 0. Alter Stand ohne `swapDone`: alle offenen Inseln gelten als erledigt (`upgradeState`).
+- Ansage nur gesprochen: `S.swapNews` [{row,n}], `swapNewsLine(row,true)` hängt sich an die Insel-Feier (`maybeRowParty`) oder, falls die ausblieb, ans erste Öffnen der Insel (`openIsland`). Danach verbraucht.
+- Tausch-Start ist nicht "neu": `guideMode` zählt neu = `seen 0 und Fach 0`, `factStage` gibt Fach 2 schon `uebt`, Sterne zeigen ihn als angefangen. `blockWeight` nimmt Fach 2 aus Tausch als Blockade-Ziel.
+
+## Geteilt (seit v66)
+- Vorher wurde Geteilt (35 % der lila Fakten in Zaubertraining und Sternschnuppe) auf den Mal-Fakt gebucht. Das ist raus. Jetzt eigener Lernstand `S.divs` = {"42:7": {box, seen, ok, no, last, rt, typed}}, angelegt beim ersten Buchen (`factOf(state,key,true)`, `isDivKey`). Gleiche Fächer und Regeln wie Mal (`applyResult`, `applyTimeout`). `rowMastery`, `unlockedRows`, `guideMode`, `masteredCount` sehen nur `S.facts`: Geteilt zählt nie für Inseln.
+- Kandidaten (`divCands`): beide Geteilt-Aufgaben zu jedem lila Mal-Fakt einer offenen Reihe, ohne 1, wenn die 1er im Urlaub ist (`isRetired`). `pickTask(...,{div:true})` nimmt mit `DIV_SHARE` 0.12 eine Geteilt-Aufgabe (`pickDiv`), wenn mindestens `DIV_MIN` 3 Kandidaten da sind. Ohne `opts.div` nie Geteilt.
+- Nur in Zaubertraining, Sternschnuppe (dort auch ohne Fach 2) und an normalen Wolkenflug-Toren (`makeDivOptions`: Nachbarn des Ergebnisses). Nie am Weltentor, nie als Blockade, nie im Inselritt, nie bei Kawumm. Rätsel-Teilaufgaben (`friendRiddle`) buchen weiter auf den Mal-Fakt.
+- Anzeige "42 : 7", Sprache "42 geteilt durch 7". Elternbereich: Schalter "Geteilt-Aufgaben" (`S.divOn`, Standard an) und "Geteilt sicher x / y" (`divStats`).
+

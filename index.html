@@ -396,6 +396,15 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
 .dots b{width:13px;height:13px;border-radius:50%;background:var(--accent);opacity:0;animation:dotin .25s ease forwards;}
 @keyframes dotin{to{opacity:1}}
 .dots .alt b{background:#B493F0;}
+/* Punktefeld in Fünfergruppen (wie 100er-Feld), Rechenweg farbig: Kernaufgabe lila, Rest gold, weggenommen nur als Ring (seit v66) */
+.dots.grp{display:flex; flex-direction:column; align-items:center; gap:4px;}
+.dots.grp .dr{display:flex; gap:4px;}
+.dots.grp .dr.g5{margin-top:5px;}
+.dots.grp .dr b.g5{margin-left:5px;}
+.dots.grp b.rest{background:var(--gold);}
+.dots.grp b.ghost{background:transparent; box-shadow:inset 0 0 0 2px var(--gold); animation:dotghost .25s ease forwards;}
+@keyframes dotghost{to{opacity:.55}}
+.fbway{display:block; font-size:15px; color:var(--muted); font-weight:700; margin-top:2px;}
 .dotcap{font-size:14px;color:var(--muted);font-weight:700;text-align:center;margin-top:4px;}
 .badge-new{background:var(--gold); color:#fff; font-size:12px; border-radius:999px; padding:2px 8px; font-family:var(--font-body); vertical-align:middle; margin-left:6px;}
 .friend{font-size:22px; margin-left:auto;}
@@ -631,9 +640,9 @@ button.ctawait:active{transform:none;}
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=65"></script>
-<script src="game.js?v=65"></script>
-<script src="kawumm.js?v=65"></script>
+<script src="islands.js?v=66"></script>
+<script src="game.js?v=66"></script>
+<script src="kawumm.js?v=66"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -661,6 +670,8 @@ function defaultState(now){
     best:{blitz:0, rows:{}},     // rows: reihe -> sekunden
     spent:0, islands:{},         // Sterne ausgegeben, Ausbauten je Insel: {reihe:[ids]}
     unlocked:[ROW_ORDER[0]],     // einmal offene Inseln bleiben offen (rememberUnlocks)
+    swapDone:[ROW_ORDER[0]],     // Inseln, für die der Tausch-Start schon gelaufen ist (seedSwaps)
+    divs:{}, divOn:true,         // Geteilt: eigener Lernstand je "42:7" (zählt nie für Inseln), Elternschalter
     created: now
   };
 }
@@ -681,7 +692,7 @@ function unlockedRows(state){
   return open;
 }
 /* Neu Freigeschaltetes dauerhaft eintragen (läuft bei jedem save). Alte Stände ohne unlocked bekommen so den heutigen Stand. */
-function rememberUnlocks(state){ state.unlocked=unlockedRows(state); return state.unlocked; }
+function rememberUnlocks(state){ state.unlocked=unlockedRows(state); seedSwaps(state); return state.unlocked; }
 /* Urlaub (Entscheidung Simon): Die leichten Reihen 1 und 10 sind gesperrt, sobald sie sitzen (Tier wach).
    Das Tier fährt in den Urlaub, Inselscreen, Inselritt und Kawumms Schatzkarte dieser Reihe gibt es dann nicht mehr. */
 const VACATION_ROWS=[1,10];
@@ -699,8 +710,11 @@ function isDue(f, now){
    - Reihen, deren Tier wach ist, kommen nur noch mit knapp halbem Gewicht (Wiederholung bleibt über isDue).
    - Die neueste offene Insel bekommt fast das doppelte Gewicht. */
 function isRetired(state,r,b){ return onVacation(state,1) && (r===1 || b===1); }
-function pickTask(state, recentKeys, now, rng){
+/* opts.div: Geteilt-Aufgaben erlaubt (nur Zaubertraining, Sternschnuppe, normale Wolkenflug-Tore).
+   Dann kommt mit DIV_SHARE eine Geteilt-Aufgabe mit eigenem Lernstand (pickDiv), wenn genug passende da sind. */
+function pickTask(state, recentKeys, now, rng, opts){
   rng = rng || Math.random;
+  if(opts && opts.div && state.divOn!==false && rng()<DIV_SHARE){ const d=pickDiv(state, recentKeys, now, rng); if(d) return d; }
   const open = unlockedRows(state), newest = open[open.length-1];
   const cand = [];
   for(const r of open){
@@ -718,16 +732,10 @@ function pickTask(state, recentKeys, now, rng){
   let sum=0; for(const c of cand) sum+=c.w;
   let t=rng()*sum, chosen=cand[cand.length-1];
   for(const c of cand){ t-=c.w; if(t<=0){ chosen=c; break; } }
-  // Form: Division erst, wenn der Mal-Fakt sitzt (Box>=3): dann zu 35 %. Tauschaufgabe zu 40 %.
-  let type='mul';
-  if(chosen.f.box>=3 && rng()<0.35) type='div';
-  const swap = type==='mul' && rng()<0.4;
+  // Tauschaufgabe zu 40 % (gebucht wird immer auf den Schlüssel Reihe x Zahl). Geteilt läuft seit v66 getrennt (pickDiv).
+  const swap = rng()<0.4;
   const a = swap? chosen.b : chosen.r, b = swap? chosen.r : chosen.b;
-  if(type==='mul') return {key:chosen.k, a, b, type, show:a+' · '+b, answer:a*b, say:a+' mal '+b};
-  // Division: Produkt ÷ Reihenzahl = b  (oder umgekehrt)
-  const divBySwap = rng()<0.5;
-  const d1 = chosen.r*chosen.b, d2 = divBySwap? chosen.b : chosen.r, ans = divBySwap? chosen.r : chosen.b;
-  return {key:chosen.k, a:d1, b:d2, type, show:d1+' : '+d2, answer:ans, say:d1+' geteilt durch '+d2};
+  return {key:chosen.k, a, b, type:'mul', show:a+' · '+b, answer:a*b, say:a+' mal '+b};
 }
 
 /* Ergebnis einarbeiten. correct:boolean, rt:ms, how: 'typed' (selbst eingetippt) oder 'choice' (Tor/Auswahl angetippt, auch Gesprochenes).
@@ -737,7 +745,7 @@ function pickTask(state, recentKeys, now, rng){
    - Auswahl richtig: hebt höchstens bis Fach 2, schon lila Fakten bleiben, wo sie sind (kein Herabstufen fürs Nie-Getippt-Haben).
      Auswahl falsch: höchstens ein Fach runter (Fach 4 → 3, Fach 1 bleibt 1). Ohne how gilt 'choice'. */
 function applyResult(state, key, correct, rt, now, how){
-  const f = state.facts[key]; if(!f) return;
+  const f = factOf(state,key,true); if(!f) return;      // Mal-Fakt oder Geteilt-Eintrag ("42:7", wird beim ersten Mal angelegt)
   const typed = how==='typed';
   f.seen++; f.last=now;
   f.rt.push(Math.min(rt,20000)); if(f.rt.length>5) f.rt.shift();
@@ -757,7 +765,7 @@ function applyResult(state, key, correct, rt, now, how){
 /* Tempo-Stufe eines Fakts: 'neu' (noch nie oder gerade erst gesehen), 'uebt', 'sicher'.
    Daraus entsteht der Zeitplan der Tore: wie lange sie anfliegen, ab wann sie kriechen, ob sie stehen bleiben. */
 function factStage(f){
-  if(!f || f.seen===0 || f.box<=1) return 'neu';
+  if(!f || f.box<=1) return 'neu';                    // Fach 2 ohne Sehen gibt es nur über den Tausch-Start (seedSwaps): dann schon 'uebt'
   if(f.box<=3) return 'uebt';
   return 'sicher';
 }
@@ -769,7 +777,7 @@ function gatePlan(stage, f){
 }
 /* Nicht rechtzeitig getippt: zählt als Zögern, nicht als Fehler. Eine Box runter statt zurück auf Box 1. */
 function applyTimeout(state, key, budgetMs, now){
-  const f=state.facts[key]; if(!f) return;
+  const f=factOf(state,key,true); if(!f) return;
   f.seen++; f.last=now; f.no++;
   f.rt.push(Math.min(budgetMs,20000)); if(f.rt.length>5) f.rt.shift();
   f.box=Math.max(0,f.box-1);
@@ -793,7 +801,7 @@ function applyRide(state, row, misses, rts, now){
    Ziel: Fach 2, noch nie eingetippt (bevorzugt, Gewicht 3), oder schon lila, aber nie eingetippt (Gewicht 1).
    Nie neue oder wackelnde Fakten (Fach 0-1), nie ausgemusterte. Höchstens BLOCK_MAX pro Ritt. */
 const BLOCK_MAX = 3, BLOCK_P = 0.35;
-function blockWeight(f){ if(!f || f.seen===0 || (f.typed||0)>0) return 0; return f.box===2 ? 3 : f.box>=3 ? 1 : 0; }
+function blockWeight(f){ if(!f || (f.typed||0)>0) return 0; return f.box===2 ? 3 : f.box>=3 ? 1 : 0; }   // Fach 0-1 nie (auch Tausch-Start Fach 1)
 function pickBlockTarget(state, recentKeys, rng){
   rng=rng||Math.random;
   const cand=[]; let sum=0;
@@ -819,8 +827,8 @@ const GUIDE_NEW = 3, GUIDE_UNTYPED = 2;
 function guideMode(state, kwDue){
   const open=unlockedRows(state), row=open[open.length-1], facts=rowFacts(state,row);
   const live=facts.filter((f,i)=>!isRetired(state,row,i+1));
-  const neu=live.filter(f=>f.seen===0).length;
-  const wackelt=live.filter(f=>f.seen>0&&f.box<=1).length;
+  const neu=live.filter(f=>f.seen===0&&f.box===0).length;          // Tausch-Start (Fach 1-2 ungesehen) ist nicht neu
+  const wackelt=live.filter(f=>f.box<=1&&!(f.seen===0&&f.box===0)).length;
   const fast=live.filter(f=>f.box===2).length;
   const untyped=live.filter(f=>f.box===2&&!(f.typed>0)).length;
   const c={row, neu, wackelt, fast, untyped};
@@ -950,11 +958,188 @@ function friendRiddle(state, rng, friends){
   if(state.facts[key].box>=3 && m>1 && ans>1 && rng()<0.35){
     const prod=a*b;
     const txt=RIDDLE_DIV[Math.floor(rng()*RIDDLE_DIV.length)](prod,m);
-    return {kind:'riddle', icon:f[0], name:f[1], key, answer:ans, text:f[1]+': „'+txt+'“', opts:makeOptions(ans,ans,m,rng)};
+    return {kind:'riddle', icon:f[0], name:f[1], key, answer:ans, text:f[1]+': „'+txt+'“', opts:makeDivOptions(ans,rng), div:true, a:prod, b:m};
   }
   const tpl=RIDDLE_MUL[Math.floor(rng()*RIDDLE_MUL.length)];
   const txt=riddleMulText(tpl,a,b);
-  return {kind:'riddle', icon:f[0], name:f[1], key, answer:a*b, text:f[1]+': „'+txt+'“', opts:makeOptions(a*b,a,b,rng), pic:{n:a,m:b,g:tpl.g,i:tpl.i}};
+  return {kind:'riddle', icon:f[0], name:f[1], key, answer:a*b, text:f[1]+': „'+txt+'“', opts:makeOptions(a*b,a,b,rng), pic:{n:a,m:b,g:tpl.g,i:tpl.i}, a, b};
+}
+
+/* ================= Paket D: Geteilt, Tauschaufgaben, Rechenwege ================= */
+const SURE_BOX = 3;                                  // "sicher" = lila
+function newFact(){ return {box:0, seen:0, ok:0, no:0, last:0, rt:[], typed:0}; }
+function isDivKey(k){ return typeof k==='string' && k.indexOf(':')>0; }
+function divKey(p,d){ return p+':'+d; }
+/* Lernstand zu einem Schlüssel: Mal-Fakt "7x4" in state.facts, Geteilt "28:4" in state.divs (getrennt, zählt nie für Inseln).
+   create: Geteilt-Eintrag anlegen, wenn er fehlt (nur beim Buchen). Ohne create: Lesen, fehlender Eintrag = neu. */
+function factOf(state,key,create){
+  if(!isDivKey(key)) return state.facts[key];
+  if(!state.divs || typeof state.divs!=='object') state.divs={};
+  if(state.divs[key]) return state.divs[key];
+  if(create) return (state.divs[key]=newFact());
+  return newFact();
+}
+/* Ist a·b sicher (lila)? Egal in welcher Richtung (a x b oder b x a), Tausch zählt mit. */
+function mulSure(state,a,b){
+  if(a<1||a>10||b<1||b>10) return false;
+  const f1=state.facts[factKey(a,b)], f2=state.facts[factKey(b,a)];
+  return !!((f1&&f1.box>=SURE_BOX)||(f2&&f2.box>=SURE_BOX));
+}
+function swapKey(key){ const pr=String(key).split('x'); return pr[1]+'x'+pr[0]; }
+
+/* ---- Geteilt (Aufgabenfamilie 6·7, 7·6, 42:7, 42:6) ----
+   Eine Geteilt-Aufgabe kommt erst, wenn der Mal-Fakt dazu lila ist (eine der beiden Richtungen, in einer offenen Reihe).
+   Eigener Lernstand in state.divs, gleiche Fächer und Regeln wie Mal (applyResult). rowMastery/unlockedRows sehen nur Mal. */
+const DIV_SHARE = 0.12, DIV_MIN = 3;
+function divCands(state){
+  const out=[], seen=new Set();
+  for(const r of unlockedRows(state)) for(let b=1;b<=10;b++){
+    const f=state.facts[factKey(r,b)];
+    if(!f || f.box<SURE_BOX) continue;
+    const p=r*b;
+    for(const [d,q] of [[r,b],[b,r]]){
+      if(isRetired(state,d,q)) continue;           // 1er im Urlaub: auch nichts Geteiltes mit 1
+      const k=divKey(p,d); if(seen.has(k)) continue; seen.add(k);
+      out.push({k, p, d, q});
+    }
+  }
+  return out;
+}
+function pickDiv(state, recentKeys, now, rng){
+  rng=rng||Math.random;
+  const cand=divCands(state); if(cand.length<DIV_MIN) return null;
+  let sum=0;
+  for(const c of cand){
+    const f=factOf(state,c.k);
+    let w=BOX_WEIGHT[f.box];
+    if(isDue(f,now)) w*=2.2;
+    if(f.no>f.ok) w*=1.6;
+    if(recentKeys && recentKeys.includes(c.k)) w*=0.05;
+    c.w=w; sum+=w;
+  }
+  let t=rng()*sum, ch=cand[cand.length-1];
+  for(const c of cand){ t-=c.w; if(t<=0){ ch=c; break; } }
+  return {key:ch.k, a:ch.p, b:ch.d, type:'div', div:true, show:ch.p+' : '+ch.d, answer:ch.q, say:ch.p+' geteilt durch '+ch.d};
+}
+/* Antwort-Tore für Geteilt: Nachbarn des Ergebnisses (1 bis 10), keine Vielfachen. */
+function makeDivOptions(answer, rng){
+  rng=rng||Math.random;
+  const opts=[answer], seen=new Set([answer]);
+  for(const n of [answer+1,answer-1,answer+2,answer-2,answer+3,answer-3].sort(()=>rng()-0.5).sort((x,y)=>Math.abs(x-answer)-Math.abs(y-answer))){
+    if(opts.length>=3) break; if(n>=1&&n<=10&&!seen.has(n)){ seen.add(n); opts.push(n); }
+  }
+  return opts.sort(()=>rng()-0.5);
+}
+function divStats(state){
+  const c=divCands(state);
+  return {open:c.length, sure:Object.values(state.divs||{}).filter(f=>f.box>=SURE_BOX).length};
+}
+
+/* ---- Tauschaufgaben ----
+   Wenn 7·4 sitzt, ist 4·7 schon fast da. Die Lernstände bleiben getrennt (7x4 und 4x7), aber beim Öffnen einer Insel
+   starten die Fakten, deren Tauschaufgabe lila ist, in Fach 1 (Tauschaufgabe auch schon selbst getippt: Fach 2). Nie lila.
+   Läuft genau einmal je Insel (state.swapDone). Alter Stand ohne swapDone: alle offenen Inseln gelten als erledigt. */
+function swapKnown(state,row){
+  const out=[];
+  for(let b=1;b<=10;b++){
+    if(b===row || isRetired(state,row,b)) continue;
+    const p=state.facts[factKey(b,row)];
+    if(p && p.box>=SURE_BOX) out.push({k:factKey(row,b), typed:(p.typed||0)>0});
+  }
+  return out;
+}
+function seedSwaps(state){
+  const open=unlockedRows(state);
+  if(!Array.isArray(state.swapDone)){ state.swapDone=open.slice(); return []; }
+  const news=[];
+  for(const r of open){
+    if(state.swapDone.includes(r)) continue;
+    state.swapDone.push(r);
+    const kn=swapKnown(state,r);
+    for(const x of kn){
+      const f=state.facts[x.k];
+      if(f && f.box===0 && f.seen===0){ f.box = x.typed ? 2 : 1; f.swap=1; }   // höchstens Fach 2: lila nur nach Eintippen
+    }
+    if(kn.length) news.push({row:r, n:kn.length});
+  }
+  if(news.length) state.swapNews=(state.swapNews||[]).concat(news);
+  return news;
+}
+
+/* ---- Rechenwege nach Fehlern ----
+   rechenweg(state, task): kurzer Weg über einen Fakt, den Romy schon sicher kann.
+   task: {key, a, b} (Mal, a·b wie gezeigt) oder {div:true, a:Produkt, b:Teiler, answer} (Geteilt).
+   Reihenfolge: Tauschaufgabe sicher > Regel (mal 1, mal 2, mal 10) > Kernaufgabe 5er/10er (5n+n, 5n−n, 10n−n, Hälfte von 10n)
+   > Verdoppeln > Nachbaraufgabe (n±1). Jeweils nur, wenn der Bezugsfakt lila ist. Sonst trotzdem eine Kernaufgabe
+   (5er/10er, sonst 2er-Nachbar, bei 7: 5n+2n, bei 8: verdoppeln).
+   Ergebnis: {op, sure, base:[x,y], say (Zaubertraining), short (ein Satz, Wolkenflug), show (nur Zahlen), dots:{rows,cols,base,ghost}} */
+function divBridge(d,q,p){
+  return {op:'div', sure:true, base:[d,q], say:d+' mal wie viel ist '+p+'? '+d+' mal '+q+' ist '+p+'.', short:d+' mal '+q+' ist '+p+'.',
+          show:d+'·'+q+' = '+p, dots:{rows:d, cols:q, base:d, ghost:0}};
+}
+function mkBridge(op,m,n,sure){
+  const P=m*n;
+  if(op==='plus'){ const x=m-1, bp=x*n;
+    return {op, sure, base:[x,n], say:x+' mal '+n+(sure?' kennst du.':' ist '+bp+'.')+' Plus noch eine '+n+'.', short:x+' mal '+n+' und noch eine '+n+'.',
+            show:x+'·'+n+' = '+bp+', +'+n+' = '+P, dots:{rows:m, cols:n, base:x, ghost:0}}; }
+  if(op==='minus'){ const x=m+1, bp=x*n;
+    return {op, sure, base:[x,n], say:x+' mal '+n+(sure?' kennst du.':' ist '+bp+'.')+' Eine '+n+' weniger.', short:x+' mal '+n+', eine '+n+' weniger.',
+            show:x+'·'+n+' = '+bp+', −'+n+' = '+P, dots:{rows:x, cols:n, base:m, ghost:1}}; }
+  if(op==='double'){ const h=m/2, bp=h*n;
+    return {op, sure, base:[h,n], say:h+' mal '+n+(sure?' kennst du.':' ist '+bp+'.')+' Und das doppelt.', short:h+' mal '+n+', und das doppelt.',
+            show:h+'·'+n+' = '+bp+', '+bp+'+'+bp+' = '+P, dots:{rows:m, cols:n, base:h, ghost:0}}; }
+  if(op==='half'){ const bp=10*n;
+    return {op, sure, base:[10,n], say:'10 mal '+n+(sure?' kennst du.':' ist '+bp+'.')+' Davon die Hälfte.', short:'Die Hälfte von 10 mal '+n+'.',
+            show:'10·'+n+' = '+bp+', die Hälfte = '+P, dots:{rows:10, cols:n, base:5, ghost:5}}; }
+  if(op==='split'){ const a5=5*n, a2=2*n;
+    return {op, sure, base:[5,n], say:'5 mal '+n+' ist '+a5+'. 2 mal '+n+' ist '+a2+'. Zusammen '+P+'.', short:'5 mal '+n+' und 2 mal '+n+'.',
+            show:'5·'+n+' = '+a5+', 2·'+n+' = '+a2+', '+a5+'+'+a2+' = '+P, dots:{rows:7, cols:n, base:5, ghost:0}}; }
+  if(op==='rule10') return {op, sure:true, base:[10,n], say:'Mal 10: an die '+n+' kommt eine Null.', short:'Mal 10: an die '+n+' kommt eine Null.',
+            show:n+'·10 = '+P, dots:{rows:10, cols:n, base:10, ghost:0}};
+  if(op==='rule2') return {op, sure:true, base:[2,n], say:'Das ist '+n+' plus '+n+'.', short:'Das ist '+n+' plus '+n+'.',
+            show:n+'+'+n+' = '+P, dots:{rows:2, cols:n, base:1, ghost:0}};
+  if(op==='rule1') return {op, sure:true, base:[1,n], say:'Mal 1 bleibt die '+n+' gleich.', short:'Mal 1 bleibt die '+n+' gleich.',
+            show:'1·'+n+' = '+n, dots:{rows:1, cols:n, base:1, ghost:0}};
+  return null;
+}
+function rechenweg(state, task){
+  if(!task) return null;
+  if(task.div){ const p=task.a, d=task.b, q=task.answer!=null?task.answer:p/d; return divBridge(d,q,p); }
+  const a=task.a, b=task.b;
+  if(!(a>=1&&a<=10&&b>=1&&b<=10)) return null;
+  // 1) Tauschaufgabe: die andere Richtung ist sicher
+  if(a!==b){
+    const own=task.key||factKey(a,b), other=state.facts[swapKey(own)];
+    if(other && other.box>=SURE_BOX){ const P=a*b;
+      return {op:'swap', sure:true, base:[b,a], say:b+' mal '+a+' kennst du. Das ist dasselbe.', short:'Das ist dasselbe wie '+b+' mal '+a+'.',
+              show:b+'·'+a+' = '+P, dots:{rows:Math.min(a,b), cols:Math.max(a,b), base:Math.min(a,b), ghost:0}}; }
+  }
+  const ori = a===b ? [[a,b]] : [[a,b],[b,a]];      // [m,n]: m = wie oft, n = welche Zahl
+  // 2) Regeln für mal 1, mal 10, mal 2
+  for(const r of [1,10,2]) for(const [m,n] of ori) if(m===r) return mkBridge('rule'+r,m,n,true);
+  const sure=(x,y)=>mulSure(state,x,y);
+  const core=[], dbl=[], near=[];
+  for(const [m,n] of ori){
+    if(m===6) core.push(['plus',m,n,[5,n]]);
+    if(m===4) core.push(['minus',m,n,[5,n]]);
+    if(m===9) core.push(['minus',m,n,[10,n]]);
+    if(m===5) core.push(['half',m,n,[10,n]]);
+    if(m%2===0 && m/2>=2) dbl.push(['double',m,n,[m/2,n]]);
+    if(m-1>=2) near.push(['plus',m,n,[m-1,n]]);
+    if(m+1<=10) near.push(['minus',m,n,[m+1,n]]);
+  }
+  const pref={plus:0, double:1, minus:2, half:3};       // Plus vor Minus vor Halbieren (leichter für die 2. Klasse)
+  const bySure=list=>list.slice().sort((x,y)=>pref[x[0]]-pref[y[0]]).find(c=>sure(c[3][0],c[3][1]));
+  // 3) Kernaufgabe, 4) Verdoppeln, 5) Nachbaraufgabe: jeweils über einen sicheren Fakt
+  const hit=bySure(core)||bySure(dbl)||bySure(near);
+  if(hit) return mkBridge(hit[0],hit[1],hit[2],true);
+  // Fallback: trotzdem eine Kernaufgabe nehmen (5er/10er, sonst 2er-Nachbar, 7 = 5+2, 8 = verdoppeln)
+  const sorted=l=>l.slice().sort((x,y)=>pref[x[0]]-pref[y[0]]);
+  const fb=sorted(core)[0] || near.find(c=>c[3][0]===2) || null;
+  if(fb) return mkBridge(fb[0],fb[1],fb[2],false);
+  for(const [m,n] of ori) if(m===7) return mkBridge('split',m,n,sure(5,n)&&sure(2,n));
+  const d=sorted(dbl)[0]||sorted(near)[0];
+  return d ? mkBridge(d[0],d[1],d[2],false) : null;
 }
 /* ================= LOGIC-END ================= */
 
@@ -965,6 +1150,9 @@ let S;
 function upgradeState(p){
   if(!p.islands) p.islands={}; if(!p.spent) p.spent=0;
   if(!p.gear){ p.gear=gearOf(p.items||0); p.rewards=p.items||0; }   // alte Speicherung: jedes Extra auf Stufe 1
+  if(!Array.isArray(p.swapDone)) p.swapDone=unlockedRows(p).slice(); // seit v66: offene Inseln bekommen keinen Tausch-Start mehr
+  if(!p.divs || typeof p.divs!=='object') p.divs={};                // seit v66: Geteilt mit eigenem Lernstand
+  if(typeof p.divOn!=='boolean') p.divOn=true;
   if(!Array.isArray(p.unlocked)) rememberUnlocks(p);               // alter Stand: heutige Inseln merken
   for(const k in p.facts){ const f=p.facts[k]; if(f && typeof f.typed!=='number') f.typed=0; }   // seit Paket B: selbst eingetippt (alte Stände: noch nie)
   if(p.kw && typeof kwTripEnsure==='function') kwTripEnsure(p.kw);   // seit v64: Kawumm auf Reisen (Reise, Briefe, Andenken)
@@ -1500,12 +1688,19 @@ function starFly(fromEl, toEl){
     setTimeout(()=>{ s.remove(); toEl.classList.remove('pop'); void toEl.offsetWidth; toEl.classList.add('pop'); },560);
   }catch(e){}
 }
-/* Punktefeld: a Reihen mit b Punkten – so sieht man, was Mal bedeutet */
-function renderDots(el, rows, cols, caption){
+/* Punktefeld: rows Reihen mit cols Punkten, in Fünfergruppen (Lücke nach 5 Reihen und nach 5 Spalten).
+   Rechenweg farbig (opt aus rechenweg().dots): die ersten base Reihen lila (Kernaufgabe), der Rest gold,
+   die letzten ghost Reihen nur als Ring (weggenommen, z. B. 10·6 − 6). caption: nur Zahlen (Wenig Text). */
+function renderDots(el, rows, cols, caption, opt){
   if(rows>10||cols>10){ el.innerHTML=''; return; }
-  let h='<div class="dots" style="grid-template-columns:repeat('+cols+',13px)">';
-  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++)
-    h+='<b style="animation-delay:'+(r*0.12+c*0.015)+'s'+(r%2?';background:#B493F0':'')+'"></b>';
+  const base=opt?opt.base:rows, ghost=opt?opt.ghost||0:0;
+  let h='<div class="dots grp">';
+  for(let r=0;r<rows;r++){
+    const cls = r>=rows-ghost ? 'ghost' : r<base ? '' : 'rest';
+    h+='<div class="dr'+(r===5?' g5':'')+'">';
+    for(let c=0;c<cols;c++) h+='<b class="'+cls+(c===5?' g5':'')+'" style="animation-delay:'+(r*0.12+c*0.015).toFixed(3)+'s"></b>';
+    h+='</div>';
+  }
   h+='</div>'+(caption?'<div class="dotcap">'+caption+'</div>':'');
   el.innerHTML=h;
 }
@@ -1595,7 +1790,7 @@ function nextTask(){
   // fällige Wiederholung einer eben verfehlten Aufgabe?
   const redoIdx=R.redo.findIndex(x=>x.after<=R.i);
   if(redoIdx>=0 && (R.i<R.n || true)){ R.task=R.redo.splice(redoIdx,1)[0].task; }
-  else if(R.i<R.n){ R.task=pickTask(S,R.recent,Date.now()); R.recent.push(R.task.key); if(R.recent.length>4) R.recent.shift(); }
+  else if(R.i<R.n){ R.task=pickTask(S,R.recent,Date.now(),undefined,{div:true}); R.recent.push(R.task.key); if(R.recent.length>4) R.recent.shift(); }
   else { R.task=R.redo.splice(0,1)[0].task; }
   R.input=''; R.locked=false; R.t0=performance.now();
   renderTask();
@@ -1658,17 +1853,21 @@ function submit(val, how){
     fb.textContent='Fast! '+R.task.show+' = '+R.task.answer; fb.className='feedback again';
     sndAgain();
     wait=1600;
+    const rw=rechenweg(S,R.task);     // Rechenweg über einen Fakt, den Romy schon sicher kann (Paket D)
     if(R.mode==='practice'){
-      speak(R.task.say+' ist '+R.task.answer+'. Gleich nochmal!');
       R.redo.push({task:{...R.task}, after:R.i+2});
-      // Punktefeld zeigen: so sieht man, warum das Ergebnis stimmt
-      const t=R.task, r=Math.min(t.a,t.b), c=Math.max(t.a,t.b);
-      const rowsWord = r===1 ? '1 Reihe' : r+' Reihen';
-      const dotsWord = c===1 ? 'mit 1 Punkt' : (r===1?'mit ':'mit je ')+c+' Punkten';
-      if(t.type==='mul') renderDots($('qDots'), r, c, rowsWord+' '+dotsWord+' = '+t.answer);
-      else renderDots($('qDots'), Math.min(t.answer,t.b), Math.max(t.answer,t.b), (t.a===1?'1 Punkt':t.a+' Punkte')+' = '+t.answer+' · '+t.b);
-      wait=3400;
+      // Punktefeld in Fünfergruppen, Rechenweg farbig, darunter nur die Rechnung in Zahlen
+      if(rw) renderDots($('qDots'), rw.dots.rows, rw.dots.cols, rw.show, rw.dots);
+      save(); R.i++;
+      // erst weiter, wenn der Rechenweg fertig gesprochen ist (nächste Aufgabe würde ihn abschneiden), mindestens 3,4 s
+      const run=R, task=R.task, t0=performance.now(); let gone=false;
+      const go=()=>{ if(gone) return; gone=true; setTimeout(()=>{ if(R===run && R.task===task) nextTask(); }, Math.max(700, 3400-(performance.now()-t0))); };
+      speak(R.task.say+' ist '+R.task.answer+'. '+(rw?rw.say+' ':'')+'Gleich nochmal!', go);
+      setTimeout(go, 12000);         // falls die Sprachausgabe hängt
+      return;
     }
+    // Sternschnuppe: Rechenweg nur als Zahlen (dort hört das Mikro mit, gesprochene Zahlen würden als Antwort zählen)
+    if(rw){ fb.innerHTML='Fast! '+R.task.show+' = '+R.task.answer+'<small class="fbway">'+rw.show+'</small>'; wait=2400; }
   }
   save();
   R.i++;
@@ -1749,9 +1948,18 @@ function maybeRowParty(){
         +'<div class="pill">'+fr[1]+' ist aufgewacht und fliegt jetzt mit!</div>'
         +'<p style="margin:0;font-weight:600;color:var(--muted)">Nächstes Abenteuer: die '+row+'er-Insel</p>','Weiter zur '+row+'er-Insel!');
       bigKnall(); sndFanfare();
-      speak('Juhu! Die '+done+'er-Insel leuchtet wieder! '+fr[1]+' ist aufgewacht! Weiter zur '+row+'er-Insel!');
+      speak('Juhu! Die '+done+'er-Insel leuchtet wieder! '+fr[1]+' ist aufgewacht! Weiter zur '+row+'er-Insel!'+swapNewsLine(row,true));
     },2000);
   }
+}
+/* Tauschaufgaben (seit v66): Beim Öffnen einer Insel sagt Lumi einmal, wie viele Aufgaben der neuen Reihe Romy
+   andersrum schon kann (seedSwaps legt S.swapNews an). Nur gesprochen. consume: Eintrag verbrauchen und speichern. */
+function swapNewsLine(row, consume){
+  const list=S.swapNews||[], i=list.findIndex(x=>x.row===row);
+  if(i<0) return '';
+  const n=list[i].n;
+  if(consume){ list.splice(i,1); S.swapNews=list; save(); }
+  return ' Und weißt du was? Von der '+row+'er-Reihe kennst du schon '+plural(n,'Aufgabe','Aufgaben')+'! Andersrum hast du sie nämlich schon gelernt.';
 }
 function showOverlay(html,btn){
   const box=$('overlayBox');
@@ -1938,8 +2146,8 @@ function nextBlitzTask(){
   // Nur geübte Fakten (Box>=2), damit es flutscht
   let task=null;
   for(let tries=0;tries<20;tries++){
-    const t=pickTask(S,R.recent,Date.now());
-    if(S.facts[t.key].box>=2||tries===19){ task=t; break; }
+    const t=pickTask(S,R.recent,Date.now(),undefined,{div:true});
+    if(t.div||factOf(S,t.key).box>=2||tries===19){ task=t; break; }   // Geteilt kommt nur zu lila Mal-Fakten, darf darum gleich mit
   }
   R.task=task; R.recent.push(task.key); if(R.recent.length>4) R.recent.shift();
   R.input=''; R.locked=false; R.t0=performance.now();
@@ -1966,6 +2174,7 @@ function finishBlitz(){
   if(record){ bigKnall(); sndFanfare(); } else { burst(40,0.5,0.5,9); }
   speak(record?'Wahnsinn! Neuer Rekord: '+count+'!':'Zeit um! '+plural(count,'Sternschnuppe','Sternschnuppen')+'!');
   if(unlockedItem) setTimeout(()=>showItemOverlay(unlockedItem),1400);
+  maybeRowParty();
 }
 
 /* ---------- Wolkenritt v4: PixiJS-Szene, Welten, Weltentore, Rätsel-Stopp ---------- */
@@ -2021,9 +2230,10 @@ function renderRunDots(){
   }
 }
 function planFor(t){
-  if(RN.first) return gatePlan('neu', S.facts[t.key]);
+  if(RN.first) return gatePlan('neu', factOf(S,t.key));
   if(t.kind==='seq'){ const m=rowMastery(S,t.row), f=S.facts[t.key]; const order=['neu','uebt','sicher']; const st=order[Math.min(order.indexOf(factStage(f)), m<0.5?0:m<0.8?1:2)]; return gatePlan(st,f); }
-  return gatePlan(factStage(S.facts[t.key]), S.facts[t.key]);
+  const f=factOf(S,t.key);            // Mal-Fakt oder Geteilt-Eintrag
+  return gatePlan(factStage(f), f);
 }
 function setQ(small,big){ const q=$('runQ').querySelector('.qchip'); q.style.display=''; q.innerHTML='<small>'+small+'</small>'+(big||''); }
 
@@ -2083,7 +2293,7 @@ function nextGate(){
   }else if(redoIdx>=0 && !isWorldGate){
     // dieselbe Aufgabe noch einmal, kurz nach dem Fehler
     const r=RN.redo.splice(redoIdx,1)[0];
-    t={kind:'fact', key:r.key, answer:r.answer, opts:makeOptions(r.answer,r.a,r.b), show:r.show, a:r.a, b:r.b};
+    t={kind:'fact', key:r.key, answer:r.answer, opts:r.div?makeDivOptions(r.answer):makeOptions(r.answer,r.a,r.b), show:r.show, a:r.a, b:r.b, div:r.div, say:r.say};
     setQ('Nochmal! Du schaffst das:', r.show+' = ?');
   }else if(!isWorldGate && RN.gate>=2 && roll<0.22){
     t=friendRiddle(S, Math.random, RN.friends); riddle=true;
@@ -2093,10 +2303,9 @@ function nextGate(){
     t=seqQuestion(S);
     setQ('Lumi springt in '+t.row+'er-Sprüngen!','… '+t.shown[0]+' … '+t.shown[1]+' … <b style="color:var(--accent)">?</b>');
   }else{
-    let p=null;
-    for(let i=0;i<10;i++){ p=pickTask(S,RN.recent,Date.now()); if(p.type==='mul') break; }
-    if(p.type!=='mul'){ const pr=p.key.split('x').map(Number); p={key:p.key,a:pr[0],b:pr[1],show:pr[0]+' · '+pr[1],answer:pr[0]*pr[1]}; }
-    t={kind:'fact', key:p.key, answer:p.answer, opts:makeOptions(p.answer,p.a,p.b), show:p.show, a:p.a, b:p.b};
+    // Geteilt nur an normalen Toren, nie am Weltentor (dort nur eine Malaufgabe)
+    const p=pickTask(S,RN.recent,Date.now(),undefined,{div:!isWorldGate});
+    t={kind:'fact', key:p.key, answer:p.answer, opts:p.div?makeDivOptions(p.answer):makeOptions(p.answer,p.a,p.b), show:p.show, a:p.a, b:p.b, div:!!p.div, say:p.say};
     RN.recent.push(p.key); if(RN.recent.length>4) RN.recent.shift();
     setQ('Durch welches Tor, Lumi?', p.show+' = ?');
   }
@@ -2122,7 +2331,7 @@ function nextGate(){
     },700);
   }else{
     const plan=planFor(t); RN.plan=plan;
-    if(plan.stage==='neu' && t.kind==='fact' && S.facts[t.key].seen===0){ setQ('Neue Aufgabe, lass dir Zeit!', t.show+' = ?'); }
+    if(plan.stage==='neu' && t.kind==='fact' && !t.div && S.facts[t.key].seen===0 && S.facts[t.key].box===0){ setQ('Neue Aufgabe, lass dir Zeit!', t.show+' = ?'); }
     eng.spawnGates(t.opts,Object.assign({worldgate:isWorldGate, onWaitLong:()=>{ if(RN&&!RN.locked) speak('Die Tore warten auf dich. Schau sie dir in Ruhe an.'); }},plan));
   }
 }
@@ -2159,12 +2368,15 @@ async function chooseGate(val, lane, how){
   }else{
     RN.combo=0; $('comboN').textContent='0'; $('comboBar').style.width='0%'; $('comboChip').classList.remove('hot');
     sndAgain();
-    const sayIt = t.kind==='seq' ? 'Nach '+t.shown[1]+' kommt '+t.answer+'.' : (t.show? t.show.replace('·','mal')+' ist '+t.answer+'.' : 'Es sind '+t.answer+'.');
+    const sayIt = t.kind==='seq' ? 'Nach '+t.shown[1]+' kommt '+t.answer+'.' : (t.show? (t.say||t.show.replace('·','mal'))+' ist '+t.answer+'.' : 'Es sind '+t.answer+'.');
+    // Rechenweg nach einer falschen Antwort (nicht beim Vorbeireiten, nicht am Weltentor): ein kurzer Satz, kein Bild
+    const rw = (val!==null && t.kind!=='seq' && !wasWorldGate) ? rechenweg(S,t) : null;
     const msg = (val===null ? 'Hui, vorbeigeritten! ' : 'Fast! ')+(t.show? t.show+' = '+t.answer : 'Es war '+t.answer);
     if(wasRiddle){ friendSay('Macht nix! Es sind '+t.answer+'.'); }
     else setQ(msg,'');
-    if(!wasWorldGate && !wasBlock) speak(sayIt);
-    if(t.kind==='fact' && t.show) RN.redo.push({key:t.key, answer:t.answer, a:t.a, b:t.b, show:t.show, after:RN.gate+3});
+    if(!wasWorldGate && !wasBlock) speak(sayIt+(rw?' '+rw.short:''));
+    if(t.kind==='fact' && t.show) RN.redo.push({key:t.key, answer:t.answer, a:t.a, b:t.b, show:t.show, div:t.div, say:t.say, after:RN.gate+3});
+    RN.lastWay=rw;
   }
   eng.setCombo(RN.combo);
   save();
@@ -2183,7 +2395,7 @@ async function chooseGate(val, lane, how){
     nextGate(); return;
   }
   if(wasBlock){
-    blockReact(good, t);
+    blockReact(good, t, good?null:RN.lastWay);
     await wait(good?1300:2600); if(!RN) return;
     hideBlock(false);
     await wait(700); if(!RN) return;
@@ -2277,10 +2489,14 @@ function blockKey(k){
   a.textContent=B.typed||'?'; a.className=B.typed?'':'empty';
   if(B.typed.length>=String(ans).length){ B.pending=true; setTimeout(()=>{ if(RN&&RN.block===B&&!RN.locked) chooseGate(parseInt(B.typed,10), null, 'typed'); },180); }
 }
-function blockReact(good, t){
+/* rw: Rechenweg nach falscher Eingabe. Die Figur sagt die Lösung, danach sagt Lumi den Weg in einem Satz,
+   aber nur, wenn inzwischen nichts anderes gesprochen wurde (speakSeq unverändert). */
+function blockReact(good, t, rw){
   const B=RN&&RN.block; if(!B) return;
   const a=$('blockAns'); a.textContent=good?B.typed:String(t.answer); a.className=good?'good':'again';
-  speak(good?pickOne(B.fig.ok):pickOne(B.fig.no).replace('{a}',t.answer), null, B.fig.voice);
+  let seq=0;
+  speak(good?pickOne(B.fig.ok):pickOne(B.fig.no).replace('{a}',t.answer), rw?()=>{ if(seq===speakSeq && RN) speak(rw.short); }:null, B.fig.voice);
+  seq=speakSeq;
 }
 function hideBlock(instant){
   const r=$('blockRig'), p=$('blockPad'); if(!r||!p) return;
@@ -2328,7 +2544,7 @@ function renderPath(){
   const newAway=[];
   for(const r of ROW_ORDER){
     const facts=rowFacts(S,r);
-    const stars=facts.map(f=> f.box>=5?starSVG('#F2B83C') : f.box>=3?starSVG('#9A6AE8') : f.seen>0?starSVG('#D9CFF0'):starSVG('#EEE8F8')).join('');
+    const stars=facts.map(f=> f.box>=5?starSVG('#F2B83C') : f.box>=3?starSVG('#9A6AE8') : (f.seen>0||f.box>0)?starSVG('#D9CFF0'):starSVG('#EEE8F8')).join('');
     const mastered=rowMastery(S,r)>=ROW_UNLOCK_SHARE, isOpen=open.includes(r), away=isOpen&&onVacation(S,r);
     const b=document.createElement(away?'div':'button');   // im Urlaub: kein Knopf, keine Interaktion
     b.className='islcard'+(isOpen?'':' locked')+(away?' away':'');
@@ -2395,13 +2611,13 @@ function openIsland(r){
   const line=islandLine(r);
   $('islBubble').textContent=line;
   const facts=rowFacts(S,r), sure=facts.filter(f=>f.box>=3).length;
-  $('islProgress').innerHTML=facts.map(f=> f.box>=5?starSVG('#F2B83C') : f.box>=3?starSVG('#9A6AE8') : f.seen>0?starSVG('#D9CFF0'):starSVG('#EEE8F8')).join('')+'<span style="margin-left:6px">'+(()=>{ const op=unlockedRows(S), nx=nextLockedRow(S); return (r===op[op.length-1]&&nx!==null)? Math.min(sure,8)+' / 8' : ''; })()+(S.best.rows[r]?' · 🏆 '+(S.best.rows[r]/1000).toFixed(1).replace('.',',')+' s':'')+'</span>';
+  $('islProgress').innerHTML=facts.map(f=> f.box>=5?starSVG('#F2B83C') : f.box>=3?starSVG('#9A6AE8') : (f.seen>0||f.box>0)?starSVG('#D9CFF0'):starSVG('#EEE8F8')).join('')+'<span style="margin-left:6px">'+(()=>{ const op=unlockedRows(S), nx=nextLockedRow(S); return (r===op[op.length-1]&&nx!==null)? Math.min(sure,8)+' / 8' : ''; })()+(S.best.rows[r]?' · 🏆 '+(S.best.rows[r]/1000).toFixed(1).replace('.',',')+' s':'')+'</span>';
   const an=$('islStage').querySelector('.isl-animal');
   if(an){ an.style.cursor='pointer'; an.addEventListener('click',()=>{ an.classList.remove('hop'); void an.getBBox(); an.classList.add('hop'); smallSparkle(); sndGood(); const t=nextIslandLine(r); $('islBubble').textContent=t; speak(t); }); }
   renderShop(r);
   if(window.KW) KW.islandCard(r);
   show('island');
-  speak(line);
+  speak(line+swapNewsLine(r,true));
 }
 function renderShop(r){
   const W=IW(), built=islandBuilt(r), avail=starsAvail(), el=$('islShop'); el.innerHTML='';
@@ -2451,7 +2667,7 @@ function renderParent(){
   const maxSec=Math.max(60,...days.map(x=>x.e.sec));
   const tasks7=days.slice(7).reduce((s,x)=>s+x.e.tasks,0), ok7=days.slice(7).reduce((s,x)=>s+x.e.ok,0);
   const totalSec=Object.values(S.days).reduce((s,e)=>s+e.sec,0);
-  const mastered=masteredCount(S), gold=goldCount(S), typedN=Object.values(S.facts).filter(f=>f.typed>0).length;
+  const mastered=masteredCount(S), gold=goldCount(S), typedN=Object.values(S.facts).filter(f=>f.typed>0).length, ds=divStats(S);
   const fastFacts=Object.values(S.facts).filter(f=>f.box>=3&&f.rt.length);
   const avgFast=fastFacts.length? (fastFacts.reduce((s,f)=>s+avgRt(f),0)/fastFacts.length/1000).toFixed(1):'–';
 
@@ -2485,6 +2701,7 @@ function renderParent(){
     +'<div class="kpi"><b>'+avgFast+' s</b><span>ø Antwortzeit (sichere Fakten)</span></div>'
     +'<div class="kpi"><b>'+fmtMin(totalSec)+'</b><span>Übungszeit gesamt</span></div>'
     +'<div class="kpi"><b>'+(S.best.blitz||'–')+'</b><span>Rekord Sternschnuppe</span></div>'
+    +'<div class="kpi"><b>'+ds.sure+' / '+ds.open+'</b><span>Geteilt sicher (von den schon möglichen)</span></div>'
     +'</div>'
     +'<h2>Übungszeit, letzte 14 Tage (Minuten)</h2>'+chart
     +'<h2>Lern-Backlog: alle 100 Fakten</h2>'
@@ -2498,6 +2715,7 @@ function renderParent(){
     +'<div class="setrow"><label>Ton und Vorlesen</label><button class="toggle'+(S.sound?' on':'')+'" id="setSound" role="switch" aria-checked="'+S.sound+'" aria-label="Ton"><i></i></button></div>'
     +'<div class="setrow"><label>Vorlesen prüfen</label><button class="smallbtn" id="setVoiceTest">Stimme testen</button></div>'
     +'<div id="voiceDiag" style="font-size:12px;color:var(--muted);font-weight:600;margin:-4px 0 6px"></div>'
+    +'<div class="setrow"><label>Geteilt-Aufgaben (kommen erst, wenn die Malaufgabe dazu lila ist; zählen nicht für Inseln)</label><button class="toggle'+(S.divOn!==false?' on':'')+'" id="setDiv" role="switch" aria-checked="'+(S.divOn!==false)+'" aria-label="Geteilt"><i></i></button></div>'
     +'<div class="setrow"><label>Aufgaben pro Runde</label><div>'+[5,10,15].map(n=>'<button class="smallbtn" data-tc="'+n+'" style="'+(S.tasksPerRound===n?'background:var(--accent-soft)':'')+'">'+n+'</button>').join(' ')+'</div></div>'
     +'<h2>Sicherung</h2>'
     +'<p style="margin:2px 0;font-size:13px;color:var(--muted)">Einmal am Tag legt Lumi nach der ersten Runde eine Sicherungsdatei in den Download-Ordner (lumi-sicherung-Datum.json). Letzte Sicherung: '+(lastBackupDay()||'noch keine')+'</p>'
@@ -2516,6 +2734,7 @@ function renderParent(){
   $('setForceBlock').addEventListener('click',()=>{ forceBlockNext=BLOCK_MAX; $('setForceBlock').textContent='kommt'; });
   $('setName').addEventListener('change',e=>{ S.name=(e.target.value||'').trim()||'Du'; save(); });
   $('setSound').addEventListener('click',()=>{ S.sound=!S.sound; save(); renderParent(); });
+  $('setDiv').addEventListener('click',()=>{ S.divOn=(S.divOn===false); save(); renderParent(); });
   $('setVoiceTest').addEventListener('click',()=>{
     unlockSpeech(); speak('Hallo '+S.name+'! Ich bin Lumi. Hörst du mich?'); $('voiceDiag').textContent='Ich teste …';
     setTimeout(()=>{ const de=voices.filter(v=>/^de/i.test(v.lang)).length;
