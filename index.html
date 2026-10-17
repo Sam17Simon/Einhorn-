@@ -594,9 +594,9 @@ button.ctawait:active{transform:none;}
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=59"></script>
-<script src="game.js?v=59"></script>
-<script src="kawumm.js?v=59"></script>
+<script src="islands.js?v=60"></script>
+<script src="game.js?v=60"></script>
+<script src="kawumm.js?v=60"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -1928,7 +1928,7 @@ function nextGate(){
     eng.brake(); sndBrake();
     eng.spawnGates(t.opts,{hold:true});
     setTimeout(()=>{ if(!RN||!RN.riddle) return;
-      showFriend(t.icon, t.text, t.pic);
+      showFriend(t.icon, t.text, null);   // keine Bilder zum Abzählen: Romy soll rechnen, nicht zählen (Entscheidung Simon)
       speak(t.name+' fragt: '+t.text.replace(/^[^:]*:\s*/,'').replace(/[„“]/g,''));
       RN.t0=performance.now();
     },700);
