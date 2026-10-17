@@ -4,7 +4,7 @@
 (function(){
 'use strict';
 const P = window.PIXI;
-const VERSION='57';   // wird vom Release-Skript hochgezählt (Cache-Buster)
+const VERSION='58';   // wird vom Release-Skript hochgezählt (Cache-Buster)
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*t;
 const easeOut=t=>1-Math.pow(1-t,3);

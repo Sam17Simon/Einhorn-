@@ -183,7 +183,12 @@ button:focus-visible, input:focus-visible{outline:3px solid var(--accent); outli
 .islcard.away{position:relative;}
 .islcard.away > svg.isl{filter:saturate(.45) brightness(1.05); opacity:.7;}
 .islcard.away .isl-animal,.islcard.away .isl-zzz{display:none;}
-.islcard .awaytag{position:absolute; top:14px; left:50%; transform:translateX(-50%) rotate(-4deg); background:#FFF6E6; border:2px solid #EBCB94; border-radius:999px; padding:3px 12px; font-family:var(--font-disp); font-weight:700; font-size:15px; white-space:nowrap; box-shadow:0 3px 0 #EBCB94;}
+.islcard.away{box-shadow:none; cursor:default;}
+.islcard.away:active{transform:none;}
+.islcard .awaysign{position:absolute; left:50%; top:22%; transform:translate(-50%,-50%) rotate(-5deg); width:78%; text-align:center; background:#FFF6E6; border:3px solid #B9773F; border-radius:14px; padding:6px 6px 4px; box-shadow:0 4px 0 #B9773F; pointer-events:none;}
+.islcard .awaysign b{display:block; font-family:var(--font-disp); font-weight:700; font-size:clamp(18px,5.4vw,26px); line-height:1.05; color:var(--ink);}
+.islcard .awaysign span{display:block; font-size:clamp(16px,4.6vw,22px); line-height:1.2;}
+.islcard .awaysign::after{content:''; position:absolute; left:50%; bottom:-30px; width:7px; height:28px; margin-left:-3px; background:#B9773F; border-radius:3px; z-index:-1;}
 .islcard .ministars{margin-top:2px;}
 .isltitle{font-family:var(--font-disp); font-size:19px; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;}
 .islwrap{flex:1; overflow-y:auto; display:flex; flex-direction:column; align-items:center; gap:10px; padding-block:4px 30px;}
@@ -589,14 +594,15 @@ button.ctawait:active{transform:none;}
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=57"></script>
-<script src="game.js?v=57"></script>
-<script src="kawumm.js?v=57"></script>
+<script src="islands.js?v=58"></script>
+<script src="game.js?v=58"></script>
+<script src="kawumm.js?v=58"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
 const ROW_ORDER = [2,10,5,1,4,8,3,6,9,7];           // didaktische Reihenfolge: Kernreihen zuerst, 7 zuletzt
-const BOX_WEIGHT = [8,6,4,2.2,1.1,0.5];              // Auswahlgewicht je Leitner-Box 0..5
+const BOX_WEIGHT = [8,6,4,2.2,1.1,0.2];              // Auswahlgewicht je Leitner-Box 0..5 (Gold kommt nur noch selten, zur Wiederholung)
+const DONE_ROW_W = 0.6, NEW_ROW_W = 1.4;            // Niveau zieht an: sichere Reihen treten zurück, die neueste Insel kommt öfter
 const DUE_DAYS   = [0,0,1,2,4,8];                    // Wiedervorlage in Tagen je Box
 const FAST_MS = 4000;                                // "aus dem Kopf"-Schwelle
 const ROW_UNLOCK_MIN_BOX = 3, ROW_UNLOCK_SHARE = 0.8;
@@ -642,14 +648,21 @@ function isDue(f, now){
 }
 
 /* Gewichtete Aufgabenwahl. recentKeys: zuletzt gestellte (vermeiden). rng: ()=>[0,1) */
+/* Niveau zieht an (Entscheidung Simon): Was sicher sitzt, tritt zurück, neue schwerere Aufgaben rücken nach.
+   - Sitzt die 1er-Reihe (Urlaub), fliegt alles mit 1 raus: die 1er-Reihe und jedes "mal 1" in anderen Reihen.
+   - Reihen, deren Tier wach ist, kommen nur noch mit knapp halbem Gewicht (Wiederholung bleibt über isDue).
+   - Die neueste offene Insel bekommt fast das doppelte Gewicht. */
+function isRetired(state,r,b){ return onVacation(state,1) && (r===1 || b===1); }
 function pickTask(state, recentKeys, now, rng){
   rng = rng || Math.random;
-  const open = unlockedRows(state);
+  const open = unlockedRows(state), newest = open[open.length-1];
   const cand = [];
   for(const r of open){
+    const rowW = rowMastery(state,r)>=ROW_UNLOCK_SHARE ? DONE_ROW_W : (r===newest ? NEW_ROW_W : 1);
     for(let b=1;b<=10;b++){
+      if(isRetired(state,r,b)) continue;
       const k=factKey(r,b), f=state.facts[k];
-      let w = BOX_WEIGHT[f.box];
+      let w = BOX_WEIGHT[f.box]*rowW;
       if(isDue(f,now)) w*=2.2;
       if(f.no>f.ok) w*=1.6;                           // Stolperfakten anziehen
       if(recentKeys.includes(k)) w*=0.05;             // direkte Wiederholung vermeiden
@@ -773,7 +786,7 @@ function makeOptions(answer,a,b,rng){
 /* Reihen-Sprung: "…, 8, 12, ?" – nächste Zahl der Reihe finden */
 function seqQuestion(state,rng){
   rng=rng||Math.random;
-  const open=unlockedRows(state).filter(r=>r>1);
+  const open=unlockedRows(state).filter(r=>r>1 && !(r===10 && onVacation(state,10)));
   const row=open.length?open[Math.min(open.length-1,Math.floor(rng()*open.length))]:2;
   const k=3+Math.floor(rng()*8);              // Position 3..10
   const answer=k*row, shown=[(k-2)*row,(k-1)*row];
@@ -2026,24 +2039,26 @@ function renderPath(){
   $('mapStarCount').textContent=starsAvail();
   const el=$('pathList'); el.innerHTML='';
   if(window.KW) KW.mapCard(el);
+  const newAway=[];
   for(const r of ROW_ORDER){
     const facts=rowFacts(S,r);
     const stars=facts.map(f=> f.box>=5?starSVG('#F2B83C') : f.box>=3?starSVG('#9A6AE8') : f.seen>0?starSVG('#D9CFF0'):starSVG('#EEE8F8')).join('');
     const mastered=rowMastery(S,r)>=ROW_UNLOCK_SHARE, isOpen=open.includes(r), away=isOpen&&onVacation(S,r);
-    const b=document.createElement('button');
+    const b=document.createElement(away?'div':'button');   // im Urlaub: kein Knopf, keine Interaktion
     b.className='islcard'+(isOpen?'':' locked')+(away?' away':'');
     b.dataset.row=r;
     b.innerHTML=W.islandSVG(r,{open:isOpen, mastered, built:islandBuilt(r), size:200})
       +'<div class="nm">'+r+'er · '+W.ISLANDS[r].title+'</div>'
       +'<div class="ministars">'+stars+'</div>'
-      +(away?'<span class="awaytag">🧳 Im Urlaub</span>':'')
+      +(away?'<div class="awaysign"><b>Im Urlaub</b><span>🧳 🏖</span></div>':'')
       +'<div class="st">'+(away?FRIENDS[r][1]+' macht Urlaub. Du kannst die '+r+'er-Reihe schon!': mastered?FRIENDS[r][1]+' ist wach ✨': isOpen?FRIENDS[r][1]+' wartet auf dich': r===next?'Schaff die '+open[open.length-1]+'er-Insel, dann kommt diese':'Kommt später dran')+'</div>'
       +(isOpen&&!away&&window.KW?KW.badge(r):'');
-    if(away) b.addEventListener('click',()=>speak(vacationLine(r)));
+    if(away && !(S.vacSaid&&S.vacSaid[r])){ S.vacSaid=S.vacSaid||{}; S.vacSaid[r]=true; newAway.push(r); }   // Ansage nur ein einziges Mal
     else if(isOpen) b.addEventListener('click',()=>openIsland(r));
     else b.addEventListener('click',()=>{ speak(r===next?'Diese Insel taucht bald auf. Erst die '+open[open.length-1]+'er-Reihe schaffen!':'Diese Insel ist noch hinter den Wolken.'); });
     el.appendChild(b);
   }
+  if(newAway.length){ save(); const t=newAway.length===1?vacationLine(newAway[0]):newAway.map(r=>FRIENDS[r][1]).join(' und ')+' machen Urlaub! Du kannst die '+newAway.join('er- und die ')+'er-Reihe schon so gut, dass sie am Strand liegen und Eis essen.'; setTimeout(()=>speak(t),900); }
 }
 const ANIMAL_LINES={
   wait:['Hallo! Ich bin {n}. Übst du die {r}er-Reihe mit mir? Tipp mich an, dann sag ich dir, was noch fehlt.','Psst, ich warte hier auf dich. Schaffst du die {r}er-Reihe?','Die {r}er-Reihe macht mich ganz müde. Hilfst du mir?'],
@@ -2083,7 +2098,7 @@ function pickOne(a){ return a[Math.floor(Math.random()*a.length)]; }
 const VACATION_LINES=['{n} ist im Urlaub! Du kannst die {r}er-Reihe schon so gut, dass {n} am Strand liegt und Eis isst.','Hör mal, {n} macht Ferien. Die {r}er-Reihe kannst du ja schon!','{n} hat eine Postkarte geschickt: Liebe Grüße aus dem Urlaub! Die {r}er-Reihe kannst du schon.'];
 function vacationLine(r){ return pickOne(VACATION_LINES).replace(/\{n\}/g,FRIENDS[r][1]).replace(/\{r\}/g,r); }
 function openIsland(r){
-  if(onVacation(S,r)){ renderPath(); show('path'); speak(vacationLine(r)); return; }
+  if(onVacation(S,r)){ renderPath(); show('path'); return; }
   const W=IW(); ISL=r;
   const mastered=rowMastery(S,r)>=ROW_UNLOCK_SHARE;
   $('islTitle').textContent=r+'er · '+W.ISLANDS[r].title;

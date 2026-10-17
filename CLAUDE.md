@@ -37,7 +37,8 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 - Neue Ausbauten: in `BUILDS` zeichnen (80x80, Boden y=76) und in `ISLANDS[reihe].builds` eintragen. Es gibt genau drei Bauplätze je Insel.
 
 ## Urlaub für leichte Reihen (seit v57)
-- 1er und 10er (`VACATION_ROWS`) sind gesperrt, sobald sie sitzen (`onVacation`: Tier wach, 80 %). Inselkarte blass, ohne Tier, mit "🧳 Im Urlaub", Antippen sagt `vacationLine`, `openIsland` lässt nicht hinein. Kawumm überspringt diese Reihen in der Kette (`kwAvailable(kw, fwd, away)`), ihre Schatzkarte verschwindet. Aufgaben aus diesen Reihen kommen in den anderen Modi weiter vor. Entscheidung Simon.
+- 1er und 10er (`VACATION_ROWS`) sind gesperrt, sobald sie sitzen (`onVacation`: Tier wach, 80 %). Inselkarte blass, ohne Tier, mit großem Schild "Im Urlaub", keine Interaktion (Karte ist ein div). Ansage `vacationLine` nur ein einziges Mal (`S.vacSaid`), mehrere neue in einem Satz. `openIsland` lässt nicht hinein. Kawumm überspringt diese Reihen in der Kette (`kwAvailable(kw, fwd, away)`), ihre Schatzkarte verschwindet. Entscheidung Simon.
+- Niveau zieht an (`pickTask`): Sitzt die 1er, fliegt alles mit 1 raus (1er-Reihe und jedes "mal 1", `isRetired`). Reihen mit wachem Tier `DONE_ROW_W` 0.6, neueste Insel `NEW_ROW_W` 1.4, Gold-Fakten Gewicht 0.2. Wiederholung läuft weiter über `isDue`. Reihen-Sprung lässt 10er im Urlaub aus.
 
 ## Lumis Extras in Stufen (seit v31)
 - `ITEMS` in index.html: acht Extras mit je drei Stufen (`names`, `desc`, `crop`). Stand liegt in `S.gear` = {id: stufe}, `S.rewards` zählt eingelöste Geschenke. `S.items` ist nur noch Altlast (Zahl), `gearOf()` übersetzt alles.
