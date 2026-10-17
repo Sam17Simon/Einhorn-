@@ -4,7 +4,7 @@
 (function(){
 'use strict';
 const P = window.PIXI;
-const VERSION='62';   // wird vom Release-Skript hochgezählt (Cache-Buster)
+const VERSION='63';   // wird vom Release-Skript hochgezählt (Cache-Buster)
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*t;
 const easeOut=t=>1-Math.pow(1-t,3);
@@ -26,7 +26,7 @@ const G={
   clouds:[], sparks:[], portals:[], parts:[], amb:[],
   palette:null, paletteFrom:null, paletteT:1,
   lumi:null, lumiState:'ride', lumiT:0, phase:0, stateT:0, lane:1, laneX:0,
-  gatesActive:false, gateDeadline:null, held:false,
+  gatesActive:false, gateDeadline:null, held:false, blocked:false,   // blocked: Blockade liegt über den Toren, kein Tor-Tap zählt
   onPick:null, onArrive:null,
   shakeT:0, flashA:0, tweens:[], reduce:false, lastAmb:0, speedLines:[]
 };
@@ -294,11 +294,11 @@ G.spawnGates=function(values,opts){
   G.onWaitLong=opts.onWaitLong||null;
 };
 function clearPortals(){ G.portals.forEach(p=>p.destroy({children:true})); G.portals=[]; }
-function pick(lane){ if(!G.gatesActive||G.resolved) return; if(window.sndClick) window.sndClick('gate'); G.onPick&&G.onPick(lane); }
+function pick(lane){ if(!G.gatesActive||G.resolved||G.blocked) return; if(window.sndClick) window.sndClick('gate'); G.onPick&&G.onPick(lane); }
 /* Tap-Auswertung über die Position. Pixi trifft die Tor-Objekte selbst nicht zuverlässig,
    darum entscheidet hier immer der Abstand zum Tor bzw. zum Schild am Weltentor. */
 function onTap(e){
-  if(!G.gatesActive||G.resolved) return;
+  if(!G.gatesActive||G.resolved||G.blocked) return;
   const x=e.global.x, y=e.global.y;
   if(G.gate && G.gate.signs){
     let best=-1,bd=1e9;
@@ -311,6 +311,8 @@ function onTap(e){
   let best=null,bd=1e9; G.portals.forEach(p=>{ const d=Math.abs(p.x-x); if(d<bd){bd=d;best=p;} });
   if(best) pick(best.lane);
 }
+/* Blockade (index.html): kein Tor-Tap zählt, die Zahlen auf den Toren sind weg, damit nicht abgelesen statt gerechnet wird */
+G.setBlocked=function(on){ G.blocked=!!on; G.portals.forEach(p=>{ if(p.sign) p.sign.visible=!on; }); };
 G.resumeGates=function(ms){ G.hideGroups(); G.held=false; G.holdAt=null; const rest=1-(G.portals[0]?G.portals[0].t:0); G.gateDur=(ms||1200)/1000; G.targetSpeed=rest/G.gateDur; };
 function updPortals(dt){
   const pal=curPalette();
@@ -562,7 +564,7 @@ G.start=function(opts){
   if(G.fit) G.fit();
   G.worldName=opts.world||'wolken'; G.setWorld(G.worldName,true);
   if(opts.items!==undefined) G.setLumiItems(opts.items);
-  G.combo=0; G.speed=0; G.targetSpeed=0.1; G.held=false; G.gatesActive=false; G.resolved=false; G.lane=1; G.laneX=0;
+  G.combo=0; G.speed=0; G.targetSpeed=0.1; G.held=false; G.blocked=false; G.gatesActive=false; G.resolved=false; G.lane=1; G.laneX=0;
   clearPortals(); G.clearGate(); G.clouds.forEach(c=>c.destroy()); G.clouds=[]; G.sparks.forEach(c=>c.destroy()); G.sparks=[]; G.amb.forEach(c=>c.destroy()); G.amb=[];
   G.setLumiState('ride'); G.tweens=[]; G.lastAmb=4;
   for(let i=0;i<8;i++) spawnCloud(Math.random());

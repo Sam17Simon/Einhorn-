@@ -589,7 +589,6 @@ function kwStart(r, ret){
   map.style.setProperty('--kwring', world.ring||'#BFE7F7');
   map.style.backgroundPosition='0 0';
   $('kwTitle').textContent=world.name+' · '+r+'er';
-  $('kwStars').textContent=kws().stars||0;
   $('kwEnd').hidden=true;
   KR.seed=Math.floor(Math.random()*1e6)+1; KR.sx=KW_ST.x;
   { const p=$('kwPad'); if(p) p.remove(); }
@@ -602,14 +601,21 @@ function kwStart(r, ret){
   const open = world.say || kwPick(space?KW_LINES.startSpace:KW_LINES.startSea).replace('{name}',name);
   if(plan.superSpeed){
     KR.k=10; kwRenderStrip(); kwRenderLayerAt(10, true);
-    kwSayLine(open);
+    kwSayLine(kwNoStarsLine()+open);
     setTimeout(()=>{ if(!KR||KR.id!==my) return; kwSuperSpeed(); }, 2000);
   } else {
     kwRenderStrip();
     const how = 'Wir starten bei '+(10*r)+'. Immer '+kwNum(r)+' zurück. Wohin segeln wir?';
-    kwSay(open+' '+how);
+    kwSay(kwNoStarsLine()+open+' '+how);
     setTimeout(()=>{ if(!KR||KR.id!==my) return; kwStep(); }, 1000);
   }
+}
+/* Kawumm sammelt keine Sterne mehr, nur Schätze (Entscheidung Simon, Paket B). Wer früher Kawumm-Sterne gesehen hat,
+   hört das genau einmal in der Geschichte (Flag kw.noStarsSaid). Das alte Feld kw.stars bleibt liegen. */
+function kwNoStarsLine(){
+  const kw=kws(); if(kw.noStarsSaid || !(kw.stars>0)) return '';
+  kw.noStarsSaid=true; save();
+  return 'Übrigens: Echte Piraten sammeln keine Sterne. Wir sammeln nur Schätze! ';
 }
 /* Super-Speed: Kawumm überfliegt die ersten Stationen, die Zahlen leuchten dabei kurz auf */
 function kwSuperSpeed(){
@@ -723,7 +729,7 @@ function kwTypedDone(){
   $('kwTyped').textContent=correct?String(val):ans;
   $('kwTyped').classList.add(correct?'good':'again');
   const IN=$('kwLayerIn'), opts=IN.querySelectorAll('.kwopt'), ai=KR.opts.indexOf(ans), blk=IN.querySelector('.kwblock'), pad=$('kwPad');
-  if(correct){ sndGood(); $('kwStars').textContent=kws().stars||0; kwSayLine(kwPick(['Kawumm! Aus dem Kopf gewusst!','Ha! Da staunt '+B.c.name+'!','Richtig! Und tschüss, '+B.c.name+'!'])); }
+  if(correct){ sndGood(); kwSayLine(kwPick(['Kawumm! Aus dem Kopf gewusst!','Ha! Da staunt '+B.c.name+'!','Richtig! Und tschüss, '+B.c.name+'!'])); }
   else { sndAgain(); kwSayLine('Fast! Es ist die '+ans+'. Tschüss, '+B.c.name+'!'); }
   setTimeout(()=>{
     if(!KR||KR.id!==my) return;
@@ -741,7 +747,7 @@ function kwRecord(val, rt){
   const r=KR.r, k=KR.k, ans=(k-1)*r, correct=val===ans;
   kwApplyStep(KR.rs.steps[k], correct, rt);
   KR.steps++;
-  if(correct){ KR.ok++; const kw=kws(); kw.stars=(kw.stars||0)+1; } else KR.clean=false;   // eigene Kawumm-Sterne, getrennt von Lumis Sternen (Entscheidung Simon)
+  if(correct){ KR.ok++; } else KR.clean=false;   // keine Kawumm-Sterne mehr, der Schatz ist die Belohnung (Entscheidung Simon)
   if(rt>KW_FAST) KR.clean=false;
   save();   // nicht in die Mal-Statistik (Aufgaben und Trefferquote) zählen; die Spielzeit läuft über trackScreen weiter
   return correct;
@@ -753,7 +759,7 @@ function kwChoose(i){
   const correct=kwRecord(val, rt);
   const ai=KR.opts.indexOf(ans), btns=$('kwLayerIn').querySelectorAll('.kwopt');
   if(correct){
-    sndGood(); $('kwStars').textContent=kws().stars||0;
+    sndGood();
     const b=btns[ai].getBoundingClientRect(); burst(18,(b.left+b.width/2)/innerWidth,(b.top+b.height/2)/innerHeight,6);
     if(Math.random()<0.4) kwSayLine(kwPick(KW_LINES.ok));
     kwSail(ai,0);
@@ -829,7 +835,6 @@ function kwTreasure(ai){
       </svg>
       <h2>Schatz gefunden!</h2>
       <div style="display:flex;align-items:center;gap:8px">${kwBoxSVG(r, rs.finds, 96, false, rs.level)}<b>${Math.min(rs.finds,KW_CAP)} / ${KW_CAP}</b></div>
-      <div class="pill">⭐ ${KR.ok}</div>
       <div class="btnrow"><button class="kwbtn" id="kwEndVault">Schatzkammer</button><button class="kwbtn sec" id="kwEndAgain">Nochmal</button><button class="kwbtn sec" id="kwEndBack">Fertig</button></div>`;
     end.hidden=false;
     kwArm(end, 2000);
@@ -1054,5 +1059,6 @@ function kwSetup(){
   $('kwVaultBack').addEventListener('click',()=>{ if(kwVaultRet==='parent'){ renderParent(); show('parent'); } else { renderPath(); show('path'); } });
 }
 
-window.KW={setup:kwSetup, islandCard:kwIslandCard, mapCard:kwMapCard, badge:kwMapBadge, maybeLetter:kwMaybeLetter, parentHTML:kwParentHTML, parentWire:kwParentWire, stop:kwStop, active:kwActive};
+window.KW={setup:kwSetup, islandCard:kwIslandCard, mapCard:kwMapCard, badge:kwMapBadge, maybeLetter:kwMaybeLetter, parentHTML:kwParentHTML, parentWire:kwParentWire, stop:kwStop, active:kwActive,
+  dueRows:kwDueRows, voice:KW_VOICE, img:KW_IMG, say:kwSay};   // dueRows: Wegweiser; voice/img/say: Blockade im Wolkenflug
 }

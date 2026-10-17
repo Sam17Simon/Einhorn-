@@ -351,6 +351,41 @@ textarea.backup{width:100%; height:90px; border:2px solid var(--line); border-ra
 .combochip.hot{border-color:#F2B83C; background:#FFF4D6;}
 .combochip.hot .flame{filter:none; opacity:1; animation:flamepop .5s ease infinite alternate;}
 @keyframes flamepop{to{transform:scale(1.25) rotate(-6deg)}}
+/* Blockade: eine Figur legt sich über die Tore, Zahlenfeld kommt von unten (Paket B) */
+#blockRig{position:absolute; left:50%; top:45%; width:min(94%,440px); transform:translateX(-50%); z-index:4; pointer-events:none;}
+#blockRig .fig{animation:blkin .9s cubic-bezier(.3,1.4,.5,1) both;}
+#blockRig.bye .fig{animation:blkout .8s ease forwards;}
+#blockRig svg{display:block; width:100%; height:auto; overflow:visible;}
+#blockRig .idle{animation:blkbob 2.4s ease-in-out infinite; transform-box:fill-box; transform-origin:50% 90%;}
+#blockRig .arm{animation:blkwave 1.1s ease-in-out infinite alternate; transform-box:fill-box;}
+#blockRig .arm.l{transform-origin:100% 100%;} #blockRig .arm.r{transform-origin:0 100%; animation-delay:.4s;}
+#blockRig.kawumm{top:41%;}
+#blockRig .kwfig{position:relative; height:clamp(150px,26vh,220px);}
+#blockRig .kwfig .bar{position:absolute; left:0; right:0; top:52%; transform-origin:4% 50%; animation:blkbar 1s .35s cubic-bezier(.3,1.3,.5,1) both;}
+#blockRig .kwfig img{position:absolute; left:50%; bottom:0; height:100%; width:auto; transform:translateX(-50%); animation:blkhop .8s .9s ease both;}
+@keyframes blkin{from{transform:translateY(-140%) scale(.8); opacity:0}60%{opacity:1}}
+@keyframes blkout{to{transform:translateY(-150%) rotate(-8deg); opacity:0}}
+@keyframes blkbob{50%{transform:scale(1.03,.96)}}
+@keyframes blkwave{from{transform:rotate(-10deg)}to{transform:rotate(14deg)}}
+@keyframes blkbar{from{transform:rotate(-80deg)}to{transform:rotate(0)}}
+@keyframes blkhop{40%{transform:translateX(-50%) translateY(-14px)}}
+.blkpad{position:absolute; left:8px; right:8px; bottom:8px; z-index:6; background:rgba(255,255,255,.97); border:2px solid var(--line); border-radius:22px; padding:8px; box-shadow:0 4px 0 rgba(170,195,230,.5); transform:translateY(130%); transition:transform .55s cubic-bezier(.3,1.2,.5,1);}
+.blkpad.show{transform:none;}
+.blktop{display:flex; justify-content:center; padding:0 6px 6px;}
+.blktop b{min-width:96px; text-align:center; font-family:var(--font-disp); font-size:32px; line-height:1.1; color:var(--accent); border-bottom:4px solid var(--accent); font-variant-numeric:tabular-nums;}
+.blktop b.empty{color:var(--line);}
+.blktop b.good{color:var(--ok); border-color:var(--ok);}
+.blktop b.again{color:var(--warm); border-color:var(--warm);}
+.blkkeys{display:grid; grid-template-columns:repeat(6,1fr); gap:6px;}
+.blkkeys button{font-family:var(--font-disp); font-weight:700; font-size:26px; min-height:52px; border-radius:14px; background:var(--card); border:2px solid var(--line); box-shadow:0 3px 0 var(--line);}
+.blkkeys button:active{transform:translateY(2px); box-shadow:0 1px 0 var(--line);}
+.blkkeys .okkey{background:var(--accent); color:#fff; border-color:var(--accent); box-shadow:0 3px 0 #5C36A0;}
+.blkkeys .delkey{color:var(--muted); font-size:22px;}
+/* Wegweiser: der Modus, der jetzt am meisten hilft, leuchtet ruhig */
+.bigbtn.guide{border-color:#C7B0EE; box-shadow:0 3px 0 #D9C8F2, 0 0 0 4px rgba(124,77,204,.1); animation:guideglow 2.8s ease-in-out infinite;}
+.bigbtn.guide .em{animation:guideem 2.8s ease-in-out infinite;}
+@keyframes guideglow{0%,100%{box-shadow:0 3px 0 #D9C8F2, 0 0 0 0 rgba(124,77,204,0)}50%{box-shadow:0 3px 0 #D9C8F2, 0 0 0 7px rgba(124,77,204,.16)}}
+@keyframes guideem{50%{transform:scale(1.08)}}
 /* fliegender Stern */
 .starfly{position:fixed; z-index:60; width:30px; height:30px; pointer-events:none; transition:transform .55s cubic-bezier(.4,-0.2,.6,1), opacity .55s;}
 /* Mini-Lumi in der Aufgabenkarte */
@@ -474,7 +509,6 @@ button.ctawait:active{transform:none;}
       <button class="iconbtn" id="kwBack" aria-label="Zurück">←</button>
       <h1 class="isltitle" id="kwTitle"></h1>
       <div class="spacer"></div>
-      <div class="starchip"><svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 16.9 5.9 20.4l1.5-6.8L2.2 9l6.9-.7z" fill="#F2B83C"/></svg><span id="kwStars">0</span></div>
     </div>
     <div class="kwstrip" id="kwStrip"></div>
     <div class="kwmap" id="kwMap">
@@ -538,6 +572,8 @@ button.ctawait:active{transform:none;}
       <div class="runQ" id="runQ"><div class="qchip"></div><div id="runDots"></div></div>
       <div class="world" id="world">
         <div id="friendRig" hidden></div>
+        <div id="blockRig" hidden></div>
+        <div class="blkpad" id="blockPad" aria-hidden="true"><div class="blktop"><b id="blockAns">?</b></div><div class="blkkeys" id="blockKeys"></div></div>
         <div id="worldBanner"></div>
       </div>
     </div>
@@ -594,9 +630,9 @@ button.ctawait:active{transform:none;}
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=62"></script>
-<script src="game.js?v=62"></script>
-<script src="kawumm.js?v=62"></script>
+<script src="islands.js?v=63"></script>
+<script src="game.js?v=63"></script>
+<script src="kawumm.js?v=63"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -604,7 +640,9 @@ const ROW_ORDER = [2,10,5,1,4,8,3,6,9,7];           // didaktische Reihenfolge: 
 const BOX_WEIGHT = [8,6,4,2.2,1.1,0.35];             // Auswahlgewicht je Leitner-Box 0..5 (Gold kommt seltener, bleibt aber in der Wiederholung)
 const DONE_ROW_W = 0.8, NEW_ROW_W = 1.4;            // Niveau zieht an: sichere Reihen treten etwas zurück, die neueste Insel kommt öfter
 const DUE_DAYS   = [0,0,1,2,4,8];                    // Wiedervorlage in Tagen je Box
-const FAST_MS = 4000;                                // "aus dem Kopf"-Schwelle
+const FAST_MS = 4000;                                // "aus dem Kopf"-Schwelle beim Antippen (Tore, Auswahl)
+const TYPE_FAST_MS = 5000;                           // Eintippen braucht länger: bis 5 s gilt als aus dem Kopf (nur so wird ein Fakt lila)
+const CHOICE_MAX_BOX = 2;                            // Antippen einer Antwort (Tore, Auswahl) hebt höchstens bis Fach 2
 const ROW_UNLOCK_MIN_BOX = 3, ROW_UNLOCK_SHARE = 0.8;
 
 function factKey(a,b){ return a+'x'+b; }
@@ -613,7 +651,7 @@ function todayStr(ts){ const d=new Date(ts); return d.getFullYear()+'-'+String(d
 function defaultState(now){
   now = now || Date.now();
   const facts = {};
-  for(const r of ROW_ORDER) for(let b=1;b<=10;b++) facts[factKey(r,b)] = {box:0, seen:0, ok:0, no:0, last:0, rt:[]};
+  for(const r of ROW_ORDER) for(let b=1;b<=10;b++) facts[factKey(r,b)] = {box:0, seen:0, ok:0, no:0, last:0, rt:[], typed:0};   // typed: richtige, selbst eingetippte Antworten
   return {
     v:1, name:'Romy', sound:true, tasksPerRound:10,
     facts, stars:0, items:0, gear:{}, rewards:0,   // gear: {extra:stufe}, rewards: eingelöste Geschenke
@@ -691,20 +729,30 @@ function pickTask(state, recentKeys, now, rng){
   return {key:chosen.k, a:d1, b:d2, type, show:d1+' : '+d2, answer:ans, say:d1+' geteilt durch '+d2};
 }
 
-/* Ergebnis einarbeiten. correct:boolean, rt:ms */
-function applyResult(state, key, correct, rt, now){
+/* Ergebnis einarbeiten. correct:boolean, rt:ms, how: 'typed' (selbst eingetippt) oder 'choice' (Tor/Auswahl angetippt, auch Gesprochenes).
+   Lila (Fach 3+) heißt "kann es selbst abrufen" (Entscheidung Simon):
+   - Eingetippt richtig: zählt typed hoch. Bis TYPE_FAST_MS ein Fach rauf (auch 2 → 3), langsamer: unten +1, ab Fach 2 halten.
+     Eingetippt falsch: zurück in Fach 1 (wie bisher).
+   - Auswahl richtig: hebt höchstens bis Fach 2, schon lila Fakten bleiben, wo sie sind (kein Herabstufen fürs Nie-Getippt-Haben).
+     Auswahl falsch: höchstens ein Fach runter (Fach 4 → 3, Fach 1 bleibt 1). Ohne how gilt 'choice'. */
+function applyResult(state, key, correct, rt, now, how){
   const f = state.facts[key]; if(!f) return;
+  const typed = how==='typed';
   f.seen++; f.last=now;
   f.rt.push(Math.min(rt,20000)); if(f.rt.length>5) f.rt.shift();
   if(correct){
     f.ok++;
-    if(rt<=FAST_MS) f.box=Math.min(5,f.box+1);
-    else f.box=Math.min(5,Math.max(f.box, f.box<2? f.box+1 : f.box)); // langsam richtig: unten +1, oben halten
+    if(typed){
+      f.typed=(f.typed||0)+1;
+      if(rt<=TYPE_FAST_MS) f.box=Math.min(5,f.box+1);
+      else if(f.box<2) f.box++;                       // langsam richtig: unten +1, oben halten
+    }else if(f.box<CHOICE_MAX_BOX) f.box++;           // schnell oder langsam: unten +1, nie über Fach 2 hinaus
   }else{
-    f.no++; f.box = Math.max(0, Math.min(f.box,1)); // zurück in Box 1
+    f.no++;
+    f.box = typed ? Math.max(0, Math.min(f.box,1))    // zurück in Box 1
+                  : Math.max(Math.min(f.box,1), f.box-1);   // Auswahl: höchstens ein Fach runter, nie strenger als früher
   }
 }
-
 /* Tempo-Stufe eines Fakts: 'neu' (noch nie oder gerade erst gesehen), 'uebt', 'sicher'.
    Daraus entsteht der Zeitplan der Tore: wie lange sie anfliegen, ab wann sie kriechen, ob sie stehen bleiben. */
 function factStage(f){
@@ -734,11 +782,53 @@ function applyRide(state, row, misses, rts, now){
   for(let b=1;b<=10;b++){
     const k=factKey(row,b), f=state.facts[k]; if(!f) continue;
     const rt=(rts&&rts[b])||5000;
-    if(misses.includes(b)){ applyResult(state,k,false,rt,now); continue; }
+    if(misses.includes(b)){ applyResult(state,k,false,rt,now,'typed'); continue; }
     ok++; f.seen++; f.ok++; f.last=now;
     if(f.box<2) f.box++;
   }
   return {tasks:10, ok};
+}
+/* Blockade im Wolkenflug: eine Figur legt sich über die Tore, Romy tippt die Lösung selbst ein.
+   Ziel: Fach 2, noch nie eingetippt (bevorzugt, Gewicht 3), oder schon lila, aber nie eingetippt (Gewicht 1).
+   Nie neue oder wackelnde Fakten (Fach 0-1), nie ausgemusterte. Höchstens BLOCK_MAX pro Ritt. */
+const BLOCK_MAX = 3, BLOCK_P = 0.35;
+function blockWeight(f){ if(!f || f.seen===0 || (f.typed||0)>0) return 0; return f.box===2 ? 3 : f.box>=3 ? 1 : 0; }
+function pickBlockTarget(state, recentKeys, rng){
+  rng=rng||Math.random;
+  const cand=[]; let sum=0;
+  for(const r of unlockedRows(state)) for(let b=1;b<=10;b++){
+    if(isRetired(state,r,b)) continue;
+    const k=factKey(r,b); let w=blockWeight(state.facts[k]);
+    if(!w) continue;
+    if(recentKeys&&recentKeys.includes(k)) w*=0.05;
+    cand.push({k,r,b,w}); sum+=w;
+  }
+  if(!cand.length) return null;
+  let t=rng()*sum; for(const c of cand){ t-=c.w; if(t<=0) return c; }
+  return cand[cand.length-1];
+}
+/* Wegweiser: welcher Spielmodus hilft jetzt am meisten? Eine Regel für Startseite und Inseltier (nextIslandLine).
+   Gezählt wird auf der neuesten offenen Insel. kwDue: eine Kawumm-Karte ist fällig.
+   island   = 3+ neue Aufgaben: Inselritt (Reihe kennenlernen)
+   practice = mehr wackelnde (Fach 0-1, schon gesehen) als fast sichere (Fach 2): Zaubertraining
+   run      = 2+ Fach-2-Aufgaben noch nie eingetippt: Wolkenflug (dort kommen die Blockaden)
+   ship     = fällige Kawumm-Karte
+   sonst: Fach-2-Aufgaben übrig (schon getippt, aber zu langsam) → practice (schnell eintippen), sonst run. */
+const GUIDE_NEW = 3, GUIDE_UNTYPED = 2;
+function guideMode(state, kwDue){
+  const open=unlockedRows(state), row=open[open.length-1], facts=rowFacts(state,row);
+  const live=facts.filter((f,i)=>!isRetired(state,row,i+1));
+  const neu=live.filter(f=>f.seen===0).length;
+  const wackelt=live.filter(f=>f.seen>0&&f.box<=1).length;
+  const fast=live.filter(f=>f.box===2).length;
+  const untyped=live.filter(f=>f.box===2&&!(f.typed>0)).length;
+  const c={row, neu, wackelt, fast, untyped};
+  if(neu>=GUIDE_NEW) return Object.assign({mode:'island', why:'new'},c);
+  if(wackelt>fast) return Object.assign({mode:'practice', why:'shaky'},c);
+  if(untyped>=GUIDE_UNTYPED) return Object.assign({mode:'run', why:'untyped'},c);
+  if(kwDue) return Object.assign({mode:'ship', why:'kw'},c);
+  if(fast>0) return Object.assign({mode:'practice', why:'speed'},c);
+  return Object.assign({mode:'run', why:'fun'},c);
 }
 function avgRt(f){ return f.rt.length? Math.round(f.rt.reduce((s,x)=>s+x,0)/f.rt.length) : null; }
 
@@ -868,6 +958,7 @@ function upgradeState(p){
   if(!p.islands) p.islands={}; if(!p.spent) p.spent=0;
   if(!p.gear){ p.gear=gearOf(p.items||0); p.rewards=p.items||0; }   // alte Speicherung: jedes Extra auf Stufe 1
   if(!Array.isArray(p.unlocked)) rememberUnlocks(p);               // alter Stand: heutige Inseln merken
+  for(const k in p.facts){ const f=p.facts[k]; if(f && typeof f.typed!=='number') f.typed=0; }   // seit Paket B: selbst eingetippt (alte Stände: noch nie)
   return p;
 }
 function load(){
@@ -1012,7 +1103,7 @@ function sndClick(kind){
 }
 document.addEventListener('pointerdown',e=>{
   const b=e.target.closest('button'); if(!b) return;
-  if(b.closest('.pad')||b.closest('.kwkeys')) sndClick('pad');
+  if(b.closest('.pad')||b.closest('.kwkeys')||b.closest('.blkkeys')) sndClick('pad');
   else if(b.classList.contains('bigbtn')||b.classList.contains('cta')||b.classList.contains('rowbtn')||b.classList.contains('callbtn')) sndClick('big');
   else sndClick('small');
 },{passive:true});
@@ -1425,6 +1516,31 @@ function renderHome(){
   const todo=starsToNextGift(), pend=pendingRewards();
   $('giftInfo').textContent = pend>0 ? '🎁 Geschenk!' : todo===null ? '' : '🎁 noch '+todo+' ⭐';
   $('giftInfo').onclick = pend>0 ? ()=>showGiftChoice() : null;
+  // Wegweiser: der Modus, der jetzt am meisten hilft, leuchtet sanft (kein Zwang)
+  const gm=guideMode(S, kwDueNow());
+  for(const id of ['btnRun','btnPractice','btnPath']) $(id).classList.toggle('guide', id===GUIDE_BTN[gm.mode]);
+}
+/* ---------- Wegweiser (Startseite) ----------
+   Regel: guideMode im LOGIC-Block. Lumi sagt höchstens einmal pro App-Start einen Satz dazu, nur auf der Startseite. */
+const GUIDE_BTN={island:'btnPath', ship:'btnPath', practice:'btnPractice', run:'btnRun'};
+const GUIDE_LINES={
+  new:['Auf der {r}er-Insel warten neue Aufgaben. Komm, wir reiten dort den Inselritt!','Hast du die {r}er-Insel schon gesehen? Reite dort den Inselritt, dann lernst du die Reihe kennen.'],
+  shaky:['Ein paar Aufgaben wackeln noch. Im Zaubertraining üben wir sie ganz in Ruhe.','Heute passt das Zaubertraining gut. Da kannst du in Ruhe üben.'],
+  untyped:['Lust auf den Wolkenflug? Da legt sich manchmal jemand Freches auf die Tore!','Flieg mit mir im Wolkenflug! Vielleicht versperrt uns heute jemand den Weg.'],
+  kw:['Kawumm wartet an ihrem Schiff. Da liegt ein Schatz für dich!','Hör mal, Kawumm hat einen Schatz gefunden. Schau in der Inselwelt bei ihrem Schiff!'],
+  speed:['Im Zaubertraining kannst du die Ergebnisse ganz schnell eintippen. Dann werden die Sterne lila!'],
+  fun:['Fliegen wir eine Runde im Wolkenflug?','Ich hab Lust auf einen Wolkenflug. Du auch?']
+};
+function kwDueNow(){ try{ return !!(window.KW && KW.active() && KW.dueRows().length); }catch(e){ return false; } }
+let guideSaid=false;
+function maybeGuideSay(tries){
+  tries=tries||0;
+  if(guideSaid || current!=='home' || $('overlay').classList.contains('show')) return;
+  let busy=false; try{ busy=speechSynthesis.speaking||speechSynthesis.pending; }catch(e){}
+  if(busy && tries<8){ setTimeout(()=>maybeGuideSay(tries+1),700); return; }   // Lumis Begrüßung nicht abschneiden
+  guideSaid=true;
+  const gm=guideMode(S, kwDueNow());
+  speak(pickOne(GUIDE_LINES[gm.why]).replace('{r}',gm.row));
 }
 $('btnSound').addEventListener('click',()=>{ S.sound=!S.sound; save(); renderHome(); if(S.sound) speak('Ton an!'); });
 $('btnParent').addEventListener('click',openGate);
@@ -1493,24 +1609,25 @@ function padKey(k){ handleKey(k,false); }
 function handleKey(k,blitz){
   if(!R||R.locked||R.pending) return;
   if(k==='⌫'){ R.input=R.input.slice(0,-1); }
-  else if(k==='✓'){ if(R.input) submit(parseInt(R.input,10)); return; }
+  else if(k==='✓'){ if(R.input) submit(parseInt(R.input,10),'typed'); return; }
   else {
     if(R.input.length<3) R.input+=k;
     if(R.input.length>=String(R.task.answer).length){
       renderInput();
       const task=R.task, run=R; run.pending=true;       // letzte Ziffer kurz sichtbar, dann werten; keine weiteren Tasten
-      setTimeout(()=>{ if(R!==run) return; run.pending=false; if(run.task===task && !run.locked) submit(parseInt(run.input,10)); },180);
+      setTimeout(()=>{ if(R!==run) return; run.pending=false; if(run.task===task && !run.locked) submit(parseInt(run.input,10),'typed'); },180);
       return;
     }
   }
   renderInput();
 }
-function submit(val){
+/* how: 'typed' = über das Zahlenfeld eingetippt (kann lila machen), 'spoken' = über das Mikro erkannt (zählt wie eine Auswahl, höchstens Fach 2) */
+function submit(val, how){
   if(!R||R.locked) return;
   R.locked=true; stopAnswerRec();
   const rt=performance.now()-R.t0;
   const good = val===R.task.answer;
-  applyResult(S,R.task.key,good,rt,Date.now());
+  applyResult(S,R.task.key,good,rt,Date.now(), how==='typed'?'typed':'choice');
   logDay(S,Date.now(),0,1,good?1:0);
   const fb=$(R.mode==='blitz'?'bFeedback':'qFeedback');
   R.input=String(val); renderInput();
@@ -1642,10 +1759,10 @@ function startAnswerRec(){
   recWanted=true;
   rec=makeRec((nums,isFinal)=>{
     if(!R||R.locked) return;
-    if(nums.includes(R.task.answer)){ submit(R.task.answer); return; }
+    if(nums.includes(R.task.answer)){ submit(R.task.answer,'spoken'); return; }
     // Aufgabenzahlen (z. B. "sechs mal sieben" nachgesprochen) nicht als Antwort werten
     const cand=nums.filter(n=>n!==R.task.a&&n!==R.task.b);
-    if(isFinal && cand.length){ submit(cand[cand.length-1]); }
+    if(isFinal && cand.length){ submit(cand[cand.length-1],'spoken'); }
   },(err)=>{
     if(srBlocked){ setMicUI(); return; }
     if(recWanted){ setTimeout(()=>{ if(recWanted&&!srBlocked){ try{ rec&&rec.start(); }catch(e){} } },250); }  // iOS beendet gern: sanft neu starten
@@ -1658,7 +1775,7 @@ function setMicUI(){
   for(const [line,txt] of [['micLine','micText'],['bMicLine','bMicText']]){
     const l=$(line); if(!l) continue;
     if(srBlocked){ l.classList.remove('listening'); $(txt).textContent='Tippe die Zahl ein'; }
-    else if(recWanted){ l.classList.add('listening'); $(txt).textContent='Sag die Zahl – oder tippe sie'; }
+    else if(recWanted){ l.classList.add('listening'); $(txt).textContent='Sag die Zahl oder tippe sie'; }
     else { l.classList.remove('listening'); $(txt).textContent=''; }
   }
 }
@@ -1673,8 +1790,8 @@ function startRide(row){
   renderRide();
   $('btnRideMic').style.display = srBlocked?'none':'';
   $('rideHint').textContent = (window.Inselwelt?window.Inselwelt.ISLANDS[row].title+': ':'')+(srBlocked
-    ? 'Sag das Ergebnis laut – und tippe es ein.'
-    : 'Sag das Ergebnis laut – oder tippe es ein.');
+    ? 'Sag das Ergebnis laut und tippe es ein.'
+    : 'Sag das Ergebnis laut oder tippe es ein.');
   clearInterval(rideTick);
   rideTick=setInterval(()=>{ if(RD&&!RD.done) $('rideTimer').textContent=((performance.now()-RD.t0)/1000).toFixed(1).replace('.',',')+' s'; },100);
   speak('Inselritt! Die ganze '+row+'er-Reihe. Sag die Ergebnisse laut.',
@@ -1865,16 +1982,18 @@ async function startRun(){
     if(current!=='run') return;
   }
   RN={gate:0, n:RUN_GATES, ok:0, combo:0, bestCombo:0, stars:0, task:null, locked:false, recent:[], redo:[], metFriends:[],
-      first:(S.flights||0)===0, friends:masteredFriends(), worlds:shuffleArr(WORLD_KEYS).slice(0,3), wIdx:0};
+      first:(S.flights||0)===0, friends:masteredFriends(), worlds:shuffleArr(WORLD_KEYS).slice(0,3), wIdx:0,
+      blocks:0, block:null, forceBlock:forceBlockNext};
+  forceBlockNext=0;
   bumpStreak(S,Date.now());
   $('runStars').textContent='0'; $('comboN').textContent='0'; $('comboBar').style.width='0%';
   hideFriend(true);
   eng.start({world:RN.worlds[0], items:gearKey(S.gear)});
-  eng.onPick=(lane)=>{ if(RN&&!RN.locked) chooseGate(RN.task.opts[lane], lane); };
-  eng.onArrive=()=>{ if(RN&&!RN.locked) chooseGate(null, null); };
+  eng.onPick=(lane)=>{ if(RN&&!RN.locked&&!RN.block) chooseGate(RN.task.opts[lane], lane); };   // während der Blockade zählt kein Tor
+  eng.onArrive=()=>{ if(RN&&!RN.locked&&!RN.block) chooseGate(null, null); };
   renderRunDots();
   if(RN.first){
-    showFriend('✨','Tipp das Tor mit der richtigen Zahl – Lumi reitet hindurch!');
+    showFriend('✨','Tipp das Tor mit der richtigen Zahl, dann reitet Lumi hindurch!');
     speak('Steig auf, '+S.name+'! Tippe das Tor mit der richtigen Zahl, dann reitet Lumi hindurch. Lass dir Zeit!');
   }else{
     speak('Steig auf, '+S.name+'! '+WORLD_INFO[RN.worlds[0]].auf);
@@ -1938,7 +2057,19 @@ function nextGate(){
   const isWorldGate = (RN.gate%4===3) && RN.gate<RN.n-1;
   let t, riddle=false;
   const redoIdx=RN.redo.findIndex(x=>x.after<=RN.gate);
-  if(redoIdx>=0 && !isWorldGate){
+  RN.block=null; eng.blocked=false;
+  // Blockade: nie am Weltentor, nie im allerersten Ritt, nie direkt nach einem Fehler (Wiederholung), höchstens BLOCK_MAX
+  let blk=null;
+  if(!isWorldGate && redoIdx<0 && !RN.first && RN.gate>=1 && RN.blocks<BLOCK_MAX && (RN.forceBlock>0 || Math.random()<BLOCK_P)){
+    blk=pickBlockTarget(S, RN.recent);
+    if(!blk && RN.forceBlock>0){ const p=pickTask(S,RN.recent,Date.now()); const pr=p.key.split('x').map(Number); blk={k:p.key, r:pr[0], b:pr[1]}; }   // nur zum Ausprobieren (Elternbereich)
+  }
+  if(blk){
+    const sw=Math.random()<0.4, a=sw?blk.b:blk.r, b=sw?blk.r:blk.b;
+    t={kind:'fact', key:blk.k, answer:a*b, opts:makeOptions(a*b,a,b), show:a+' · '+b, a, b, block:true};
+    RN.recent.push(blk.k); if(RN.recent.length>4) RN.recent.shift();
+    setQ('', t.show+' = ?');
+  }else if(redoIdx>=0 && !isWorldGate){
     // dieselbe Aufgabe noch einmal, kurz nach dem Fehler
     const r=RN.redo.splice(redoIdx,1)[0];
     t={kind:'fact', key:r.key, answer:r.answer, opts:makeOptions(r.answer,r.a,r.b), show:r.show, a:r.a, b:r.b};
@@ -1959,6 +2090,7 @@ function nextGate(){
     setQ('Durch welches Tor, Lumi?', p.show+' = ?');
   }
   RN.task=t; RN.locked=false; RN.riddle=riddle; RN.isWorldGate=isWorldGate; RN.t0=performance.now();
+  if(t.block){ startBlock(t); return; }
   if(isWorldGate){
     // Vor dem Weltentor anhalten: Türen zu, Aufgabe hängt am Tor
     const next=RN.worlds[RN.wIdx+1];
@@ -1984,16 +2116,18 @@ function nextGate(){
   }
 }
 
-async function chooseGate(val, lane){
+/* how: 'typed' bei der Blockade (Zahl selbst eingetippt), sonst Tor angetippt ('choice', hebt höchstens bis Fach 2) */
+async function chooseGate(val, lane, how){
   if(!RN||RN.locked) return;
   RN.locked=true;
   const eng=G();
   const t=RN.task, rt=performance.now()-RN.t0, good=val===t.answer;
   const goodLane=t.opts.indexOf(t.answer);
+  const wasBlock=!!t.block;
   // Reihen-Sprünge sind Weiterzählen, keine Malaufgabe: sie ändern die Lernkartei und die Mal-Statistik nicht
   if(t.kind!=='seq'){
     if(val===null) applyTimeout(S, t.key, (RN.plan&&RN.plan.approachMs)||9000, Date.now());
-    else applyResult(S, t.key, good, rt, Date.now());
+    else applyResult(S, t.key, good, rt, Date.now(), how==='typed'?'typed':'choice');
     logDay(S,Date.now(),0,1,good?1:0);
   }
   if(RN.first && RN.gate===0) hideFriend();
@@ -2018,7 +2152,7 @@ async function chooseGate(val, lane){
     const msg = (val===null ? 'Hui, vorbeigeritten! ' : 'Fast! ')+(t.show? t.show+' = '+t.answer : 'Es war '+t.answer);
     if(wasRiddle){ friendSay('Macht nix! Es sind '+t.answer+'.'); }
     else setQ(msg,'');
-    if(!wasWorldGate) speak(sayIt);
+    if(!wasWorldGate && !wasBlock) speak(sayIt);
     if(t.kind==='fact' && t.show) RN.redo.push({key:t.key, answer:t.answer, a:t.a, b:t.b, show:t.show, after:RN.gate+3});
   }
   eng.setCombo(RN.combo);
@@ -2037,13 +2171,22 @@ async function chooseGate(val, lane){
     await wait(1500); if(!RN) return;
     nextGate(); return;
   }
+  if(wasBlock){
+    blockReact(good, t);
+    await wait(good?1300:2600); if(!RN) return;
+    hideBlock(false);
+    await wait(700); if(!RN) return;
+    eng.setBlocked(false); eng.launch(); sndWorld();
+    eng.resumeGates(1100);
+    await wait(1100); if(!RN) return;
+  }
   if(wasRiddle){
     await wait(good?900:1500); if(!RN) return;
     hideFriend(); eng.launch(); sndWorld();
     eng.resumeGates(1100);
     await wait(1100); if(!RN) return;
   }
-  await eng.resolve({goodLane, pickedLane:lane, good, worldgate:false});
+  await eng.resolve({goodLane, pickedLane:wasBlock?(good?goodLane:null):lane, good, worldgate:false});
   if(!RN) return;
   if(good){ eng.collectStar(); pling(); }
   await wait(good?350:900); if(!RN) return;
@@ -2051,10 +2194,94 @@ async function chooseGate(val, lane){
 }
 function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
 
+/* ---------- Blockade im Wolkenflug (Paket B) ----------
+   Eine Figur legt sich über die Tore, die Tore bleiben stehen (hold, kein Ablaufen, kein Timeout).
+   Romy tippt die Lösung ein, das zählt als getippt (applyResult 'typed', kann lila machen).
+   Kawumm, wenn sie schon da ist (KW.active), sonst Alien Plopp. Tor-Taps sind gesperrt (eng.blocked und RN.block). */
+let forceBlockNext=0;                       // Elternbereich / Ausprobieren: so viele Blockaden im nächsten Ritt erzwingen
+window.forceBlock=(n)=>{ forceBlockNext=n===undefined?BLOCK_MAX:n; return forceBlockNext; };
+const ALIEN_SVG=(()=>{ const I='#3B2A52', eye=(x,y,r)=>'<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="#fff" stroke="'+I+'" stroke-width="2.6"/><circle cx="'+(x+r*.2)+'" cy="'+(y+r*.1)+'" r="'+(r*.5)+'" fill="'+I+'"/><circle cx="'+(x+r*.4)+'" cy="'+(y-r*.2)+'" r="'+(r*.18)+'" fill="#fff"/>';
+  return '<svg viewBox="0 0 220 112" aria-hidden="true">'
+  +'<ellipse cx="110" cy="104" rx="98" ry="6" fill="'+I+'" opacity=".12"/>'
+  +'<g class="arm l"><path d="M30 74 Q12 66 12 44" stroke="'+I+'" stroke-width="13" fill="none" stroke-linecap="round"/><path d="M30 74 Q12 66 12 44" stroke="#8EDB6E" stroke-width="7.5" fill="none" stroke-linecap="round"/><circle cx="12" cy="40" r="6.5" fill="#8EDB6E" stroke="'+I+'" stroke-width="2.6"/></g>'
+  +'<g class="arm r"><path d="M190 76 Q208 68 208 48" stroke="'+I+'" stroke-width="13" fill="none" stroke-linecap="round"/><path d="M190 76 Q208 68 208 48" stroke="#8EDB6E" stroke-width="7.5" fill="none" stroke-linecap="round"/><circle cx="208" cy="44" r="6.5" fill="#8EDB6E" stroke="'+I+'" stroke-width="2.6"/></g>'
+  +'<g class="idle">'
+  +'<path d="M96 26 Q90 12 80 9 M124 26 Q130 12 140 9" stroke="'+I+'" stroke-width="3" fill="none" stroke-linecap="round"/>'
+  +'<circle cx="79" cy="8" r="6" fill="#F96D9B" stroke="'+I+'" stroke-width="2.6"/><circle cx="141" cy="8" r="6" fill="#FFE27A" stroke="'+I+'" stroke-width="2.6"/>'
+  +'<path d="M18 96 Q12 56 54 48 Q78 22 110 22 Q142 22 166 48 Q208 56 202 96 Q110 106 18 96 Z" fill="#8EDB6E" stroke="'+I+'" stroke-width="3.5" stroke-linejoin="round"/>'
+  +'<path d="M40 88 Q110 98 180 88" stroke="#6FC676" stroke-width="5" fill="none" stroke-linecap="round"/>'
+  +'<circle cx="46" cy="72" r="5" fill="#6FC676"/><circle cx="176" cy="76" r="6" fill="#6FC676"/><circle cx="186" cy="62" r="3.5" fill="#6FC676"/><circle cx="36" cy="84" r="3" fill="#6FC676"/>'
+  +eye(86,52,11)+eye(134,52,11)+eye(110,38,8.5)
+  +'<ellipse cx="66" cy="70" rx="8" ry="4.5" fill="#F96D9B" opacity=".45"/><ellipse cx="154" cy="70" rx="8" ry="4.5" fill="#F96D9B" opacity=".45"/>'
+  +'<path d="M92 68 Q110 90 128 68 Z" fill="'+I+'" stroke="'+I+'" stroke-width="2.6" stroke-linejoin="round"/><path d="M104 79 Q111 92 119 80 Z" fill="#F96D9B"/>'
+  +'</g></svg>'; })();
+const KW_BAR_SVG='<svg viewBox="0 0 220 26" aria-hidden="true"><rect x="4" y="4" width="212" height="18" rx="9" fill="#fff" stroke="#3B2A52" stroke-width="3"/>'
+  +[0,1,2,3,4,5].map(i=>'<path d="M'+(22+i*34)+' 5.5 h14 l-10 15 h-14 Z" fill="#E04A40"/>').join('')+'<circle cx="11" cy="13" r="7" fill="#F2B83C" stroke="#3B2A52" stroke-width="2.6"/></svg>';
+function blockFigure(){
+  if(window.KW && KW.active && KW.active()) return {id:'kawumm', voice:KW.voice,
+    html:'<div class="kwfig"><div class="bar">'+KW_BAR_SVG+'</div><img src="'+KW.img+'" alt=""></div>',
+    say:['Halt! Piratenkontrolle! Wer durch will, muss die Zahl wissen.','Kawumm! Hier ist zu! Nur mit der richtigen Zahl geht die Schranke auf.','Ahoi Lumi! Heute bin ich der Torwächter. Weißt du die Zahl?'],
+    ok:['Kawumm! Aus dem Kopf gewusst! Schranke auf!','Ha! Richtig! Ihr dürft durch.','Stimmt genau! Gute Fahrt, ihr zwei!'],
+    no:['Fast! Es ist {a}. Ich mach trotzdem auf.','Huch, knapp daneben. Es ist {a}. Na los, fliegt durch!']};
+  return {id:'alien', voice:{rate:1.1},
+    html:'<div class="idlewrap">'+ALIEN_SVG+'</div>',
+    say:['Hallo! Ich bin Plopp vom Glibberstern. Eure Tore sind so schön weich, ich bleib hier liegen!','Plopp! Gelandet! Ich mach hier Pause. Außer, du weißt die Zahl.','Ich bin ein Alien und kann nicht rechnen. Du vielleicht?'],
+    ok:['Wow! Du bist ja schlauer als mein Raumschiff! Tschüss!','Richtig! Dann flieg ich mal nach Hause. Plopp!','Stimmt! Ich mach Platz. Bis bald!'],
+    no:['Fast! Es ist {a}. Ich flieg trotzdem weiter.','Knapp daneben! Es ist {a}. Tschüss!']};
+}
+function buildBlockPad(){
+  const k=$('blockKeys'); if(k.childElementCount) return;
+  ['1','2','3','4','5','⌫','6','7','8','9','0','✓'].forEach(c=>{ const b=document.createElement('button'); b.textContent=c; b.dataset.noarm='';   // Zahlenfeld nie sperren (Antwortzeit)
+    if(c==='✓') b.className='okkey'; if(c==='⌫') b.className='delkey';
+    b.addEventListener('click',()=>blockKey(c)); k.appendChild(b); });
+}
+function startBlock(t){
+  const eng=G(), my=RN, fig=blockFigure();
+  RN.block={typed:'', ready:false, pending:false, fig}; RN.blocks++; RN.plan=null;
+  if(RN.forceBlock>0) RN.forceBlock--;
+  eng.brake(); sndBrake();
+  eng.spawnGates(t.opts,{hold:true});          // Tore stehen und warten, nichts läuft ab
+  eng.setBlocked(true);                         // Zahlen auf den Toren weg: Romy soll abrufen, nicht ablesen
+  buildBlockPad();
+  const a=$('blockAns'); a.textContent='?'; a.className='empty';
+  setTimeout(()=>{ if(RN!==my||!RN.block) return;
+    const r=$('blockRig'); r.className=fig.id; r.innerHTML='<div class="fig">'+fig.html+'</div>'; r.hidden=false;
+    if(fig.id==='alien'){ tone(880,.1,0,'sine',.06); tone(660,.12,.1,'sine',.06); tone(990,.16,.22,'sine',.06); }
+    else { tone(523,.1,0,'triangle',.08); tone(784,.16,.1,'triangle',.08); }
+  },700);
+  setTimeout(()=>{ if(RN!==my||!RN.block) return;
+    $('blockPad').classList.add('show'); $('blockPad').setAttribute('aria-hidden','false');
+    speak(pickOne(fig.say)+' Tipp die Zahl ein!', null, fig.voice);
+    // Antwortzeit erst messen, wenn das Zahlenfeld ganz zu sehen ist
+    setTimeout(()=>{ if(RN!==my||!RN.block) return; RN.block.ready=true; RN.t0=performance.now(); },560);
+  },1700);
+}
+/* Wie handleKey: genug Ziffern = nach 180 ms werten, richtig oder falsch. ✓ für kürzere Eingaben. */
+function blockKey(k){
+  if(!RN||!RN.block||!RN.block.ready||RN.block.pending||RN.locked) return;
+  const B=RN.block, ans=RN.task.answer, a=$('blockAns');
+  if(k==='⌫') B.typed=B.typed.slice(0,-1);
+  else if(k==='✓'){ if(B.typed){ B.pending=true; chooseGate(parseInt(B.typed,10), null, 'typed'); } return; }
+  else if(B.typed.length<3) B.typed+=k;
+  a.textContent=B.typed||'?'; a.className=B.typed?'':'empty';
+  if(B.typed.length>=String(ans).length){ B.pending=true; setTimeout(()=>{ if(RN&&RN.block===B&&!RN.locked) chooseGate(parseInt(B.typed,10), null, 'typed'); },180); }
+}
+function blockReact(good, t){
+  const B=RN&&RN.block; if(!B) return;
+  const a=$('blockAns'); a.textContent=good?B.typed:String(t.answer); a.className=good?'good':'again';
+  speak(good?pickOne(B.fig.ok):pickOne(B.fig.no).replace('{a}',t.answer), null, B.fig.voice);
+}
+function hideBlock(instant){
+  const r=$('blockRig'), p=$('blockPad'); if(!r||!p) return;
+  p.classList.remove('show'); p.setAttribute('aria-hidden','true');
+  if(instant){ r.hidden=true; r.innerHTML=''; return; }
+  r.classList.add('bye'); setTimeout(()=>{ if(r.classList.contains('bye')){ r.hidden=true; r.innerHTML=''; r.classList.remove('bye'); } },800);
+}
+
 function finishRun(){
   if(!RN) return;
   const eng=G();
-  hideFriend(true);
+  hideFriend(true); hideBlock(true);
   S.flights=(S.flights||0)+1;
   const ok=RN.ok, n=RN.n, best=RN.bestCombo, stars=RN.stars;
   const comboRecord = best>(S.best.combo||0);
@@ -2075,7 +2302,7 @@ function finishRun(){
   if(unlockedItem) setTimeout(()=>showItemOverlay(unlockedItem),1400);
   maybeRowParty();
 }
-function stopRun(){ RN=null; const eng=G(); if(eng&&eng.ready) eng.stop(); if($('friendRig')) hideFriend(true); }
+function stopRun(){ RN=null; const eng=G(); if(eng&&eng.ready){ eng.blocked=false; eng.stop(); } if($('friendRig')) hideFriend(true); hideBlock(true); }
 /* ---------- Mein Weg ---------- */
 function starSVG(fill){ return '<svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 16.9 5.9 20.4l1.5-6.8L2.2 9l6.9-.7z" fill="'+fill+'"/></svg>'; }
 const IW=()=>window.Inselwelt;
@@ -2117,22 +2344,25 @@ function islandLine(r){
 }
 /* Was fehlt bis zur nächsten Insel? Kindgerecht, mit Spieltipp. Wird gesagt, wenn man das Tier antippt.
    Regel: Die neueste offene Insel braucht 8 lila Sterne (Aufgaben in Box 3+), dann taucht die nächste auf.
-   Lila wird eine Aufgabe nur durch eine SCHNELLE richtige Antwort, darum der Tipp je nach Stand. */
+   Lila wird eine Aufgabe nur durch eine schnelle, selbst eingetippte Antwort (seit Paket B).
+   Der Tipp kommt aus guideMode (dieselbe Regel wie der Wegweiser auf der Startseite; Kawumm spielt hier keine Rolle). */
 function nextIslandLine(r){
   const open=unlockedRows(S), cur=open[open.length-1], next=nextLockedRow(S);
   if(next===null) return pickOne(['Alle Inseln sind schon offen! Jetzt kannst du alle Sterne golden machen.','Du hast alle Inseln geweckt! Schaffst du es, dass alle Sterne golden leuchten?']);
   const facts=rowFacts(S,cur), need=Math.ceil(ROW_UNLOCK_SHARE*10);
   const sure=facts.filter(f=>f.box>=ROW_UNLOCK_MIN_BOX).length, rest=Math.max(1,need-sure);
-  const neu=facts.filter(f=>f.seen===0).length;
-  const wackelt=facts.filter(f=>f.seen>0&&f.box<=1).length;
-  const fast=facts.filter(f=>f.box===2).length;
+  const gm=guideMode(S,false), fast=gm.fast;
   const nextName='die '+next+'er-Insel', nextFriend=FRIENDS[next][1];
   const where = r===cur ? 'auf meiner Insel' : 'auf der '+cur+'er-Insel';
-  let tip;
-  if(neu>=3) tip = r===cur ? 'Tipp: Reite den Inselritt hier bei mir. Da lernst du die ganze '+cur+'er-Reihe kennen.' : 'Tipp: Flieg zur '+cur+'er-Insel und reite dort den Inselritt.';
-  else if(wackelt>=fast && wackelt>0) tip='Tipp: Spiel das Zaubertraining. Da übst du ganz in Ruhe die Aufgaben, die noch wackeln.';
-  else tip='Tipp: Spiel den Wolkenflug und antworte ganz schnell aus dem Kopf. Dann werden die Sterne lila.';
-  const almost = fast>0 && fast>=rest ? ' Bei '+plural(fast,'Aufgabe','Aufgaben')+' fehlt nur noch eine schnelle Antwort!' : '';
+  const TIPS={
+    new: r===cur ? 'Tipp: Reite den Inselritt hier bei mir. Da lernst du die ganze '+cur+'er-Reihe kennen.' : 'Tipp: Flieg zur '+cur+'er-Insel und reite dort den Inselritt.',
+    shaky:'Tipp: Spiel das Zaubertraining. Da übst du ganz in Ruhe die Aufgaben, die noch wackeln.',
+    untyped:'Tipp: Spiel den Wolkenflug. Wenn sich jemand auf die Tore legt, tippst du die Zahl selbst ein. Dann werden die Sterne lila.',
+    speed:'Tipp: Spiel das Zaubertraining und tipp die Ergebnisse ganz schnell ein. Dann werden die Sterne lila.',
+    fun: gm.neu>0 ? 'Tipp: Spiel das Zaubertraining, da kommen auch die letzten neuen Aufgaben dran.' : 'Tipp: Spiel das Zaubertraining und tipp die Ergebnisse schnell ein.'
+  };
+  const tip=TIPS[gm.why]||TIPS.shaky;
+  const almost = fast>0 && fast>=rest ? ' Bei '+plural(fast,'Aufgabe','Aufgaben')+' fehlt nur noch eine schnelle Antwort, selbst eingetippt!' : '';
   const head = rest===1
     ? pickOne(['Nur noch 1 lila Stern '+where+', dann taucht '+nextName+' auf!','Fast geschafft! Noch 1 lila Stern '+where+', dann kommt '+nextName+'.'])
     : pickOne(['Noch '+rest+' lila Sterne '+where+', dann taucht '+nextName+' auf!','Weißt du was? Mit '+rest+' lila Sternen mehr '+where+' wacht '+nextName+' auf.']
@@ -2210,7 +2440,7 @@ function renderParent(){
   const maxSec=Math.max(60,...days.map(x=>x.e.sec));
   const tasks7=days.slice(7).reduce((s,x)=>s+x.e.tasks,0), ok7=days.slice(7).reduce((s,x)=>s+x.e.ok,0);
   const totalSec=Object.values(S.days).reduce((s,e)=>s+e.sec,0);
-  const mastered=masteredCount(S), gold=goldCount(S);
+  const mastered=masteredCount(S), gold=goldCount(S), typedN=Object.values(S.facts).filter(f=>f.typed>0).length;
   const fastFacts=Object.values(S.facts).filter(f=>f.box>=3&&f.rt.length);
   const avgFast=fastFacts.length? (fastFacts.reduce((s,f)=>s+avgRt(f),0)/fastFacts.length/1000).toFixed(1):'–';
 
@@ -2239,6 +2469,7 @@ function renderParent(){
     '<div class="kpis">'
     +'<div class="kpi"><b>'+mastered+' / 100</b><span>Fakten sicher (Box ≥ 3)</span></div>'
     +'<div class="kpi"><b>'+gold+'</b><span>davon blitzschnell (Gold)</span></div>'
+    +'<div class="kpi"><b>'+typedN+' / 100</b><span>schon selbst eingetippt</span></div>'
     +'<div class="kpi"><b>'+(tasks7?Math.round(ok7/tasks7*100)+' %':'–')+'</b><span>richtig, letzte 7 Tage</span></div>'
     +'<div class="kpi"><b>'+avgFast+' s</b><span>ø Antwortzeit (sichere Fakten)</span></div>'
     +'<div class="kpi"><b>'+fmtMin(totalSec)+'</b><span>Übungszeit gesamt</span></div>'
@@ -2250,6 +2481,7 @@ function renderParent(){
     +heat
     +'<h2>Bestzeiten Inselritt</h2><div class="besttimes">'+bests+'</div>'
     +'<h2>Kawumm (Rückwärtsreihen)</h2>'+(window.KW?KW.parentHTML():'')
+    +'<div class="setrow"><label>Wolkenflug: Blockade im nächsten Ritt (bis zu 3, ab dem 2. Tor). Figur: '+(window.KW&&KW.active()?'Kawumm':'Alien Plopp')+'</label><button class="smallbtn" id="setForceBlock">'+(forceBlockNext?'kommt':'erzwingen')+'</button></div>'
     +'<h2>Einstellungen</h2>'
     +'<div class="setrow"><label>Name des Kindes</label><input type="text" id="setName" value="'+S.name.replace(/"/g,'&quot;')+'"></div>'
     +'<div class="setrow"><label>Ton und Vorlesen</label><button class="toggle'+(S.sound?' on':'')+'" id="setSound" role="switch" aria-checked="'+S.sound+'" aria-label="Ton"><i></i></button></div>'
@@ -2270,6 +2502,7 @@ function renderParent(){
     +'</div><div id="bkMsg" style="font-size:13px;color:var(--muted);font-weight:700;"></div>';
 
   if(window.KW) KW.parentWire();
+  $('setForceBlock').addEventListener('click',()=>{ forceBlockNext=BLOCK_MAX; $('setForceBlock').textContent='kommt'; });
   $('setName').addEventListener('change',e=>{ S.name=(e.target.value||'').trim()||'Du'; save(); });
   $('setSound').addEventListener('click',()=>{ S.sound=!S.sound; save(); renderParent(); });
   $('setVoiceTest').addEventListener('click',()=>{
@@ -2347,8 +2580,8 @@ function init(){
   lastOpenCount=unlockedRows(S).length;
   if(window.KW) KW.setup();
   show('home');
-  if(!matchMedia('(prefers-reduced-motion: reduce)').matches) setTimeout(()=>playIntroOnce().then(()=>{ if(window.KW) KW.maybeLetter(); }), 150);
-  else if(window.KW) setTimeout(()=>KW.maybeLetter(), 600);
+  if(!matchMedia('(prefers-reduced-motion: reduce)').matches) setTimeout(()=>playIntroOnce().then(()=>{ if(window.KW) KW.maybeLetter(); setTimeout(maybeGuideSay,2200); }), 150);
+  else { if(window.KW) setTimeout(()=>KW.maybeLetter(), 600); setTimeout(maybeGuideSay,2500); }
 }
 const _boot=()=>init();
 (window.claude&&window.claude.hot&&window.claude.hot.ready)? window.claude.hot.ready(_boot) : _boot();

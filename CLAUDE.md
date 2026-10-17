@@ -69,7 +69,7 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 
 ## Nächste Insel (seit v34)
 - Tippt man auf der Insel das Tier an, sagt es `nextIslandLine(r)`: wie viele lila Sterne (Box 3+) auf der neuesten offenen Insel noch fehlen (8 von 10 nötig), welche Insel dann kommt und einen Spieltipp.
-- Tipp-Regel: viele neue Aufgaben (3+) → Inselritt; mehr wackelnde (Box 0-1) als fast sichere → Zaubertraining; sonst Wolkenflug mit schnellen Antworten (Box 2 → 3 nur bei schneller richtiger Antwort, siehe `applyResult`).
+- Tipp-Regel: kommt aus `guideMode` (siehe Wegweiser, seit v63), dieselbe Regel wie auf der Startseite. Box 2 → 3 nur bei schneller, selbst eingetippter Antwort (siehe Lila nur nach Eintippen).
 - Unter den Sternen der aktuellen Insel steht "x von 8 für die Ner-Insel". Elemente in `.islwrap` dürfen nicht schrumpfen (`flex-shrink:0`).
 
 ## Sicherung (seit v36)
@@ -83,7 +83,7 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 
 ## Kawumm: Rückwärtsreihen (seit v38, live seit v56 am 2026-10-17)
 - Alles in `kawumm.js` (vor dem Hauptskript geladen). Lernlogik oben zwischen KW-LOGIC-START/END, in Node testbar (`require('./kawumm.js')`). Bild: `assets/kawumm.png` (freigestellte Vorlage von Simon, nicht nachzeichnen). Spiegeln nur per CSS `scaleX(-1)`.
-- Eigene Sterne in `S.kw.stars`, getrennt von Lumis `S.stars` (Entscheidung Simon). Kawumm-Antworten zählen nicht in `S.days` tasks/ok (Mal-Statistik), nur die Spielzeit.
+- Keine Kawumm-Sterne mehr (seit v63, Entscheidung Simon): der Schatz ist die Belohnung. Kein Sternchip, keine Sterne am Ende. `S.kw.stars` bleibt als Altlast liegen, wird nicht mehr hochgezählt. Wer früher welche hatte, hört beim nächsten Start einmal `kwNoStarsLine` (Flag `S.kw.noStarsSaid`). Kawumm-Antworten zählen nicht in `S.days` tasks/ok (Mal-Statistik), nur die Spielzeit.
 - Live: `KW_LIVE = true` in kawumm.js (zurück auf false blendet alles wieder aus). Dann kommt beim Öffnen nach dem Intro einmal der Brief ("Post für Romy", Brief wird nicht vorgelesen, Romy liest selbst. Button "Ja, komm vorbei!" spätestens 3 s nach Öffnen (`KW_READ_MS`), hat `data-noarm`, damit `armCTAs` ihn nicht vorher blass sichtbar macht). Bis dahin sieht Romy nichts.
 - Elternbereich, Abschnitt Kawumm: Testmodus (nur bis Neustart), Brief ansehen, Schatzkammer, Stimme, Brief zurücksetzen, Kawumm-Stand löschen, je Reihe Starten und Stufe umschalten.
 - Stand liegt getrennt in `S.kw` = {joined, rows:{reihe:{stage:'sea'|'space', clean, runs, finds, steps:{k:{box,...}}}}}. Schritt k = von k·r nach (k-1)·r. Nie mit `S.facts` vermischen.
@@ -108,3 +108,23 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 - In der Schatzsuche keine Textblase unten, nur Sprache. Jeder Tipp auf einen Knopf bricht den laufenden Satz ab (`kwHush`, danach 150 ms bis zum nächsten Satz).
 - Gesprochene Texte: keine Laute ohne Vokal und keine gedehnten Buchstaben (Mmmh, Pssst, Juhuuu, Uiii). Die Sprachausgabe buchstabiert die. Stattdessen Lecker, Hör mal, Juhu, Ui.
 - Brieftext: frech und kurz, für Romy selbst lesbar. Nicht wieder brav machen.
+
+## Lila nur nach Eintippen (seit v63)
+- Lila (Fach 3+) heißt "kann es selbst abrufen". `applyResult(state,key,correct,rt,now,how)`: `how='typed'` (Zahlenfeld) oder `'choice'` (Tor, Auswahl, Gesprochenes; ohne `how` gilt `'choice'`).
+- Eingetippt richtig: `f.typed++`, bis `TYPE_FAST_MS` (5 s) ein Fach rauf (auch 2 → 3), langsamer: unten +1, ab Fach 2 halten. Eingetippt falsch: zurück in Fach 1.
+- Auswahl richtig: höchstens bis Fach 2 (`CHOICE_MAX_BOX`), lila Fakten bleiben (nie herabstufen fürs Nie-Getippt-Haben). Auswahl falsch: höchstens ein Fach runter (4 → 3, Fach 1 bleibt 1). Timeout weiter `applyTimeout` (eine Box runter).
+- Getippt buchen: Zaubertraining und Sternschnuppe (`submit(val,'typed')` aus `handleKey`), Blockade im Wolkenflug. Mikro im Zaubertraining: `submit(val,'spoken')` = Auswahl. Inselritt bleibt `applyRide` (höchstens Fach 2, kein `typed`, Fehler als `'typed'` zurück in Fach 1).
+- `typed` liegt in jedem Fakt, `defaultState` setzt 0, `upgradeState` rüstet alte Stände und Sicherungsdateien mit 0 nach. Elternbereich zeigt "schon selbst eingetippt".
+
+## Blockade im Wolkenflug (seit v63)
+- Ab und zu legt sich eine Figur über die Tore, die Tore stehen (`spawnGates(...,{hold:true})`, kein Ablaufen, kein Timeout), ihre Zahlen sind weg (`eng.setBlocked(true)`, sonst liest Romy ab), Zahlenfeld `#blockPad` kommt von unten, Romy tippt (`blockKey`, wie `handleKey`: volle Ziffernzahl → nach 180 ms werten, ✓ für kürzere). Antwort läuft über `chooseGate(val,null,'typed')`.
+- Ziel (`pickBlockTarget`, `blockWeight`): Fach 2 nie getippt (Gewicht 3) oder lila nie getippt (Gewicht 1). Nie Fach 0-1, nie ausgemustert. `BLOCK_MAX` 3 pro Ritt, je passendes Tor `BLOCK_P` 0.35. Nie am Weltentor, nie bei Rätseln oder Reihen-Sprüngen, nie bei einer Wiederholung nach Fehler, nie am ersten Tor, nie im allerersten Ritt.
+- Tor-Taps gesperrt doppelt: `G.blocked` in `onTap`/`pick` (game.js) und `RN.block` in `onPick`/`onArrive`. Antwortzeit `RN.t0` erst, wenn das Zahlenfeld ganz drin ist (`RN.block.ready`). Zahlenfeld hat `data-noarm`, nie sperren.
+- Figur (`blockFigure`): Kawumm (`KW.img`, Stimme `KW.voice`, mit Schranke), wenn `KW.active()`; sonst Alien Plopp (`ALIEN_SVG`, 220x112, grün, drei Augen). Pupstierchen ist für später reserviert. Ein gesprochener Satz, kein Text.
+- Zum Ausprobieren: Elternbereich unter Kawumm "Blockade erzwingen" oder `forceBlock(n)` im Fenster (gilt für den nächsten Ritt).
+
+## Wegweiser auf der Startseite (seit v63)
+- `guideMode(state, kwDue)` im LOGIC-Block, gezählt auf der neuesten offenen Insel: 3+ neue → `island` (Inselwelt); mehr wackelnd (Fach 0-1) als Fach 2 → `practice`; 2+ Fach-2 nie getippt → `run` (Blockaden); fällige Kawumm-Karte → `ship` (Inselwelt); Fach 2 schon getippt, aber zu langsam → `practice`; sonst `run`.
+- Der passende Knopf bekommt `.guide` (ruhiges Pulsieren, kein Gradient). Lumi sagt höchstens einmal pro App-Start einen Satz (`maybeGuideSay`, `GUIDE_LINES`), nur auf der Startseite, nicht über Kawumms Brief, wartet bis Lumis Begrüßung fertig ist.
+- `nextIslandLine` nimmt dieselbe Regel (`guideMode(S,false)`), keine eigene Logik mehr.
+
