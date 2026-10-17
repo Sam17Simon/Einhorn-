@@ -23,6 +23,10 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 - Tor-Taps werden in `onTap` (game.js) über die Position ausgewertet. Pixi trifft die Tor-Objekte selbst nicht zuverlässig.
 - Am Weltentor kommt nur eine Malaufgabe, kein Reihen-Sprung und kein Rätsel.
 - Rätselstopps im Wolkenflug zeigen keine Bilder zum Abzählen (`showFriend(..., null)`). Romy hat dort gezählt statt gerechnet. Das Punktefeld im Zaubertraining bleibt, es kommt nur nach einem Fehler mit der Lösung.
+- Eintippen ohne Ratelücke (seit v60): Sind so viele Ziffern getippt, wie die Lösung hat, wird nach 180 ms immer gewertet, richtig oder falsch (`handleKey` für Zaubertraining und Sternschnuppe, `rideKey` im Inselritt, wie `kwType`). ✓ nur für kürzere Eingaben. Während der 180 ms sperrt `pending` weitere Tasten.
+- Inseln gehen nie wieder zu (seit v60): `S.unlocked` merkt sich jede je offene Reihe, `rememberUnlocks` läuft in jedem `save()`. `unlockedRows(state)` = gemerkte Reihen plus Kette über 80 %. Alte Stände ohne `unlocked` bekommen den heutigen Stand (`upgradeState`, gilt auch für Sicherungsdateien). Urlaub (`onVacation`) hängt weiter an der aktuellen Beherrschung.
+- Reihen-Sprünge (`seqQuestion`) sind Weiterzählen, keine Malaufgabe: kein `applyResult`/`applyTimeout`, kein `logDay`. Sterne und Combo bleiben.
+- Inselritt bucht ehrlich (`applyRide`): Nur beim ersten Versuch Richtiges zählt (leichte Übung, Box höchstens bis 2), jede Aufgabe mit falscher Eingabe wird als Fehler gebucht (`RD.misses`, zurück in Box 1). `logDay` mit echten Zahlen. Falsch Gesprochenes im Ritt wird weiter ignoriert (Spracherkennung zu unsicher).
 
 ## Tempo im Wolkenritt (seit v29)
 - Das Tempo richtet sich nach dem einzelnen Fakt (`factStage` und `gatePlan` in index.html): neu = Tore fliegen 14 s an und bleiben dann stehen, bis getippt wird. Geübt = 9 bis 14 s je nach gemessener Antwortzeit, dann 6 s Kriechen. Sicher = 5,5 bis 9 s, dann 2,5 s Kriechen.
@@ -43,7 +47,7 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 
 ## Urlaub für leichte Reihen (seit v57)
 - 1er und 10er (`VACATION_ROWS`) sind gesperrt, sobald sie sitzen (`onVacation`: Tier wach, 80 %). Inselkarte blass, ohne Tier, mit großem Schild "Im Urlaub", keine Interaktion (Karte ist ein div). Ansage `vacationLine` nur ein einziges Mal (`S.vacSaid`), mehrere neue in einem Satz. `openIsland` lässt nicht hinein. Kawumm überspringt diese Reihen in der Kette (`kwAvailable(kw, fwd, away)`), ihre Schatzkarte verschwindet. Entscheidung Simon.
-- Niveau zieht an (`pickTask`): Sitzt die 1er, fliegt alles mit 1 raus (1er-Reihe und jedes "mal 1", `isRetired`). Reihen mit wachem Tier `DONE_ROW_W` 0.6, neueste Insel `NEW_ROW_W` 1.4, Gold-Fakten Gewicht 0.2. Wiederholung läuft weiter über `isDue`. Reihen-Sprung lässt 10er im Urlaub aus.
+- Niveau zieht an (`pickTask`): Sitzt die 1er, fliegt alles mit 1 raus (1er-Reihe und jedes "mal 1", `isRetired`). Reihen mit wachem Tier `DONE_ROW_W` 0.8, neueste Insel `NEW_ROW_W` 1.4, Gold-Fakten Gewicht 0.35 (seit v60: ganz neue Insel und fällige alte Reihen ergibt etwa 17 bis 19 % alte Aufgaben, vorher 12 bis 13 %). Wiederholung läuft weiter über `isDue`. Reihen-Sprung lässt 10er im Urlaub aus.
 
 ## Lumis Extras in Stufen (seit v31)
 - `ITEMS` in index.html: acht Extras mit je drei Stufen (`names`, `desc`, `crop`). Stand liegt in `S.gear` = {id: stufe}, `S.rewards` zählt eingelöste Geschenke. `S.items` ist nur noch Altlast (Zahl), `gearOf()` übersetzt alles.

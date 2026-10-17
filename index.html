@@ -594,15 +594,15 @@ button.ctawait:active{transform:none;}
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=61"></script>
-<script src="game.js?v=61"></script>
-<script src="kawumm.js?v=61"></script>
+<script src="islands.js?v=62"></script>
+<script src="game.js?v=62"></script>
+<script src="kawumm.js?v=62"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
 const ROW_ORDER = [2,10,5,1,4,8,3,6,9,7];           // didaktische Reihenfolge: Kernreihen zuerst, 7 zuletzt
-const BOX_WEIGHT = [8,6,4,2.2,1.1,0.2];              // Auswahlgewicht je Leitner-Box 0..5 (Gold kommt nur noch selten, zur Wiederholung)
-const DONE_ROW_W = 0.6, NEW_ROW_W = 1.4;            // Niveau zieht an: sichere Reihen treten zurück, die neueste Insel kommt öfter
+const BOX_WEIGHT = [8,6,4,2.2,1.1,0.35];             // Auswahlgewicht je Leitner-Box 0..5 (Gold kommt seltener, bleibt aber in der Wiederholung)
+const DONE_ROW_W = 0.8, NEW_ROW_W = 1.4;            // Niveau zieht an: sichere Reihen treten etwas zurück, die neueste Insel kommt öfter
 const DUE_DAYS   = [0,0,1,2,4,8];                    // Wiedervorlage in Tagen je Box
 const FAST_MS = 4000;                                // "aus dem Kopf"-Schwelle
 const ROW_UNLOCK_MIN_BOX = 3, ROW_UNLOCK_SHARE = 0.8;
@@ -621,6 +621,7 @@ function defaultState(now){
     streak:{len:0,last:''},
     best:{blitz:0, rows:{}},     // rows: reihe -> sekunden
     spent:0, islands:{},         // Sterne ausgegeben, Ausbauten je Insel: {reihe:[ids]}
+    unlocked:[ROW_ORDER[0]],     // einmal offene Inseln bleiben offen (rememberUnlocks)
     created: now
   };
 }
@@ -628,14 +629,20 @@ function defaultState(now){
 function rowFacts(state,row){ const out=[]; for(let b=1;b<=10;b++) out.push(state.facts[factKey(row,b)]); return out; }
 function rowMastery(state,row){ return rowFacts(state,row).filter(f=>f.box>=ROW_UNLOCK_MIN_BOX).length/10; }
 
-/* Freigeschaltete Reihen: Reihe i+1 öffnet, wenn Reihe i gemeistert ist. Mindestens eine offen. */
+/* Freigeschaltete Reihen: Reihe i+1 öffnet, wenn Reihe i gemeistert ist. Mindestens eine offen.
+   Einmal offen bleibt offen: state.unlocked merkt sich jede Insel, die je offen war (rememberUnlocks).
+   Fällt eine alte Reihe unter 80 %, geht keine Insel wieder zu. Ergebnis immer in ROW_ORDER-Reihenfolge. */
 function unlockedRows(state){
+  const keep=Array.isArray(state.unlocked)?state.unlocked:[];
   const open=[ROW_ORDER[0]];
   for(let i=0;i<ROW_ORDER.length-1;i++){
-    if(rowMastery(state,ROW_ORDER[i])>=ROW_UNLOCK_SHARE) open.push(ROW_ORDER[i+1]); else break;
+    const nx=ROW_ORDER[i+1];
+    if(keep.includes(nx) || rowMastery(state,ROW_ORDER[i])>=ROW_UNLOCK_SHARE) open.push(nx); else break;
   }
   return open;
 }
+/* Neu Freigeschaltetes dauerhaft eintragen (läuft bei jedem save). Alte Stände ohne unlocked bekommen so den heutigen Stand. */
+function rememberUnlocks(state){ state.unlocked=unlockedRows(state); return state.unlocked; }
 /* Urlaub (Entscheidung Simon): Die leichten Reihen 1 und 10 sind gesperrt, sobald sie sitzen (Tier wach).
    Das Tier fährt in den Urlaub, Inselscreen, Inselritt und Kawumms Schatzkarte dieser Reihe gibt es dann nicht mehr. */
 const VACATION_ROWS=[1,10];
@@ -717,6 +724,21 @@ function applyTimeout(state, key, budgetMs, now){
   f.seen++; f.last=now; f.no++;
   f.rt.push(Math.min(budgetMs,20000)); if(f.rt.length>5) f.rt.shift();
   f.box=Math.max(0,f.box-1);
+}
+/* Inselritt einbuchen: misses = Positionen b (1..10), bei denen im Ritt zuerst falsch getippt wurde.
+   Richtig beim ersten Versuch zählt als leichte Übung (ok, Box höchstens bis 2: der Ritt ist Weiterzählen
+   in der Reihe, das macht keinen Fakt lila). Ein Fehler wird als Fehler gebucht (applyResult, zurück in Box 1).
+   Liefert {tasks, ok} für logDay. */
+function applyRide(state, row, misses, rts, now){
+  let ok=0;
+  for(let b=1;b<=10;b++){
+    const k=factKey(row,b), f=state.facts[k]; if(!f) continue;
+    const rt=(rts&&rts[b])||5000;
+    if(misses.includes(b)){ applyResult(state,k,false,rt,now); continue; }
+    ok++; f.seen++; f.ok++; f.last=now;
+    if(f.box<2) f.box++;
+  }
+  return {tasks:10, ok};
 }
 function avgRt(f){ return f.rt.length? Math.round(f.rt.reduce((s,x)=>s+x,0)/f.rt.length) : null; }
 
@@ -841,13 +863,18 @@ function friendRiddle(state, rng, friends){
 /* ---------- Persistenz ---------- */
 const LS_KEY='einhorn1x1_v1';
 let S;
+/* Alte Stände nachrüsten (localStorage und Sicherungsdatei). */
+function upgradeState(p){
+  if(!p.islands) p.islands={}; if(!p.spent) p.spent=0;
+  if(!p.gear){ p.gear=gearOf(p.items||0); p.rewards=p.items||0; }   // alte Speicherung: jedes Extra auf Stufe 1
+  if(!Array.isArray(p.unlocked)) rememberUnlocks(p);               // alter Stand: heutige Inseln merken
+  return p;
+}
 function load(){
-  try{ const raw=localStorage.getItem(LS_KEY); if(raw){ const p=JSON.parse(raw); if(p&&p.v===1&&p.facts){ S=p; if(!S.islands) S.islands={}; if(!S.spent) S.spent=0;
-    if(!S.gear){ S.gear=gearOf(S.items||0); S.rewards=S.items||0; }   // alte Speicherung: jedes Extra auf Stufe 1
-    return; } } }catch(e){}
+  try{ const raw=localStorage.getItem(LS_KEY); if(raw){ const p=JSON.parse(raw); if(p&&p.v===1&&p.facts){ S=upgradeState(p); return; } } }catch(e){}
   S=defaultState();
 }
-function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(e){} }
+function save(){ try{ rememberUnlocks(S); localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(e){} }
 /* Tägliche Sicherungsdatei in den Download-Ordner. Downloads gehen nur direkt nach einem Fingertipp,
    darum hängt das an den Knöpfen des Rundenende-Screens. Höchstens eine Datei pro Tag. */
 const BK_KEY='einhorn_lastBackup';
@@ -1461,11 +1488,21 @@ function renderInput(){
   a.classList.toggle('empty',!R.input);
 }
 function padKey(k){ handleKey(k,false); }
+/* Genug Ziffern getippt (so viele, wie die Lösung hat): sofort werten, richtig oder falsch.
+   Sonst könnte man falsche Zahlen löschen und weiterraten, ohne dass ein Fehler zählt. ✓ für kürzere Eingaben. */
 function handleKey(k,blitz){
-  if(!R||R.locked) return;
+  if(!R||R.locked||R.pending) return;
   if(k==='⌫'){ R.input=R.input.slice(0,-1); }
   else if(k==='✓'){ if(R.input) submit(parseInt(R.input,10)); return; }
-  else { if(R.input.length<3) R.input+=k; if(parseInt(R.input,10)===R.task.answer && String(R.task.answer).length===R.input.length){ submit(R.task.answer); return; } }
+  else {
+    if(R.input.length<3) R.input+=k;
+    if(R.input.length>=String(R.task.answer).length){
+      renderInput();
+      const task=R.task, run=R; run.pending=true;       // letzte Ziffer kurz sichtbar, dann werten; keine weiteren Tasten
+      setTimeout(()=>{ if(R!==run) return; run.pending=false; if(run.task===task && !run.locked) submit(parseInt(run.input,10)); },180);
+      return;
+    }
+  }
   renderInput();
 }
 function submit(val){
@@ -1629,7 +1666,7 @@ function setMicUI(){
 /* ---------- Inselritt ---------- */
 let RD=null, rideTick=null;
 function startRide(row){
-  RD={row, idx:0, t0:performance.now(), done:false, input:'', errors:0};
+  RD={row, idx:0, t0:performance.now(), done:false, input:'', errors:0, misses:[], rts:{}, st:performance.now(), pending:false};
   bumpStreak(S,Date.now());
   buildPad($('ridePad'),rideKey);
   show('ride');
@@ -1641,22 +1678,30 @@ function startRide(row){
   clearInterval(rideTick);
   rideTick=setInterval(()=>{ if(RD&&!RD.done) $('rideTimer').textContent=((performance.now()-RD.t0)/1000).toFixed(1).replace('.',',')+' s'; },100);
   speak('Inselritt! Die ganze '+row+'er-Reihe. Sag die Ergebnisse laut.',
-    ()=>{ if(!RD) return; RD.t0=performance.now(); if(!srBlocked) startRideRec(); });
+    ()=>{ if(!RD) return; RD.t0=RD.st=performance.now(); if(!srBlocked) startRideRec(); });
 }
+/* Wie handleKey: genug Ziffern = sofort werten. Eine falsche vollständige Zahl ist ein Fehler für genau diese Aufgabe. */
 function rideKey(k){
-  if(!RD||RD.done) return;
+  if(!RD||RD.done||RD.pending) return;
   const expect=(RD.idx+1)*RD.row;
   if(k==='⌫'){ RD.input=RD.input.slice(0,-1); renderRideInput(); return; }
   if(k==='✓'){ if(RD.input) rideSubmit(parseInt(RD.input,10)); return; }
   if(RD.input.length<3) RD.input+=k;
-  if(parseInt(RD.input,10)===expect && String(expect).length===RD.input.length){ rideSubmit(expect); return; }
   renderRideInput();
+  if(RD.input.length>=String(expect).length){
+    const ride=RD, idx=RD.idx; ride.pending=true;
+    setTimeout(()=>{ if(RD!==ride) return; ride.pending=false; if(!ride.done && ride.idx===idx) rideSubmit(parseInt(ride.input,10)); },180);
+  }
 }
+function rideNote(){ const b=RD.idx+1; if(RD.rts[b]===undefined) RD.rts[b]=Math.round(performance.now()-RD.st); }
 function rideSubmit(val){
+  if(!RD||RD.done) return;
   const expect=(RD.idx+1)*RD.row;
+  rideNote();
   if(val===expect){ RD.input=''; sndGood(); rideAdvance(); }
   else{
     RD.errors++; RD.input=''; sndAgain();
+    if(!RD.misses.includes(RD.idx+1)) RD.misses.push(RD.idx+1);
     const c=document.querySelector('.cloud.next');
     if(c){ c.classList.add('wiggle'); setTimeout(()=>c&&c.classList.remove('wiggle'),650); }
     renderRideInput();
@@ -1682,7 +1727,7 @@ function renderRide(){
 }
 function rideAdvance(){
   if(!RD||RD.done) return;
-  RD.idx++; RD.input='';
+  RD.idx++; RD.input=''; RD.st=performance.now();
   if(RD.idx>=10) finishRide(); else { renderRide(); }
 }
 function startRideRec(){
@@ -1693,7 +1738,7 @@ function startRideRec(){
     let moved=false;
     for(const n of nums){
       const expect=(RD.idx+1)*RD.row;
-      if(n===expect){ RD.idx++; RD.input=''; moved=true; if(RD.idx>=10){ finishRide(); return; } }
+      if(n===expect){ rideNote(); RD.idx++; RD.input=''; RD.st=performance.now(); moved=true; if(RD.idx>=10){ finishRide(); return; } }
     }
     if(moved){ sndGood(); renderRide(); }
   },()=>{ if(recWanted&&!srBlocked){ setTimeout(()=>{ if(recWanted&&!srBlocked){ try{ rec&&rec.start(); }catch(e){} } },250); } else setRideMicUI(); });
@@ -1714,9 +1759,9 @@ function finishRide(){
   const clean=RD.errors===0;
   const record=clean && (!prev||ms<prev);
   if(record) S.best.rows[RD.row]=Math.round(ms);
-  // Ritt zählt als leichte Übung für die ganze Reihe
-  for(let b=1;b<=10;b++){ const f=S.facts[factKey(RD.row,b)]; f.seen++; f.ok++; f.last=Date.now(); if(f.box<2) f.box++; }
-  S.stars+=3; logDay(S,Date.now(),0,10,10);
+  // Nur beim ersten Versuch Richtiges zählt (leichte Übung), Fehler werden als Fehler gebucht
+  const res=applyRide(S, RD.row, RD.misses, RD.rts, Date.now());
+  S.stars+=3; logDay(S,Date.now(),0,res.tasks,res.ok);
   const unlockedItem=checkItemUnlock();
   save();
   renderRide();
@@ -1945,9 +1990,12 @@ async function chooseGate(val, lane){
   const eng=G();
   const t=RN.task, rt=performance.now()-RN.t0, good=val===t.answer;
   const goodLane=t.opts.indexOf(t.answer);
-  if(val===null) applyTimeout(S, t.key, (RN.plan&&RN.plan.approachMs)||9000, Date.now());
-  else applyResult(S, t.key, good, rt, Date.now());
-  logDay(S,Date.now(),0,1,good?1:0);
+  // Reihen-Sprünge sind Weiterzählen, keine Malaufgabe: sie ändern die Lernkartei und die Mal-Statistik nicht
+  if(t.kind!=='seq'){
+    if(val===null) applyTimeout(S, t.key, (RN.plan&&RN.plan.approachMs)||9000, Date.now());
+    else applyResult(S, t.key, good, rt, Date.now());
+    logDay(S,Date.now(),0,1,good?1:0);
+  }
   if(RN.first && RN.gate===0) hideFriend();
   const wasRiddle=RN.riddle, wasWorldGate=RN.isWorldGate;
   if(good){
@@ -2241,7 +2289,7 @@ function renderParent(){
   $('bkFileBtn').addEventListener('click',()=>$('bkFile').click());
   $('bkFile').addEventListener('change',async e=>{
     const f=e.target.files&&e.target.files[0]; if(!f) return;
-    try{ const p=JSON.parse(await f.text()); if(p&&p.v===1&&p.facts){ S=p; if(!S.islands) S.islands={}; if(!S.spent) S.spent=0; if(!S.gear){ S.gear=gearOf(S.items||0); S.rewards=S.items||0; } save(); renderParent(); $('bkMsg').textContent='Lernstand aus der Datei geladen.'; } else throw 0; }
+    try{ const p=JSON.parse(await f.text()); if(p&&p.v===1&&p.facts){ S=upgradeState(p); save(); renderParent(); $('bkMsg').textContent='Lernstand aus der Datei geladen.'; } else throw 0; }
     catch(err){ $('bkMsg').textContent='Das ist keine Lumi-Sicherungsdatei.'; }
   });
   $('bkExport').addEventListener('click',()=>{ $('backupTa').value=JSON.stringify(S); $('bkMsg').textContent='Stand steht im Feld.'; });
@@ -2251,7 +2299,7 @@ function renderParent(){
     catch(e){ $('backupTa').focus(); $('backupTa').select(); $('bkMsg').textContent='Bitte manuell kopieren (Text ist markiert).'; }
   });
   $('bkImport').addEventListener('click',()=>{
-    try{ const p=JSON.parse($('backupTa').value); if(p&&p.v===1&&p.facts){ S=p; save(); renderParent(); $('bkMsg').textContent='Lernstand geladen.'; } else throw 0; }
+    try{ const p=JSON.parse($('backupTa').value); if(p&&p.v===1&&p.facts){ S=upgradeState(p); save(); renderParent(); $('bkMsg').textContent='Lernstand geladen.'; } else throw 0; }
     catch(e){ $('bkMsg').textContent='Das sieht nicht nach einem Lernstand aus.'; }
   });
   let resetArmed=false;
