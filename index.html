@@ -180,6 +180,10 @@ button:focus-visible, input:focus-visible{outline:3px solid var(--accent); outli
 .islcard .nm{font-family:var(--font-disp); font-weight:700; font-size:17px; line-height:1.15;}
 .islcard .st{font-size:12px; color:var(--muted); font-weight:700;}
 .islcard.locked{opacity:.75;}
+.islcard.away{position:relative;}
+.islcard.away > svg.isl{filter:saturate(.45) brightness(1.05); opacity:.7;}
+.islcard.away .isl-animal,.islcard.away .isl-zzz{display:none;}
+.islcard .awaytag{position:absolute; top:14px; left:50%; transform:translateX(-50%) rotate(-4deg); background:#FFF6E6; border:2px solid #EBCB94; border-radius:999px; padding:3px 12px; font-family:var(--font-disp); font-weight:700; font-size:15px; white-space:nowrap; box-shadow:0 3px 0 #EBCB94;}
 .islcard .ministars{margin-top:2px;}
 .isltitle{font-family:var(--font-disp); font-size:19px; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;}
 .islwrap{flex:1; overflow-y:auto; display:flex; flex-direction:column; align-items:center; gap:10px; padding-block:4px 30px;}
@@ -585,9 +589,9 @@ button.ctawait:active{transform:none;}
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=56"></script>
-<script src="game.js?v=56"></script>
-<script src="kawumm.js?v=56"></script>
+<script src="islands.js?v=57"></script>
+<script src="game.js?v=57"></script>
+<script src="kawumm.js?v=57"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -626,6 +630,10 @@ function unlockedRows(state){
   }
   return open;
 }
+/* Urlaub (Entscheidung Simon): Die leichten Reihen 1 und 10 sind gesperrt, sobald sie sitzen (Tier wach).
+   Das Tier fährt in den Urlaub, Inselscreen, Inselritt und Kawumms Schatzkarte dieser Reihe gibt es dann nicht mehr. */
+const VACATION_ROWS=[1,10];
+function onVacation(state,r){ return VACATION_ROWS.includes(r) && rowMastery(state,r)>=ROW_UNLOCK_SHARE; }
 function nextLockedRow(state){ const u=unlockedRows(state); return ROW_ORDER.find(r=>!u.includes(r)) ?? null; }
 
 function isDue(f, now){
@@ -2021,16 +2029,18 @@ function renderPath(){
   for(const r of ROW_ORDER){
     const facts=rowFacts(S,r);
     const stars=facts.map(f=> f.box>=5?starSVG('#F2B83C') : f.box>=3?starSVG('#9A6AE8') : f.seen>0?starSVG('#D9CFF0'):starSVG('#EEE8F8')).join('');
-    const mastered=rowMastery(S,r)>=ROW_UNLOCK_SHARE, isOpen=open.includes(r);
+    const mastered=rowMastery(S,r)>=ROW_UNLOCK_SHARE, isOpen=open.includes(r), away=isOpen&&onVacation(S,r);
     const b=document.createElement('button');
-    b.className='islcard'+(isOpen?'':' locked');
+    b.className='islcard'+(isOpen?'':' locked')+(away?' away':'');
     b.dataset.row=r;
     b.innerHTML=W.islandSVG(r,{open:isOpen, mastered, built:islandBuilt(r), size:200})
       +'<div class="nm">'+r+'er · '+W.ISLANDS[r].title+'</div>'
       +'<div class="ministars">'+stars+'</div>'
-      +'<div class="st">'+(mastered?FRIENDS[r][1]+' ist wach ✨': isOpen?FRIENDS[r][1]+' wartet auf dich': r===next?'Schaff die '+open[open.length-1]+'er-Insel, dann kommt diese':'Kommt später dran')+'</div>'
-      +(isOpen&&window.KW?KW.badge(r):'');
-    if(isOpen) b.addEventListener('click',()=>openIsland(r));
+      +(away?'<span class="awaytag">🧳 Im Urlaub</span>':'')
+      +'<div class="st">'+(away?FRIENDS[r][1]+' macht Urlaub. Du kannst die '+r+'er-Reihe schon!': mastered?FRIENDS[r][1]+' ist wach ✨': isOpen?FRIENDS[r][1]+' wartet auf dich': r===next?'Schaff die '+open[open.length-1]+'er-Insel, dann kommt diese':'Kommt später dran')+'</div>'
+      +(isOpen&&!away&&window.KW?KW.badge(r):'');
+    if(away) b.addEventListener('click',()=>speak(vacationLine(r)));
+    else if(isOpen) b.addEventListener('click',()=>openIsland(r));
     else b.addEventListener('click',()=>{ speak(r===next?'Diese Insel taucht bald auf. Erst die '+open[open.length-1]+'er-Reihe schaffen!':'Diese Insel ist noch hinter den Wolken.'); });
     el.appendChild(b);
   }
@@ -2070,7 +2080,10 @@ function nextIslandLine(r){
   return done+head+friend+almost+' '+tip;
 }
 function pickOne(a){ return a[Math.floor(Math.random()*a.length)]; }
+const VACATION_LINES=['{n} ist im Urlaub! Du kannst die {r}er-Reihe schon so gut, dass {n} am Strand liegt und Eis isst.','Hör mal, {n} macht Ferien. Die {r}er-Reihe kannst du ja schon!','{n} hat eine Postkarte geschickt: Liebe Grüße aus dem Urlaub! Die {r}er-Reihe kannst du schon.'];
+function vacationLine(r){ return pickOne(VACATION_LINES).replace(/\{n\}/g,FRIENDS[r][1]).replace(/\{r\}/g,r); }
 function openIsland(r){
+  if(onVacation(S,r)){ renderPath(); show('path'); speak(vacationLine(r)); return; }
   const W=IW(); ISL=r;
   const mastered=rowMastery(S,r)>=ROW_UNLOCK_SHARE;
   $('islTitle').textContent=r+'er · '+W.ISLANDS[r].title;

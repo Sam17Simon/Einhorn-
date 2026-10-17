@@ -31,10 +31,13 @@ function kwRowState(kw, r){
 function kwRowSafe(rs){ return rs ? Object.values(rs.steps).filter(s=>s.box>=KW_SAFE_BOX).length : 0; }
 /* Offene Schatzkarten. Eine neue kommt nur, wenn BEIDES stimmt:
    die Karte davor ist im Meer geschafft (Stufe Weltall erreicht) UND die eigene Vorwärtsreihe sitzt halbwegs. */
-function kwAvailable(kw, fwdShare){
-  const out=[KW_ORDER[0]];
-  for(let i=1;i<KW_ORDER.length;i++){
-    const prev=kw.rows[KW_ORDER[i-1]], r=KW_ORDER[i];
+function kwAvailable(kw, fwdShare, away){
+  // Reihen im Urlaub (1er und 10er, sobald sie sitzen) fallen aus der Kette heraus
+  const order=KW_ORDER.filter(r=>!(away&&away(r)));
+  if(!order.length) return [];
+  const out=[order[0]];
+  for(let i=1;i<order.length;i++){
+    const prev=kw.rows[order[i-1]], r=order[i];
     if(prev && prev.stage==='space' && fwdShare(r)>=KW_FWD_SHARE) out.push(r); else break;
   }
   return out;
@@ -148,7 +151,7 @@ let kwDueSaid=false;
 function kws(){ if(!S.kw) S.kw=kwDefault(); return S.kw; }
 function kwActive(){ return kwTest || (KW_LIVE && kws().joined); }
 function kwFwd(r){ return rowMastery(S,r); }
-function kwAvail(){ return kwAvailable(kws(), kwFwd); }
+function kwAvail(){ return kwAvailable(kws(), kwFwd, r=>typeof onVacation==='function'&&onVacation(S,r)); }
 /* Vorlesen. Jeder neue Tipp bricht den laufenden Satz ab (kwHush). Nach einem Abbruch 150 ms warten, sonst verschluckt Chrome den nächsten Satz. */
 let kwHushAt=0;
 function kwSay(t,cb){ const wait=150-(Date.now()-kwHushAt); if(wait>0) setTimeout(()=>speak(t,cb,KW_VOICE),wait); else speak(t,cb,KW_VOICE); }
