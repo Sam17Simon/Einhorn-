@@ -691,6 +691,8 @@ button.kwwait:active{transform:none;}
 .kwvault > *{flex-shrink:0;}
 .kwhead{display:flex; align-items:center; gap:10px; width:100%; max-width:460px;}
 .kwhead img{height:90px; width:auto;}
+.kwsouvliese{position:absolute; right:10px; top:-58px; height:96px; animation:kwLieseIn .9s ease-out .6s both; pointer-events:none;}
+@keyframes kwLieseIn{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:none;}}
 .kwhead .bub{display:none; flex:1; background:#fff; border:2px solid var(--line); border-radius:18px; padding:8px 12px; font-weight:700; font-size:15px;}
 .kwshelf{display:grid; grid-template-columns:repeat(2,1fr); gap:12px; width:100%; max-width:460px; background:#EAD7B4; border:3px solid #C9A26B; border-radius:24px; padding:12px;}
 .kwslot{background:#FFF8EC; border:2px solid #E2C795; border-radius:18px; padding:6px 6px 8px; display:flex; flex-direction:column; align-items:center; gap:2px; text-align:center;}
@@ -734,7 +736,7 @@ button.kwwait:active{transform:none;}
 .kwbottle{animation:kwbottle 2.4s ease-in-out infinite;}
 @keyframes kwbottle{50%{transform:translateY(-3px) rotate(4deg)}}
 .kwmailmini{font-size:22px; padding:6px 12px;}
-.kwsouvshelf{width:100%; max-width:460px; background:#DCEAF5; border:3px solid #9ED3EA; border-radius:24px; padding:10px 12px 12px;}
+.kwsouvshelf{width:100%; max-width:460px; background:#DCEAF5; border:3px solid #9ED3EA; border-radius:24px; padding:10px 12px 12px; position:relative; margin-top:44px;}
 .kwsouvtitle{font-family:var(--font-disp); font-weight:700; font-size:18px; text-align:center; margin-bottom:6px; color:${KW_INK};}
 .kwsouvgrid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
 .kwsouv{background:#fff; border:2px solid #BFE0F2; border-radius:16px; padding:6px 4px; display:flex; flex-direction:column; align-items:center; gap:2px; min-height:96px; justify-content:center;}
@@ -1099,7 +1101,7 @@ function kwOpenVault(ret, popRow, o){
   const kw=kws(), av=kwAvail();
   const total=KW_ORDER.reduce((s,r)=>s+(kw.rows[r]?(kw.rows[r].level||0)*KW_CAP+kw.rows[r].finds:0),0);
   const w=$('kwVault');
-  let h='<div class="kwhead"><img src="'+KW_IMG+'" alt="Kawumm"><div class="bub" id="kwVaultBub"></div></div><div class="kwshelf">';
+  let h='<div class="kwhead"><img src="'+KW_IMG+'" alt="Kawumm">'+'<div class="bub" id="kwVaultBub"></div></div><div class="kwshelf">';
   for(const r of KW_ORDER){
     const rs=kw.rows[r], open=av.includes(r)||!!(rs&&rs.finds), n=rs?rs.finds:0, lv=rs?(rs.level||0):0;
     h+='<button class="kwslot'+(open?'':' locked')+(popRow===r?' pop':'')+'" data-r="'+r+'">'+kwBoxSVG(r,n,120,!open,lv)
@@ -1107,7 +1109,7 @@ function kwOpenVault(ret, popRow, o){
   }
   h+='</div>';
   // Andenken von Kawumms Reisen: eigenes Regal (seit v64)
-  h+='<div class="kwsouvshelf"><div class="kwsouvtitle">Andenken</div><div class="kwsouvgrid">';
+  h+='<div class="kwsouvshelf">'+(o.liese?'<img class="kwsouvliese" src="'+KW_LIESE+'" alt="Liese">':'')+'<div class="kwsouvtitle">Andenken</div><div class="kwsouvgrid">';
   for(let i=0;i<KW_TRIP_N;i++){
     const have=kw.souvenirs.includes(i), T=KW_TRIPS[i];
     h+='<button class="kwsouv'+(have?'':' locked')+(o.popSouv===i?' pop':'')+'" data-souv="'+i+'">'+(have?kwSouvSVG(T.souv):'<span class="q">?</span>')+(have?'<span class="nm">'+T.souvName+'</span>':'')+'</button>';
@@ -1321,7 +1323,9 @@ function kwComeBack(o){
   const T=KW_TRIPS[m.t], name=S.name||'Romy';
   kwShowMail(m, {onClose:()=>{
     bigKnall(); sndFanfare();
-    kwOpenVault(o.parent?'parent':'path', null, {popSouv:m.t, say:'Kawumm! Da bin ich wieder, '+name+'! Schau mal, mein Andenken '+T.from+': '+T.souvName+'! Es steht jetzt in der Schatzkammer.'});
+    // Liese steht mit in der Schatzkammer, wenn sie in einem Brief dieser Reise vorkam
+    const liese=kw.mail.some(x=>x.t===m.t && (kwMailText(x,name)||{}).liese);
+    kwOpenVault(o.parent?'parent':'path', null, {popSouv:m.t, liese, say:'Kawumm! Da bin ich wieder, '+name+'!'+(liese?' Und Liese ist auch mitgekommen!':'')+' Schau mal, mein Andenken '+T.from+': '+T.souvName+'! Es steht jetzt in der Schatzkammer.'});
   }});
 }
 /* Inselwelt, während Kawumm unterwegs ist: leerer Anleger mit Flaschenpost, nur der Briefkasten */
@@ -1507,5 +1511,5 @@ function kwSetup(){
 window.KW={setup:kwSetup, islandCard:kwIslandCard, mapCard:kwMapCard, badge:kwMapBadge, maybeLetter:kwMaybeLetter, parentHTML:kwParentHTML, parentWire:kwParentWire, stop:kwStop, active:kwActive,
   dueRows:kwDueRows, voice:KW_VOICE, img:KW_IMG, say:kwSay,   // dueRows: Wegweiser; voice/img/say: Blockade im Wolkenflug
   away:kwIsAway, mailBtn:kwMailBtn, mailbox:kwShowMailbox, roundEnd:kwRoundEnd,   // Kawumm auf Reisen (seit v64)
-  run:()=>KR};   // laufende Schatzsuche (nur zum Prüfen)
+  run:()=>KR, comeBack:kwComeBack};   // run, comeBack: nur zum Prüfen
 }
