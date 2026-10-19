@@ -295,7 +295,9 @@ function kwMailText(m, name){
   if(m.k==='bye'){ lines.push(KW_COMEBACK); if(m.tip) lines.push(m.tip); }
   if(m.k==='back') lines.push('Komm zum Schiff!');
   const sub=s=>s.replace(/\{name\}/g, name||'Romy');
-  return {head:'AHOI '+(name||'Romy')+'!', lines:lines.map(sub), ps:part.ps?sub(part.ps):''};
+  const out={head:'AHOI '+(name||'Romy')+'!', lines:lines.map(sub), ps:part.ps?sub(part.ps):''};
+  out.liese=/Liese/.test(out.lines.join(' ')+' '+out.ps);   // Liese kommt vor: kleines Bild im Brief
+  return out;
 }
 
 if(typeof module!=='undefined' && module.exports){
@@ -308,6 +310,7 @@ if(typeof document!=='undefined'){
 
 const KW_INK='#3B2A52';
 const KW_IMG='assets/kawumm.png?v=1';
+const KW_LIESE='assets/liese.png?v=1';                // Liese (Vorlage von Simon, freigestellt), nur in Briefen, in denen sie vorkommt
 const KW_VOICE={rate:1.12, pitch:1.0, alt:true};    // natürliche Tonhöhe, etwas schneller und frecher als Lumi (Lumi: Tonhöhe 1.14, Tempo 1.04)
 let kwTest=false;                                    // Testmodus aus dem Elternbereich, gilt bis zum Neustart
 let KR=null;                                         // laufende Schatzsuche
@@ -708,6 +711,7 @@ button.kwwait:active{transform:none;}
 .kwpaper.in{transform:none; opacity:1;}
 .kwpaper .sig{display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-top:6px;}
 .kwpaper .sig img{height:54px;}
+.kwpaper .kwliese{float:right; height:92px; margin:0 0 4px 8px; shape-outside:margin-box;}
 .kwpaper .ps{font-size:15px; color:var(--muted); margin-top:2px;}
 .kwpaper .ps{font-size:15px; color:var(--muted); margin-top:2px;}
 .kwyes{opacity:0; transform:scale(.6); transition:opacity .4s, transform .4s cubic-bezier(.3,1.4,.5,1); pointer-events:none; background:#E04A40; box-shadow:0 4px 0 #A8322B;}
@@ -1184,7 +1188,7 @@ function kwInviteText(name){
   return {head:'AHOI '+name+'!', lines:['Rate mal, wer schreibt. Genau. ICH!','Du rettest mit Lumi die Inseln? Ohne mich?! Frechheit!','Ich hab Schatzkarten. Total verrückte. Die liest man rückwärts. Wie ein Krebs!','Lumi zählt immer nur vorwärts. Gähn!','Ich wette, du kannst rückwärts. Darf ich kommen? Ich bring Kekse mit. Vielleicht.'], ps:'Sagst du Nein, schick ich dir eine Möwe.'};
 }
 function kwPaperHTML(x){
-  return '<b>'+x.head+'</b><br>'+x.lines.join('<br>')+'<div class="sig"><b>KAWUMM!</b> <img src="'+KW_IMG+'" alt=""></div>'+(x.ps?'<div class="ps">PS: '+x.ps+'</div>':'');
+  return (x.liese?'<img class="kwliese" src="'+KW_LIESE+'" alt="Liese">':'')+'<b>'+x.head+'</b><br>'+x.lines.join('<br>')+'<div class="sig"><b>KAWUMM!</b> <img src="'+KW_IMG+'" alt=""></div>'+(x.ps?'<div class="ps">PS: '+x.ps+'</div>':'');
 }
 function kwShowLetter(fromParent){
   const name=S.name||'Romy';
