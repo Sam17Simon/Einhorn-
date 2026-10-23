@@ -118,10 +118,21 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 
 ## Blockade im Wolkenflug (seit v63)
 - Ab und zu legt sich eine Figur über die Tore, die Tore stehen (`spawnGates(...,{hold:true})`, kein Ablaufen, kein Timeout), ihre Zahlen sind weg (`eng.setBlocked(true)`, sonst liest Romy ab), Zahlenfeld `#blockPad` kommt von unten, Romy tippt (`blockKey`, wie `handleKey`: volle Ziffernzahl → nach 180 ms werten, ✓ für kürzere). Antwort läuft über `chooseGate(val,null,'typed')`.
-- Ziel (`pickBlockTarget`, `blockWeight`): Fach 2 nie getippt (Gewicht 3) oder lila nie getippt (Gewicht 1). Nie Fach 0-1, nie ausgemustert. `BLOCK_MAX` 3 pro Ritt, je passendes Tor `BLOCK_P` 0.35. Nie am Weltentor, nie bei Rätseln oder Reihen-Sprüngen, nie bei einer Wiederholung nach Fehler, nie am ersten Tor, nie im allerersten Ritt.
+- Ziel (`pickBlockTarget`, `blockWeight`): jede Aufgabe in Fach 2 (Gewicht 3, auch wenn schon einmal zu langsam getippt, seit v69; vorher fiel sie für immer raus und war im Wolkenflug nie mehr lila zu kriegen), lila nie getippt nur noch Gewicht 0.5. Neueste Insel mal 3 (`BLOCK_NEWEST_W`). Nie Fach 0-1, nie ausgemustert. `BLOCK_MAX` 3 pro Ritt, je passendes Tor `BLOCK_P` 0.45, aber mit Abstand: mindestens `BLOCK_GAP` 2 normale Tore dazwischen, nie direkt nach dem Weltentor. Nie am Weltentor, nie bei Reihen-Sprüngen, nie bei einer Wiederholung nach Fehler, nie am ersten Tor, nie im allerersten Ritt.
+- Antwortzeit der Blockade (seit v69): Die Uhr startet neu, wenn die Figur fertig gesprochen hat und noch nichts getippt ist. Vorher lief sie während des Satzes (4 bis 5 s) und kaum etwas wurde unter 5 s lila.
+- Neuer lila Stern in der Blockade (seit v69): Die Figur sagt es ruhig (`fig.lila`, "ein lila Stern für die 4er-Insel"), Zahl wird lila, kleiner Ton, es geht erst nach dem Satz weiter (höchstens 9 s).
 - Tor-Taps gesperrt doppelt: `G.blocked` in `onTap`/`pick` (game.js) und `RN.block` in `onPick`/`onArrive`. Antwortzeit `RN.t0` erst, wenn das Zahlenfeld ganz drin ist (`RN.block.ready`). Zahlenfeld hat `data-noarm`, nie sperren.
 - Figur (`blockFigure`): Kawumm (`KW.img`, Stimme `KW.voice`, mit Schranke), wenn `KW.active()` und nicht auf Reisen (`KW.away()`); sonst Alien Plopp (`ALIEN_SVG`, 220x112, grün, drei Augen). Pupstierchen ist für später reserviert. Ein gesprochener Satz, kein Text.
 - Zum Ausprobieren: Elternbereich unter Kawumm "Blockade erzwingen" oder `forceBlock(n)` im Fenster (gilt für den nächsten Ritt).
+
+## Ruhe im Wolkenflug (seit v69, Entscheidung Simon)
+- Zu hektisch. Rätsel-Freunde sind aus (`RUN_RIDDLES = false`, Code bleibt). Reihen-Sprünge nur noch 10 % (`RUN_SEQ_P`, vorher ca. 23 %). Blockaden mit Abstand (`BLOCK_GAP`).
+
+## Lila Sterne am Rundenende (seit v69)
+- `lilaStart()` beim Start von Wolkenflug, Zaubertraining, Sternschnuppe, `lilaEnd()` am Ende: zeigt in `#endLila` je Insel die neuen lila Sterne mit Aufgabe, Lumi hängt einen Satz an ("Und du hast 2 lila Sterne für die 4er-Insel gesammelt! Jetzt hast du 6 von 8."). Zählung nur, wenn in der Runde keine Insel aufging (dann feiert `maybeRowParty`). Logik `lilaSnap`, `lilaGain` im LOGIC-Block. Inselritt macht nie lila, dort ausgeblendet.
+
+## Ausgemusterte zählen als lila (seit v69)
+- `rowMastery`: Ist die 1er im Urlaub, zählt "mal 1" jeder Reihe als lila (kommt nie mehr dran). Vorher brauchte z. B. die 4er-Insel 8 von nur 9 möglichen Aufgaben. Auch die Sterne auf Insel und Inselscreen zeigen sie lila. `rowSure` = reine Zählung (für die 1er selbst, keine Rekursion über `onVacation`).
 
 ## Wegweiser auf der Startseite (seit v63)
 - `guideMode(state, kwDue)` im LOGIC-Block, gezählt auf der neuesten offenen Insel: 3+ neue → `island` (Inselwelt); mehr wackelnd (Fach 0-1) als Fach 2 → `practice`; 2+ Fach-2 nie getippt → `run` (Blockaden); fällige Kawumm-Karte → `ship` (Inselwelt, nie während Kawumms Reise); Fach 2 schon getippt, aber zu langsam → `practice`; sonst `run`.

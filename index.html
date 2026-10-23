@@ -243,6 +243,11 @@ button:focus-visible, input:focus-visible{outline:3px solid var(--accent); outli
 .endcard{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; flex:1; text-align:center;}
 .endcard h2{font-family:var(--font-disp); font-size:clamp(28px,6vw,40px); margin:0;}
 .endcard .big{font-family:var(--font-disp); font-size:26px; font-weight:700;}
+.endlila{display:flex; flex-wrap:wrap; justify-content:center; gap:8px 14px; max-width:340px;}
+.endlila .ln{display:flex; align-items:center; gap:6px; font-weight:700; color:var(--ink);}
+.endlila .ln svg{width:22px; height:22px;}
+.endlila .ln span{margin-left:8px; color:#7A4FCF; font-variant-numeric:tabular-nums;}
+#blockAns.lila{color:#7A4FCF;}
 .pill{background:var(--accent-soft); color:var(--accent); border-radius:999px; padding:6px 16px; font-weight:700;}
 .btnrow{display:flex; gap:12px; flex-wrap:wrap; justify-content:center;}
 .cta{
@@ -607,6 +612,7 @@ button.ctawait:active{transform:none;}
       <h2 id="endTitle">Super!</h2>
       <div class="big" id="endStars"></div>
       <div class="pill" id="endDetail"></div>
+      <div id="endLila" hidden></div>
       <div class="btnrow">
         <button class="cta" id="btnAgain">Nochmal!</button>
         <button class="cta sec" data-home>Fertig</button>
@@ -640,9 +646,9 @@ button.ctawait:active{transform:none;}
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=68"></script>
-<script src="game.js?v=68"></script>
-<script src="kawumm.js?v=68"></script>
+<script src="islands.js?v=69"></script>
+<script src="game.js?v=69"></script>
+<script src="kawumm.js?v=69"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -677,7 +683,22 @@ function defaultState(now){
 }
 
 function rowFacts(state,row){ const out=[]; for(let b=1;b<=10;b++) out.push(state.facts[factKey(row,b)]); return out; }
-function rowMastery(state,row){ return rowFacts(state,row).filter(f=>f.box>=ROW_UNLOCK_MIN_BOX).length/10; }
+/* Ausgemusterte Aufgaben (mal 1, wenn die 1er im Urlaub ist) zählen als lila: sie kommen nie mehr dran,
+   sonst bräuchte z. B. die 4er-Insel 8 von nur 9 möglichen Aufgaben (seit v69). */
+function isLila(state,key){ const f=state.facts[key]; return !!f && f.box>=ROW_UNLOCK_MIN_BOX; }
+/* Neue lila Sterne seit einem Schnappschuss (lilaSnap): [{row, keys:[...]}], neueste Insel zuerst. Nur Mal-Fakten. */
+function lilaSnap(state){ return Object.keys(state.facts).filter(k=>isLila(state,k)); }
+function lilaGain(state, snap){
+  const had=new Set(snap||[]), by={};
+  for(const k of Object.keys(state.facts)) if(isLila(state,k) && !had.has(k)){ const r=+k.split('x')[0]; (by[r]=by[r]||[]).push(k); }
+  const open=unlockedRows(state);
+  return Object.keys(by).map(Number).sort((a,b)=>open.indexOf(b)-open.indexOf(a)).map(r=>({row:r, keys:by[r]}));
+}
+function rowSure(state,row){ return rowFacts(state,row).filter(f=>f&&f.box>=ROW_UNLOCK_MIN_BOX).length/10; }
+function rowMastery(state,row){
+  if(row===1 || rowSure(state,1)<ROW_UNLOCK_SHARE) return rowSure(state,row);   // 1er selbst und solange die 1er nicht im Urlaub ist: wie bisher (keine Rekursion über onVacation)
+  return rowFacts(state,row).filter((f,b)=>(f&&f.box>=ROW_UNLOCK_MIN_BOX) || b===0).length/10;   // "mal 1" ist ausgemustert und zählt
+}
 
 /* Freigeschaltete Reihen: Reihe i+1 öffnet, wenn Reihe i gemeistert ist. Mindestens eine offen.
    Einmal offen bleibt offen: state.unlocked merkt sich jede Insel, die je offen war (rememberUnlocks).
@@ -800,14 +821,19 @@ function applyRide(state, row, misses, rts, now){
 /* Blockade im Wolkenflug: eine Figur legt sich über die Tore, Romy tippt die Lösung selbst ein.
    Ziel: Fach 2, noch nie eingetippt (bevorzugt, Gewicht 3), oder schon lila, aber nie eingetippt (Gewicht 1).
    Nie neue oder wackelnde Fakten (Fach 0-1), nie ausgemusterte. Höchstens BLOCK_MAX pro Ritt. */
-const BLOCK_MAX = 3, BLOCK_P = 0.35;
-function blockWeight(f){ if(!f || (f.typed||0)>0) return 0; return f.box===2 ? 3 : f.box>=3 ? 1 : 0; }   // Fach 0-1 nie (auch Tausch-Start Fach 1)
+const BLOCK_MAX = 3, BLOCK_P = 0.45;   // v69: 0.45 statt 0.35, dafür mit Abstand (BLOCK_GAP), also nicht öfter hintereinander
+/* Seit v69: Fach 2 bleibt Ziel, auch wenn schon einmal (zu langsam) eingetippt. Vorher fiel so ein Fakt für immer
+   aus der Blockade und war im Wolkenflug nie mehr lila zu kriegen. Neueste Insel zählt dreifach (dort fehlen die Sterne). */
+const BLOCK_NEWEST_W = 3;
+function blockWeight(f){ if(!f) return 0; if(f.box===2) return 3; if(f.box>=3 && !((f.typed||0)>0)) return 0.5; return 0; }   // Fach 0-1 nie (auch Tausch-Start Fach 1)
 function pickBlockTarget(state, recentKeys, rng){
   rng=rng||Math.random;
   const cand=[]; let sum=0;
-  for(const r of unlockedRows(state)) for(let b=1;b<=10;b++){
+  const open=unlockedRows(state), newest=open[open.length-1];
+  for(const r of open) for(let b=1;b<=10;b++){
     if(isRetired(state,r,b)) continue;
     const k=factKey(r,b); let w=blockWeight(state.facts[k]);
+    if(w && r===newest) w*=BLOCK_NEWEST_W;
     if(!w) continue;
     if(recentKeys&&recentKeys.includes(k)) w*=0.05;
     cand.push({k,r,b,w}); sum+=w;
@@ -1777,6 +1803,7 @@ let rec=null, recWanted=false;
 function stopAllRec(){ recWanted=false; try{ rec&&rec.stop(); }catch(e){} rec=null; setMicUI(); }
 
 function startPractice(){
+  lilaStart();
   R={mode:'practice', i:0, n:S.tasksPerRound, ok:0, redo:[], recent:[], input:'', locked:false, task:null, t0:0, starsBefore:S.stars};
   bumpStreak(S,Date.now());
   buildPad($('pad'),padKey);
@@ -1888,7 +1915,7 @@ function finishPractice(){
   $('btnAgain').onclick=()=>startPractice();
   show('end');
   if(perfect||unlockedItem){ bigKnall(); sndFanfare(); } else { burst(40,0.5,0.5,9); sndGood(); }
-  speak(perfect?'Wow! Alles richtig! Dein Einhorn tanzt vor Freude!':'Super Runde, '+S.name+'!');
+  speak((perfect?'Wow! Alles richtig! Dein Einhorn tanzt vor Freude!':'Super Runde, '+S.name+'!')+lilaEnd());
   if(unlockedItem) setTimeout(()=>showItemOverlay(unlockedItem),1200);
   maybeRowParty();
 }
@@ -2109,6 +2136,7 @@ function finishRide(){
     +(errs?' · '+errs+(errs===1?' Ausrutscher':' Ausrutscher'):' · ohne Fehler!');
   $('btnAgain').textContent='Nochmal reiten';
   $('btnAgain').onclick=()=>startRide(row);
+  $('endLila').hidden=true;            // der Inselritt macht nie lila
   show('end');
   bigKnall(); sndFanfare();
   speak(record?'Neuer Rekord! Dein Einhorn galoppiert wie der Wind!':'Geschafft! Die ganze '+row+'er-Reihe!');
@@ -2119,6 +2147,7 @@ function finishRide(){
 /* ---------- Sternschnuppe (Blitzrunde) ---------- */
 let BZ=null, bzTick=null;
 function startBlitz(){
+  lilaStart();
   BZ={t0:0, dur:60000, count:0};
   R={mode:'blitz', i:0, n:999, ok:0, redo:[], recent:[], input:'', locked:false, task:null, t0:0};
   bumpStreak(S,Date.now());
@@ -2172,7 +2201,7 @@ function finishBlitz(){
   $('btnAgain').onclick=()=>startBlitz();
   show('end');
   if(record){ bigKnall(); sndFanfare(); } else { burst(40,0.5,0.5,9); }
-  speak(record?'Wahnsinn! Neuer Rekord: '+count+'!':'Zeit um! '+plural(count,'Sternschnuppe','Sternschnuppen')+'!');
+  speak((record?'Wahnsinn! Neuer Rekord: '+count+'!':'Zeit um! '+plural(count,'Sternschnuppe','Sternschnuppen')+'!')+lilaEnd());
   if(unlockedItem) setTimeout(()=>showItemOverlay(unlockedItem),1400);
   maybeRowParty();
 }
@@ -2180,6 +2209,11 @@ function finishBlitz(){
 /* ---------- Wolkenritt v4: PixiJS-Szene, Welten, Weltentore, Rätsel-Stopp ---------- */
 let RN=null;
 const RUN_GATES=12;
+/* Ruhe im Wolkenflug (seit v69, Entscheidung Simon: zu hektisch). Keine Rätsel-Freunde mehr, weniger Reihen-Sprünge,
+   Blockaden mit Abstand. Pro Ritt also fast nur Tore, dazwischen höchstens 3 Blockaden und 2 Weltentore. */
+const RUN_RIDDLES = false;        // Freunde mit Rätselfrage: aus. Code bleibt, true schaltet sie wieder ein
+const RUN_SEQ_P = 0.1;            // Anteil Reihen-Sprünge an normalen Toren (vorher ca. 0.23)
+const BLOCK_GAP = 2;              // zwischen zwei Blockaden mindestens so viele normale Tore
 const WORLD_INFO={
   wolken:{name:'Wolkenhimmel',   em:'☁️', auf:'Auf in den Wolkenhimmel!',     willk:'Willkommen im Wolkenhimmel!',     der:'der Wolkenhimmel'},
   meer:  {name:'Abendrot-Meer',  em:'🌅', auf:'Auf zum Abendrot-Meer!',       willk:'Willkommen am Abendrot-Meer!',    der:'das Abendrot-Meer'},
@@ -2201,6 +2235,7 @@ async function startRun(){
     try{ await eng.init($('world')); }catch(e){ showOverlay('<h2>Hoppla</h2><p>Der Wolkenritt konnte nicht starten. Bitte die App einmal neu öffnen.</p>','Okay'); show('home'); return; }
     if(current!=='run') return;
   }
+  lilaStart();
   RN={gate:0, n:RUN_GATES, ok:0, combo:0, bestCombo:0, stars:0, task:null, locked:false, recent:[], redo:[], metFriends:[],
       first:(S.flights||0)===0, friends:masteredFriends(), worlds:shuffleArr(WORLD_KEYS).slice(0,3), wIdx:0,
       blocks:0, block:null, forceBlock:forceBlockNext};
@@ -2281,7 +2316,9 @@ function nextGate(){
   RN.block=null; eng.blocked=false;
   // Blockade: nie am Weltentor, nie im allerersten Ritt, nie direkt nach einem Fehler (Wiederholung), höchstens BLOCK_MAX
   let blk=null;
-  if(!isWorldGate && redoIdx<0 && !RN.first && RN.gate>=1 && RN.blocks<BLOCK_MAX && (RN.forceBlock>0 || Math.random()<BLOCK_P)){
+  const blockGapOk = RN.lastBlockGate===undefined || RN.gate-RN.lastBlockGate>BLOCK_GAP;
+  const afterWorld = RN.gate%4===0 && RN.gate>0;   // direkt nach dem Weltentor erst einmal ein ruhiges Tor
+  if(!isWorldGate && !afterWorld && blockGapOk && redoIdx<0 && !RN.first && RN.gate>=1 && RN.blocks<BLOCK_MAX && (RN.forceBlock>0 || Math.random()<BLOCK_P)){
     blk=pickBlockTarget(S, RN.recent);
     if(!blk && RN.forceBlock>0){ const p=pickTask(S,RN.recent,Date.now()); const pr=p.key.split('x').map(Number); blk={k:p.key, r:pr[0], b:pr[1]}; }   // nur zum Ausprobieren (Elternbereich)
   }
@@ -2295,10 +2332,10 @@ function nextGate(){
     const r=RN.redo.splice(redoIdx,1)[0];
     t={kind:'fact', key:r.key, answer:r.answer, opts:r.div?makeDivOptions(r.answer):makeOptions(r.answer,r.a,r.b), show:r.show, a:r.a, b:r.b, div:r.div, say:r.say};
     setQ('Nochmal! Du schaffst das:', r.show+' = ?');
-  }else if(!isWorldGate && RN.gate>=2 && roll<0.22){
+  }else if(RUN_RIDDLES && !isWorldGate && RN.gate>=2 && roll<0.22){
     t=friendRiddle(S, Math.random, RN.friends); riddle=true;
     setQ('Der Ritt hält an …',''); $('runQ').querySelector('.qchip').style.display='none';
-  }else if(!isWorldGate && roll<0.45){
+  }else if(!isWorldGate && roll<RUN_SEQ_P){
     // Reihen-Sprung nie am Weltentor: das Tor braucht eine Malaufgabe mit Text
     t=seqQuestion(S);
     setQ('Lumi springt in '+t.row+'er-Sprüngen!','… '+t.shown[0]+' … '+t.shown[1]+' … <b style="color:var(--accent)">?</b>');
@@ -2345,6 +2382,7 @@ async function chooseGate(val, lane, how){
   const goodLane=t.opts.indexOf(t.answer);
   const wasBlock=!!t.block;
   // Reihen-Sprünge sind Weiterzählen, keine Malaufgabe: sie ändern die Lernkartei und die Mal-Statistik nicht
+  const lilaBefore = t.kind==='fact' && !t.div && isLila(S,t.key);
   if(t.kind!=='seq'){
     if(val===null) applyTimeout(S, t.key, (RN.plan&&RN.plan.approachMs)||9000, Date.now());
     else applyResult(S, t.key, good, rt, Date.now(), how==='typed'?'typed':'choice');
@@ -2395,8 +2433,13 @@ async function chooseGate(val, lane, how){
     nextGate(); return;
   }
   if(wasBlock){
-    blockReact(good, t, good?null:RN.lastWay);
-    await wait(good?1300:2600); if(!RN) return;
+    const newLila = good && !lilaBefore && isLila(S,t.key);
+    blockReact(good, t, good?null:RN.lastWay, newLila);
+    if(newLila){ $('blockAns').classList.add('lila'); tone(784,.25,0,'sine',.08); tone(1047,.4,.22,'sine',.08); }
+    // Neuer lila Stern: die Figur sagt es in Ruhe, erst danach geht es weiter (Satzende abwarten, höchstens ca. 6 s)
+    if(newLila) await new Promise(res=>{ RN.block.onSaid=res; setTimeout(res,9000); });
+    else await wait(good?1300:2600);
+    if(!RN) return;
     hideBlock(false);
     await wait(700); if(!RN) return;
     eng.setBlocked(false); eng.launch(); sndWorld();
@@ -2445,12 +2488,14 @@ function blockFigure(){
     html:'<div class="kwfig"><div class="bar">'+KW_BAR_SVG+'</div><img src="'+KW.img+'" alt=""></div>',
     say:['Halt! Piratenkontrolle! Wer durch will, muss die Zahl wissen.','Kawumm! Hier ist zu! Nur mit der richtigen Zahl geht die Schranke auf.','Ahoi Lumi! Heute bin ich der Torwächter. Weißt du die Zahl?'],
     ok:['Kawumm! Aus dem Kopf gewusst! Schranke auf!','Ha! Richtig! Ihr dürft durch.','Stimmt genau! Gute Fahrt, ihr zwei!'],
-    no:['Fast! Es ist {a}. Ich mach trotzdem auf.','Huch, knapp daneben. Es ist {a}. Na los, fliegt durch!']};
+    no:['Fast! Es ist {a}. Ich mach trotzdem auf.','Huch, knapp daneben. Es ist {a}. Na los, fliegt durch!'],
+    lila:['Richtig! Und weißt du was? Das ist ein lila Stern für die {r}er-Insel. Schranke auf!','Aus dem Kopf gewusst! Dafür gibt es einen lila Stern für die {r}er-Insel. Gute Fahrt!']};
   return {id:'alien', voice:{rate:1.1},
     html:'<div class="idlewrap">'+ALIEN_SVG+'</div>',
     say:['Hallo! Ich bin Plopp vom Glibberstern. Eure Tore sind so schön weich, ich bleib hier liegen!','Plopp! Gelandet! Ich mach hier Pause. Außer, du weißt die Zahl.','Ich bin ein Alien und kann nicht rechnen. Du vielleicht?'],
     ok:['Wow! Du bist ja schlauer als mein Raumschiff! Tschüss!','Richtig! Dann flieg ich mal nach Hause. Plopp!','Stimmt! Ich mach Platz. Bis bald!'],
-    no:['Fast! Es ist {a}. Ich flieg trotzdem weiter.','Knapp daneben! Es ist {a}. Tschüss!']};
+    no:['Fast! Es ist {a}. Ich flieg trotzdem weiter.','Knapp daneben! Es ist {a}. Tschüss!'],
+    lila:['Richtig! Oh, schau mal. Das ist ein lila Stern für die {r}er-Insel. Ich flieg nach Hause.','Stimmt! Du kriegst einen lila Stern für die {r}er-Insel. Plopp, tschüss!']};
 }
 function buildBlockPad(){
   const k=$('blockKeys'); if(k.childElementCount) return;
@@ -2460,7 +2505,7 @@ function buildBlockPad(){
 }
 function startBlock(t){
   const eng=G(), my=RN, fig=blockFigure();
-  RN.block={typed:'', ready:false, pending:false, fig}; RN.blocks++; RN.plan=null;
+  RN.block={typed:'', ready:false, pending:false, fig}; RN.blocks++; RN.lastBlockGate=RN.gate; RN.plan=null;
   if(RN.forceBlock>0) RN.forceBlock--;
   eng.brake(); sndBrake();
   eng.spawnGates(t.opts,{hold:true});          // Tore stehen und warten, nichts läuft ab
@@ -2474,8 +2519,10 @@ function startBlock(t){
   },700);
   setTimeout(()=>{ if(RN!==my||!RN.block) return;
     $('blockPad').classList.add('show'); $('blockPad').setAttribute('aria-hidden','false');
-    speak(pickOne(fig.say)+' Tipp die Zahl ein!', null, fig.voice);
-    // Antwortzeit erst messen, wenn das Zahlenfeld ganz zu sehen ist
+    // Antwortzeit: ab Zahlenfeld, aber neu ab Satzende, wenn bis dahin nichts getippt wurde.
+    // Vorher lief die Uhr schon während des Satzes (4 bis 5 s), dann war fast keine Antwort unter 5 s und nichts wurde lila (v69).
+    const B=RN.block;
+    speak(pickOne(fig.say)+' Tipp die Zahl ein!', ()=>{ if(RN===my&&RN.block===B&&B.ready&&!B.typed&&!B.pending) RN.t0=performance.now(); }, fig.voice);
     setTimeout(()=>{ if(RN!==my||!RN.block) return; RN.block.ready=true; RN.t0=performance.now(); },560);
   },1700);
 }
@@ -2491,9 +2538,14 @@ function blockKey(k){
 }
 /* rw: Rechenweg nach falscher Eingabe. Die Figur sagt die Lösung, danach sagt Lumi den Weg in einem Satz,
    aber nur, wenn inzwischen nichts anderes gesprochen wurde (speakSeq unverändert). */
-function blockReact(good, t, rw){
+function blockReact(good, t, rw, newLila){
   const B=RN&&RN.block; if(!B) return;
   const a=$('blockAns'); a.textContent=good?B.typed:String(t.answer); a.className=good?'good':'again';
+  if(newLila){
+    const row=+t.key.split('x')[0];
+    speak(pickOne(B.fig.lila).replace('{r}',row), ()=>{ setTimeout(()=>{ if(B.onSaid) B.onSaid(); },700); }, B.fig.voice);
+    return;
+  }
   let seq=0;
   speak(good?pickOne(B.fig.ok):pickOne(B.fig.no).replace('{a}',t.answer), rw?()=>{ if(seq===speakSeq && RN) speak(rw.short); }:null, B.fig.voice);
   seq=speakSeq;
@@ -2505,6 +2557,27 @@ function hideBlock(instant){
   r.classList.add('bye'); setTimeout(()=>{ if(r.classList.contains('bye')){ r.hidden=true; r.innerHTML=''; r.classList.remove('bye'); } },800);
 }
 
+/* Rundenende: neue lila Sterne seit Rundenstart nennen (seit v69). Sichtbar: Insel, lila Sterne, Aufgaben. Gesprochen ein Satz.
+   Liefert den Satz (leer, wenn nichts dazukam). */
+let LILA0=null;
+function lilaStart(){ const o=unlockedRows(S); LILA0={keys:lilaSnap(S), newest:o[o.length-1]}; }
+function lilaEnd(){
+  const el=$('endLila'); el.hidden=true; el.innerHTML=''; el.className='';
+  if(!LILA0) return '';
+  const start=LILA0; LILA0=null;
+  const g=lilaGain(S,start.keys);
+  if(!g.length) return '';
+  el.className='endlila'; el.hidden=false;
+  el.innerHTML=g.map(x=>'<div class="ln">'+x.row+'er-Insel '+x.keys.map(()=>starSVG('#9A6AE8')).join('')+x.keys.map(k=>'<span>'+k.replace('x',' · ')+'</span>').join('')+'</div>').join('');
+  const open=unlockedRows(S), cur=open[open.length-1], next=nextLockedRow(S);
+  const part=x=>(x.keys.length===1?'einen lila Stern':x.keys.length+' lila Sterne')+' für die '+x.row+'er-Insel';
+  let line='Und du hast '+(g.length===1?part(g[0]):g.slice(0,-1).map(part).join(', ')+' und '+part(g[g.length-1]))+' gesammelt!';
+  if(next!==null && cur===start.newest && g.some(x=>x.row===cur)){   // ist in der Runde eine Insel aufgegangen, feiert maybeRowParty
+    const have=Math.round(rowMastery(S,cur)*10), need=Math.ceil(ROW_UNLOCK_SHARE*10);
+    if(have<need) line+=' Jetzt hast du '+have+' von '+need+'.';
+  }
+  return ' '+line;
+}
 function finishRun(){
   if(!RN) return;
   const eng=G();
@@ -2525,7 +2598,7 @@ function finishRun(){
   $('btnAgain').onclick=()=>startRun();
   show('end');
   if(comboRecord||ok===n){ bigKnall(); sndFanfare(); } else { burst(45,0.5,0.5,9); }
-  speak(ok===n?'Wahnsinn! Alle Tore getroffen! Funkel tanzt!':'Toller Ritt, '+S.name+'! '+plural(stars,'Sternschnuppe','Sternschnuppen')+' gefangen!');
+  speak((ok===n?'Wahnsinn! Alle Tore getroffen! Funkel tanzt!':'Toller Ritt, '+S.name+'! '+plural(stars,'Sternschnuppe','Sternschnuppen')+' gefangen!')+lilaEnd());
   if(unlockedItem) setTimeout(()=>showItemOverlay(unlockedItem),1400);
   maybeRowParty();
 }
@@ -2544,7 +2617,7 @@ function renderPath(){
   const newAway=[];
   for(const r of ROW_ORDER){
     const facts=rowFacts(S,r);
-    const stars=facts.map(f=> f.box>=5?starSVG('#F2B83C') : f.box>=3?starSVG('#9A6AE8') : (f.seen>0||f.box>0)?starSVG('#D9CFF0'):starSVG('#EEE8F8')).join('');
+    const stars=facts.map((f,i)=> f.box>=5?starSVG('#F2B83C') : (f.box>=3||isRetired(S,r,i+1))?starSVG('#9A6AE8') : (f.seen>0||f.box>0)?starSVG('#D9CFF0'):starSVG('#EEE8F8')).join('');
     const mastered=rowMastery(S,r)>=ROW_UNLOCK_SHARE, isOpen=open.includes(r), away=isOpen&&onVacation(S,r);
     const b=document.createElement(away?'div':'button');   // im Urlaub: kein Knopf, keine Interaktion
     b.className='islcard'+(isOpen?'':' locked')+(away?' away':'');
@@ -2577,7 +2650,7 @@ function nextIslandLine(r){
   const open=unlockedRows(S), cur=open[open.length-1], next=nextLockedRow(S);
   if(next===null) return pickOne(['Alle Inseln sind schon offen! Jetzt kannst du alle Sterne golden machen.','Du hast alle Inseln geweckt! Schaffst du es, dass alle Sterne golden leuchten?']);
   const facts=rowFacts(S,cur), need=Math.ceil(ROW_UNLOCK_SHARE*10);
-  const sure=facts.filter(f=>f.box>=ROW_UNLOCK_MIN_BOX).length, rest=Math.max(1,need-sure);
+  const sure=Math.round(rowMastery(S,cur)*10), rest=Math.max(1,need-sure);   // ausgemusterte zählen mit (rowMastery)
   const gm=guideMode(S,false), fast=gm.fast;
   const nextName='die '+next+'er-Insel', nextFriend=FRIENDS[next][1];
   const where = r===cur ? 'auf meiner Insel' : 'auf der '+cur+'er-Insel';
@@ -2610,8 +2683,8 @@ function openIsland(r){
   $('islStage').innerHTML=W.islandSVG(r,{open:true, mastered, built:islandBuilt(r), animate:true, size:420});
   const line=islandLine(r);
   $('islBubble').textContent=line;
-  const facts=rowFacts(S,r), sure=facts.filter(f=>f.box>=3).length;
-  $('islProgress').innerHTML=facts.map(f=> f.box>=5?starSVG('#F2B83C') : f.box>=3?starSVG('#9A6AE8') : (f.seen>0||f.box>0)?starSVG('#D9CFF0'):starSVG('#EEE8F8')).join('')+'<span style="margin-left:6px">'+(()=>{ const op=unlockedRows(S), nx=nextLockedRow(S); return (r===op[op.length-1]&&nx!==null)? Math.min(sure,8)+' / 8' : ''; })()+(S.best.rows[r]?' · 🏆 '+(S.best.rows[r]/1000).toFixed(1).replace('.',',')+' s':'')+'</span>';
+  const facts=rowFacts(S,r), sure=Math.round(rowMastery(S,r)*10);   // ausgemusterte zählen mit
+  $('islProgress').innerHTML=facts.map((f,i)=> f.box>=5?starSVG('#F2B83C') : (f.box>=3||isRetired(S,r,i+1))?starSVG('#9A6AE8') : (f.seen>0||f.box>0)?starSVG('#D9CFF0'):starSVG('#EEE8F8')).join('')+'<span style="margin-left:6px">'+(()=>{ const op=unlockedRows(S), nx=nextLockedRow(S); return (r===op[op.length-1]&&nx!==null)? Math.min(sure,8)+' / 8' : ''; })()+(S.best.rows[r]?' · 🏆 '+(S.best.rows[r]/1000).toFixed(1).replace('.',',')+' s':'')+'</span>';
   const an=$('islStage').querySelector('.isl-animal');
   if(an){ an.style.cursor='pointer'; an.addEventListener('click',()=>{ an.classList.remove('hop'); void an.getBBox(); an.classList.add('hop'); smallSparkle(); sndGood(); const t=nextIslandLine(r); $('islBubble').textContent=t; speak(t); }); }
   renderShop(r);
