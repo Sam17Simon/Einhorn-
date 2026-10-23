@@ -60,6 +60,7 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 - `islands.js`: `scene` je Insel steuert ferne Bergkette (`farRange`), Berge und Bäume auf der Insel (`islandHills`, Basis y=116, rechts hinter den Bauplätzen) und die Klippe unter schwebenden Inseln (`islandCliff`). Berge haben keine Bodenlinie (`shape()` strichelt nur die Oberkante).
 
 ## Vorlesen (seit v33)
+- Zahlen mit -er werden als Wort gesprochen (seit v70, Entscheidung Simon, gilt überall): `sayEr` in `makeUtt` macht aus 4er-Insel Vierer-Insel, 10er Zehner. Sichtbar bleibt die Ziffer. Texte also ruhig weiter mit `r+'er-Insel'` bauen.
 - `speak()` heilt sich selbst: Satz sprechen, auf `onstart` warten. Kein Start nach 1,5 s oder Fehler: abbrechen und nächsten Weg probieren (`lang` = nur de-DE, `voice` = feste Stimme mit `u.lang=voice.lang`, `plain` = Gerätestandard). Der Weg, der klappt, liegt in localStorage `einhorn_speechMode`.
 - Android-Chrome: Stimme nie ohne passende Sprache setzen (Android meldet `de_DE`), sonst stumm. Dort kein `pause()`/`resume()`, wirkt wie Abbruch.
 - Nie direkt nach `cancel()` sprechen, 150 ms warten.
@@ -111,7 +112,7 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 
 ## Lila nur nach Eintippen (seit v63)
 - Lila (Fach 3+) heißt "kann es selbst abrufen". `applyResult(state,key,correct,rt,now,how)`: `how='typed'` (Zahlenfeld) oder `'choice'` (Tor, Auswahl, Gesprochenes; ohne `how` gilt `'choice'`).
-- Eingetippt richtig: `f.typed++`, bis `TYPE_FAST_MS` (5 s) ein Fach rauf (auch 2 → 3), langsamer: unten +1, ab Fach 2 halten. Eingetippt falsch: zurück in Fach 1.
+- Eingetippt richtig: `f.typed++`, bis `TYPE_FAST_MS` (7 s seit v70, Entscheidung Simon: Tippen ist nicht der Engpass; vorher 5 s) ein Fach rauf (auch 2 → 3), langsamer: unten +1, ab Fach 2 halten. Eingetippt falsch: zurück in Fach 1.
 - Auswahl richtig: höchstens bis Fach 2 (`CHOICE_MAX_BOX`), lila Fakten bleiben (nie herabstufen fürs Nie-Getippt-Haben). Auswahl falsch: höchstens ein Fach runter (4 → 3, Fach 1 bleibt 1). Timeout weiter `applyTimeout` (eine Box runter).
 - Getippt buchen: Zaubertraining und Sternschnuppe (`submit(val,'typed')` aus `handleKey`), Blockade im Wolkenflug. Mikro im Zaubertraining: `submit(val,'spoken')` = Auswahl. Inselritt bleibt `applyRide` (höchstens Fach 2, kein `typed`, Fehler als `'typed'` zurück in Fach 1).
 - `typed` liegt in jedem Fakt, `defaultState` setzt 0, `upgradeState` rüstet alte Stände und Sicherungsdateien mit 0 nach. Elternbereich zeigt "schon selbst eingetippt".
@@ -119,7 +120,7 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 ## Blockade im Wolkenflug (seit v63)
 - Ab und zu legt sich eine Figur über die Tore, die Tore stehen (`spawnGates(...,{hold:true})`, kein Ablaufen, kein Timeout), ihre Zahlen sind weg (`eng.setBlocked(true)`, sonst liest Romy ab), Zahlenfeld `#blockPad` kommt von unten, Romy tippt (`blockKey`, wie `handleKey`: volle Ziffernzahl → nach 180 ms werten, ✓ für kürzere). Antwort läuft über `chooseGate(val,null,'typed')`.
 - Ziel (`pickBlockTarget`, `blockWeight`): jede Aufgabe in Fach 2 (Gewicht 3, auch wenn schon einmal zu langsam getippt, seit v69; vorher fiel sie für immer raus und war im Wolkenflug nie mehr lila zu kriegen), lila nie getippt nur noch Gewicht 0.5. Neueste Insel mal 3 (`BLOCK_NEWEST_W`). Nie Fach 0-1, nie ausgemustert. `BLOCK_MAX` 3 pro Ritt, je passendes Tor `BLOCK_P` 0.45, aber mit Abstand: mindestens `BLOCK_GAP` 2 normale Tore dazwischen, nie direkt nach dem Weltentor. Nie am Weltentor, nie bei Reihen-Sprüngen, nie bei einer Wiederholung nach Fehler, nie am ersten Tor, nie im allerersten Ritt.
-- Antwortzeit der Blockade (seit v69): Die Uhr startet neu, wenn die Figur fertig gesprochen hat und noch nichts getippt ist. Vorher lief sie während des Satzes (4 bis 5 s) und kaum etwas wurde unter 5 s lila.
+- Antwortzeit der Blockade (seit v69): Die Uhr startet neu, wenn die Figur fertig gesprochen hat und noch nichts getippt ist. Vorher lief sie während des Satzes (4 bis 5 s) und kaum etwas wurde rechtzeitig lila.
 - Neuer lila Stern in der Blockade (seit v69): Die Figur sagt es ruhig (`fig.lila`, "ein lila Stern für die 4er-Insel"), Zahl wird lila, kleiner Ton, es geht erst nach dem Satz weiter (höchstens 9 s).
 - Tor-Taps gesperrt doppelt: `G.blocked` in `onTap`/`pick` (game.js) und `RN.block` in `onPick`/`onArrive`. Antwortzeit `RN.t0` erst, wenn das Zahlenfeld ganz drin ist (`RN.block.ready`). Zahlenfeld hat `data-noarm`, nie sperren.
 - Figur (`blockFigure`): Kawumm (`KW.img`, Stimme `KW.voice`, mit Schranke), wenn `KW.active()` und nicht auf Reisen (`KW.away()`); sonst Alien Plopp (`ALIEN_SVG`, 220x112, grün, drei Augen). Pupstierchen ist für später reserviert. Ein gesprochener Satz, kein Text.
