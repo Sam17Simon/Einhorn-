@@ -646,9 +646,9 @@ button.ctawait:active{transform:none;}
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=70"></script>
-<script src="game.js?v=70"></script>
-<script src="kawumm.js?v=70"></script>
+<script src="islands.js?v=71"></script>
+<script src="game.js?v=71"></script>
+<script src="kawumm.js?v=71"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -657,7 +657,7 @@ const BOX_WEIGHT = [8,6,4,2.2,1.1,0.35];             // Auswahlgewicht je Leitne
 const DONE_ROW_W = 0.8, NEW_ROW_W = 1.4;            // Niveau zieht an: sichere Reihen treten etwas zurück, die neueste Insel kommt öfter
 const DUE_DAYS   = [0,0,1,2,4,8];                    // Wiedervorlage in Tagen je Box
 const FAST_MS = 4000;                                // "aus dem Kopf"-Schwelle beim Antippen (Tore, Auswahl)
-const TYPE_FAST_MS = 7000;                           // Eintippen braucht länger: bis 7 s gilt als aus dem Kopf (nur so wird ein Fakt lila). v69: 5 s, Entscheidung Simon: 7 s
+const TYPE_FAST_MS = 6000;                           // Eintippen braucht länger: bis 6 s gilt als aus dem Kopf (nur so wird ein Fakt lila). Bis v69: 5 s, v70: 7 s, ab v71: 6 s (Entscheidung Simon)
 const CHOICE_MAX_BOX = 2;                            // Antippen einer Antwort (Tore, Auswahl) hebt höchstens bis Fach 2
 const ROW_UNLOCK_MIN_BOX = 3, ROW_UNLOCK_SHARE = 0.8;
 

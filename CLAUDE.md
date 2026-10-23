@@ -112,7 +112,7 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 
 ## Lila nur nach Eintippen (seit v63)
 - Lila (Fach 3+) heißt "kann es selbst abrufen". `applyResult(state,key,correct,rt,now,how)`: `how='typed'` (Zahlenfeld) oder `'choice'` (Tor, Auswahl, Gesprochenes; ohne `how` gilt `'choice'`).
-- Eingetippt richtig: `f.typed++`, bis `TYPE_FAST_MS` (7 s seit v70, Entscheidung Simon: Tippen ist nicht der Engpass; vorher 5 s) ein Fach rauf (auch 2 → 3), langsamer: unten +1, ab Fach 2 halten. Eingetippt falsch: zurück in Fach 1.
+- Eingetippt richtig: `f.typed++`, bis `TYPE_FAST_MS` (6 s seit v71, Entscheidung Simon: Tippen ist nicht der Engpass; bis v69 5 s, v70 kurz 7 s) ein Fach rauf (auch 2 → 3), langsamer: unten +1, ab Fach 2 halten. Eingetippt falsch: zurück in Fach 1.
 - Auswahl richtig: höchstens bis Fach 2 (`CHOICE_MAX_BOX`), lila Fakten bleiben (nie herabstufen fürs Nie-Getippt-Haben). Auswahl falsch: höchstens ein Fach runter (4 → 3, Fach 1 bleibt 1). Timeout weiter `applyTimeout` (eine Box runter).
 - Getippt buchen: Zaubertraining und Sternschnuppe (`submit(val,'typed')` aus `handleKey`), Blockade im Wolkenflug. Mikro im Zaubertraining: `submit(val,'spoken')` = Auswahl. Inselritt bleibt `applyRide` (höchstens Fach 2, kein `typed`, Fehler als `'typed'` zurück in Fach 1).
 - `typed` liegt in jedem Fakt, `defaultState` setzt 0, `upgradeState` rüstet alte Stände und Sicherungsdateien mit 0 nach. Elternbereich zeigt "schon selbst eingetippt".
