@@ -13,7 +13,7 @@
 /* ================= LZ-LOGIC-START ================= */
 const LZ_STORY_STARS = 3;          // Sterne für eine gelöste Inselgeschichte (Bonus, Sterne kaufen Ausbauten und Geschenke)
 /* Höchstens ein neuer Plan pro Tag. Der Begrüßungsbrief zählt nicht, der erste Plan darf am selben Tag kommen. */
-function lzDefault(){ return {hello:false, helloSeen:false, plans:{}, lastPlanDay:'', stories:{}}; }
+function lzDefault(){ return {hello:false, helloSeen:false, helloDay:'', plans:{}, lastPlanDay:'', stories:{}, cloud:null, cloudDay:'', rescues:0}; }
 function lzEnsure(state){
   if(!state.lz || typeof state.lz!=='object') state.lz=lzDefault();
   const z=state.lz, d=lzDefault();
@@ -49,6 +49,24 @@ function lzStoryDone(state, r, n, today){
 }
 function lzStoriesRead(z){ let n=0; for(const r in z.stories) n+=(z.stories[r]||[]).length; return n; }
 function lzStoriesTotal(){ let n=0; for(const r in LZ_STORIES) n+=LZ_STORIES[r].length; return n; }
+
+/* ---------- Wolken (seit v73, Entscheidung Simon: "das soll ein bisschen verrückt spielen") ----------
+   Ab und zu wacht der Wolkenwächter auf und schiebt Wolken über eine offene Insel. Nie über die Lieblingsinsel, nie im Urlaub,
+   immer nur eine. Liese schreibt sofort einen Rettungsplan: lesen, Frage beantworten, Wolken weg. Nie als Strafe, keine Bedingung.
+   Wann: frühestens LZ_CLOUD_DAYS Spieltage nach dem Begrüßungsbrief bzw. nach den letzten Wolken, dann bei jedem App-Start mit
+   LZ_CLOUD_P (nicht vorhersehbar). Mindestens LZ_CLOUD_MIN andere offene Inseln. */
+const LZ_CLOUD_DAYS = 3, LZ_CLOUD_P = 0.5, LZ_CLOUD_MIN = 2;
+function lzPlayDaysSince(days, since){ let n=0; for(const d in (days||{})) if(d>since && days[d] && days[d].tasks>0) n++; return n; }
+/* Kandidaten: offene Inseln ohne Lieblingsinsel und Urlaub. cands = Liste, die index.html liefert (unlockedRows, focusRow, onVacation). */
+function lzCloudDue(z, days, today, nCands, rng){
+  rng=rng||Math.random;
+  if(!z.hello || z.cloud || !z.helloDay || z.helloDay===today) return false;
+  if(nCands<LZ_CLOUD_MIN) return false;
+  if(lzPlayDaysSince(days, z.cloudDay||z.helloDay) < LZ_CLOUD_DAYS) return false;
+  return rng()<LZ_CLOUD_P;
+}
+function lzCloudSet(z, r, today){ z.cloud={r, d:today, n:(z.rescues||0)%LZ_RESCUES.length}; z.cloudDay=today; return z.cloud; }
+function lzCloudClear(z, today){ z.cloud=null; z.cloudDay=today; z.rescues=(z.rescues||0)+1; }
 
 /* Wegweiser auf der Startseite, wenn ein Plan wartet (index.html, maybeGuideSay) */
 const LZ_GUIDE_LINES=['Post von Liese! Sie hat einen neuen Plan geschrieben. Schau in der Inselwelt nach ihrem Fernrohr!','Liese hat einen Geheimweg gefunden! Komm, wir schauen in der Inselwelt nach.'];
@@ -124,6 +142,46 @@ const LZ_PLAN_ANY={lines:[
     '{friend} wartet schon auf euch. Viel Spaß!'],
   ps:'Ich habe dem Wächter eine Karte geschrieben. Mit Glitzer.',
   q:{ask:'Warum passt der Wächter heute nicht auf?', a:['Er feiert Geburtstag','Er ist krank','Er ist im Urlaub'], ok:0, hint:1}};
+
+/* Rettungspläne gegen die Wolken. Der Reihe nach, danach von vorne. {r}, {title}, {friend}, {name}. */
+const LZ_RESCUES=[
+  {lines:[
+    'Oh nein, {name}! Der Wolkenwächter ist aufgewacht. Er hat sich so geärgert, dass er Wolken über die {r}er-Insel geschoben hat. Ganz dicke! {friend} sitzt jetzt im Nebel.',
+    'Aber ich habe sofort einen neuen Plan gemacht. Wolken mögen keinen Wind. Darum brauchen wir einen riesigen Fächer.',
+    'Kawumm hat ihr Segel abgebaut. Das ist jetzt unser Fächer. Lumi wedelt mit dem Schwanz, und alle anderen pusten.',
+    'Wenn ihr dreimal ganz fest pustet, fliegen die Wolken weg. Einmal reicht nicht. Zweimal auch nicht. Es müssen drei Mal sein!',
+    '{friend} wartet schon. Im Nebel ist es bestimmt ein bisschen kalt.'],
+   ps:'Pusten macht schwindelig. Danach kurz hinsetzen.',
+   q:{ask:'Wie oft müsst ihr pusten?', a:['Dreimal','Einmal','Zehnmal'], ok:0, hint:3}},
+  {lines:[
+    'Hilfe, {name}! Der Wolkenwächter hat Wolken über die {r}er-Insel gelegt. Er sitzt jetzt direkt davor und passt auf.',
+    'Aber ich weiß etwas Neues über ihn. Er hat eine Oma. Und die hat ihm früher immer ein Schlaflied vorgesungen.',
+    'Das Lied geht so: Schlaf ein, du Wolkenwicht, die Sterne machen Licht.',
+    'Wenn ihr das Lied ganz leise singt, wird er müde. Er gähnt. Und dann schläft er ein.',
+    'Dann nehmt ihr die Wolken einfach weg. Wie eine Bettdecke. {friend} ist bestimmt froh, wenn es wieder hell ist.'],
+   ps:'Kawumm singt sehr laut. Sag ihr, sie soll diesmal flüstern.',
+   q:{ask:'Wie müsst ihr das Lied singen?', a:['Ganz leise','Ganz laut','Gar nicht'], ok:0, hint:3}},
+  {lines:[
+    'Schon wieder, {name}! Der Wolkenwächter hat eine Wolke über die {r}er-Insel gepustet. Eine dicke, graue.',
+    'Ich habe in meinem Buch gelesen, dass Wolken kitzelig sind. Am Bauch, so wie Lumi.',
+    'Der Plan: Ihr nehmt eine weiche Feder und kitzelt die Wolke. Sie fängt an zu kichern.',
+    'Und wenn eine Wolke kichert, regnet sie sich leer. Dann ist sie einfach weg.',
+    'Nehmt einen Regenschirm mit! Sonst werdet ihr nass. {friend} hat bestimmt keinen.'],
+   ps:'Das Pupstierchen will auch kitzeln. Es hat aber keine Hände. Es pupst einfach.',
+   q:{ask:'Was macht eine Wolke, wenn sie kichert?', a:['Sie regnet sich leer','Sie wird größer','Sie schläft ein'], ok:0, hint:3}},
+  {lines:[
+    'Na sowas, {name}! Der Wolkenwächter hat wieder Wolken gemacht. Diesmal über der {r}er-Insel.',
+    'Ich habe die Sonne gefragt. Sie hilft uns gern. Aber sie ist schüchtern.',
+    'Sie kommt nur heraus, wenn jemand einen Witz erzählt. Dann muss sie lachen und strahlt ganz hell.',
+    'Kawumm kennt viele Witze. Die meisten sind ein bisschen doof. Aber genau die mag die Sonne.',
+    'Wenn die Sonne strahlt, schmelzen die Wolken wie Eis. {friend} freut sich schon auf die Sonne.'],
+   ps:'Mein Lieblingswitz: Was ist grün und klopft an die Tür? Ein Klopfsalat.',
+   q:{ask:'Wann kommt die Sonne heraus?', a:['Wenn jemand einen Witz erzählt','Wenn es dunkel wird','Wenn alle schlafen'], ok:0, hint:2}}
+];
+function lzRescueText(n, v){
+  const P=LZ_RESCUES[n%LZ_RESCUES.length];
+  return {head:lzFill('Hallo {name}!',v), lines:P.lines.map(l=>lzFill(l,v)), ps:lzFill(P.ps,v), q:P.q};
+}
 
 /* Inselgeschichten aus Lieses Notizbuch. Je Insel in fester Reihenfolge. Neue Geschichten: einfach anhängen. */
 const LZ_STORIES={
@@ -271,7 +329,8 @@ function lzHelloText(v){
 
 if(typeof module!=='undefined' && module.exports){
   module.exports={LZ_STORY_STARS,lzDefault,lzEnsure,lzPlanReady,lzOpenByPlan,lzStoryNext,lzStoryDone,lzStoriesRead,lzStoriesTotal,
-    LZ_HELLO,LZ_PLANS,LZ_PLAN_ANY,LZ_STORIES,LZ_GUIDE_LINES,lzCurLine,lzPlanText,lzHelloText,lzFill};
+    LZ_HELLO,LZ_PLANS,LZ_PLAN_ANY,LZ_STORIES,LZ_GUIDE_LINES,lzCurLine,lzPlanText,lzHelloText,lzFill,
+    LZ_CLOUD_DAYS,LZ_CLOUD_P,LZ_CLOUD_MIN,LZ_RESCUES,lzPlayDaysSince,lzCloudDue,lzCloudSet,lzCloudClear,lzRescueText};
 }
 
 /* ===================== Oberfläche ===================== */
@@ -284,7 +343,6 @@ const lzCSS=document.createElement('style');
 lzCSS.textContent=`
 #overlay .box.lzbox{background:#F4FAEF;}
 .lzpaper p.lzl{margin:0 0 8px; border-radius:6px; transition:background .6s, box-shadow .6s;}
-.lzpaper p.lzl.mark{background:#FFE58A; box-shadow:0 0 0 4px #FFE58A;}
 .lzpaper .lztitle{display:block; font-size:23px; text-align:center; margin:2px 0 8px;}
 .lzpaper .lzimg{display:block; width:150px; margin:0 auto 4px;}
 .lzpaper .lzimg svg{width:100%; height:auto; display:block; border-radius:14px;}
@@ -371,7 +429,8 @@ function lzPaperHTML(x){
   if(x.ps) h+='<div class="ps">PS: '+lzEsc(x.ps)+'</div>';
   return h;
 }
-const LZ_WRONG=['Hm, nicht ganz. Lies nochmal nach. Ich hab die Stelle gelb gemacht.','Fast! Schau mal, wo es gelb leuchtet.','Nicht ganz. Die Antwort steht im gelben Teil.'];
+/* Seit v73 keine gelbe Stelle mehr (Simon: Romy kann gut lesen). Falsch: Knopf blass, ein ruhiger Satz, nochmal. */
+const LZ_WRONG=['Hm, nicht ganz. Lies nochmal nach.','Fast! Probier es nochmal.','Nicht ganz. Schau nochmal in den Brief.'];
 function lzClose(){ $('overlay').classList.remove('show'); const b=$('overlayBox'); b.classList.remove('kwletterbox','lzbox'); if(window.KW) KW.mailBtn(); }
 /* Ein Text mit Frage im Dialog.
    o: {paper, q, envelope, reread, goLabel, praise, onSolved(), onGo(), onClose(solved)}
@@ -407,7 +466,6 @@ function lzShowPaper(o){
       solved=true;
       b.classList.add('ok');
       box.querySelectorAll('.lzopt').forEach(x=>{ x.disabled=true; });
-      box.querySelectorAll('.lzl.mark').forEach(x=>x.classList.remove('mark'));
       sndGood(); smallSparkle();
       if(o.praise) lzSay(o.praise);
       if(o.onSolved) o.onSolved();
@@ -415,8 +473,6 @@ function lzShowPaper(o){
       setTimeout(()=>{ const g=$('lzGo'); if(g){ g.hidden=false; g.scrollIntoView({behavior:'smooth', block:'nearest'}); } },900);
     } else {
       b.classList.add('no'); b.disabled=true;
-      const m=box.querySelector('.lzl[data-i="'+o.q.hint+'"]');
-      if(m){ m.classList.add('mark'); m.scrollIntoView({behavior:'smooth', block:'center'}); }
       lzSay(lzPick(LZ_WRONG));
     }
   }));
@@ -434,7 +490,7 @@ function lzShowHello(o){
   lzShowPaper({paper:{head:x.head, lines:x.lines, ps:x.ps, face:true}, q:x.q, envelope:true, reread,
     goLabel:'Zur Inselwelt!',
     praise:'Richtig! Nach dem Mittagessen schläft der Wächter. Du hast super gelesen!',
-    onSolved:()=>{ z.hello=true; save(); },
+    onSolved:()=>{ z.hello=true; if(!z.helloDay) z.helloDay=lzToday(); save(); },
     onGo:()=>{ if(o.onClose) return o.onClose(); lzGoToMap(); },
     onClose:()=>{ if(o.onClose) o.onClose(); }});
 }
@@ -481,10 +537,68 @@ function lzArrive(r){
   speak('Geschafft! Ihr seid am Wolkenwächter vorbeigeschlichen. Die '+r+'er-Insel ist offen! '+fr[1]+' freut sich riesig.');
   $('lzArriveGo').onclick=()=>{ lzClose(); openIsland(r, {line:'Hallo! Ich bin '+fr[1]+'. Schön, dass du da bist! Ab jetzt spielen wir hier zusammen. Im Wolkenflug kommen jetzt meine Aufgaben.'}); };
 }
+/* ---------- Wolken: Ankündigung, Rettungsplan, Wolken weg ---------- */
+function lzCloudCands(){ const f=focusRow(S); return unlockedRows(S).filter(r=>r!==f && !onVacation(S,r)); }
+function lzCloudTry(tries){
+  if($('overlay').classList.contains('show') || current!=='home'){ if(tries<6) setTimeout(()=>lzCloudTry(tries+1),1500); return; }
+  const c=lzCloudCands(); if(!c.length) return;
+  const r=c[Math.floor(Math.random()*c.length)];
+  lzCloudSet(lz(), r, lzToday()); save(); partyOpenSync();
+  renderHome();
+  lzCloudNews(r);
+}
+/* App-Start: Wacht der Wächter heute auf? true = Wolken kommen (Kawumm wartet bis zum nächsten Start). */
+function lzMaybeCloud(){
+  if(!lzActive()) return false;
+  const z=lz();
+  if(z.hello && !z.helloDay){ z.helloDay=lzToday(); save(); return false; }   // alter Stand: ab heute zählen
+  if(!lzCloudDue(z, S.days, lzToday(), lzCloudCands().length)) return false;
+  setTimeout(()=>lzCloudTry(0), 800);
+  return true;
+}
+function lzCloudNews(r){
+  const W=window.Inselwelt, fr=FRIENDS[r], box=$('overlayBox');
+  box.innerHTML='<h2>Oh nein!</h2><div class="lzarrive">'+W.islandSVG(r,{open:false, mastered:false, built:islandBuilt(r), size:260})+'</div>'
+    +'<div class="pill">'+r+'er-Insel</div><button class="cta lzgo" id="lzCloudGo">Lieses Plan lesen</button><button class="ghostbtn" id="lzCloudLater">Später</button>';
+  $('overlay').classList.add('show');
+  [392,330,262].forEach((f,i)=>tone(f,.22,i*0.18,'triangle',.07));
+  speak('Oh nein! Der Wolkenwächter ist aufgewacht. Er hat Wolken über die '+r+'er-Insel geschoben. '+fr[1]+' sitzt im Nebel. Aber Liese hat schon einen Plan!');
+  $('lzCloudGo').onclick=()=>{ lzClose(); lzShowRescue(r); };
+  $('lzCloudLater').onclick=()=>{ lzClose(); renderHome(); };
+}
+function lzShowRescue(r, o){
+  o=o||{};
+  const z=lz(), c=z.cloud; if(!c || c.r!==r){ if(!o.reread) return; }
+  const x=lzRescueText(c?c.n:0, lzVars(r));
+  lzShowPaper({paper:{head:x.head, lines:x.lines, ps:x.ps, face:true}, q:x.q, envelope:!o.reread, reread:!!o.reread,
+    goLabel:'Wolken weg!',
+    praise:lzPick(['Richtig! So kriegen wir die Wolken weg!','Genau! Los, wir retten die Insel!']),
+    onSolved:()=>{ lzCloudClear(z, lzToday()); save(); partyOpenSync(); },
+    onGo:()=>lzRescued(r),
+    onClose:()=>{ renderHome(); if(current==='path') renderPath(); }});
+}
+function lzRescued(r){
+  const W=window.Inselwelt, fr=FRIENDS[r], box=$('overlayBox');
+  box.innerHTML='<h2>Die Wolken sind weg!</h2><div class="lzarrive">'+W.islandSVG(r,{open:true, mastered:rowMastery(S,r)>=ROW_UNLOCK_SHARE, built:islandBuilt(r), animate:true, size:260})+'</div>'
+    +'<div class="pill">'+fr[0]+' '+fr[1]+'</div><button class="cta lzgo" id="lzArriveGo">Hallo, '+lzEsc(fr[1].split(' ').pop())+'!</button>';
+  $('overlay').classList.add('show');
+  bigKnall(); sndFanfare();
+  speak('Geschafft! Die Wolken sind weg. '+fr[1]+' ist wieder da!');
+  $('lzArriveGo').onclick=()=>{ lzClose(); openIsland(r, {line:'Danke, dass du mich gerettet hast! Im Nebel war es echt ungemütlich.'}); };
+}
+/* Satz und Leuchten für den Wegweiser auf der Startseite: Wolken gehen vor, dann ein neuer Plan. '' = nichts. */
+function lzGuideLine(){
+  if(!lzActive()) return '';
+  const c=lz().cloud;
+  if(c) return 'Die '+c.r+'er-Insel ist noch unter Wolken. Liese hat einen Plan! Schau in der Inselwelt nach.';
+  return lzPlanWaiting() ? lzPick(LZ_GUIDE_LINES) : '';
+}
+
 /* Tipp auf eine geschlossene Insel. true = Liese hat übernommen. */
 function lzLockedTap(r){
   if(!lzActive()) return false;
   const z=lz();
+  if(z.cloud && z.cloud.r===r){ lzShowRescue(r); return true; }
   if(!z.hello){ lzShowHello(); return true; }
   if(lzPlanWaiting()){ lzShowPlan(r); return true; }
   speak(lzPick(['Liese schreibt gerade am nächsten Plan. Morgen ist er fertig!','Lieses nächster Plan kommt morgen. Heute kannst du die anderen Inseln besuchen!']));
@@ -542,7 +656,8 @@ function lzIslandButtons(r){
 /* ---------- Inselwelt: Abzeichen ---------- */
 function lzBadges(r, isOpen, away, isFocus){
   if(!lzActive()) return isOpen&&!away&&isFocus ? '<span class="lzbadge here">Hier spielst du</span>' : '';
-  if(!isOpen) return lzPlanWaiting() ? '<span class="lzbadge plan"><img src="'+LZ_IMG+'" alt=""> Plan</span>' : '';
+  const planB='<span class="lzbadge plan"><img src="'+LZ_IMG+'" alt=""> Plan</span>';
+  if(!isOpen) return (lz().cloud && lz().cloud.r===r) || lzPlanWaiting() ? planB : '';
   if(away) return '';
   let h='';
   if(isFocus) h+='<span class="lzbadge here">Hier spielst du</span>';
@@ -586,12 +701,14 @@ function lzParentHTML(){
     +'<tr><th>Pläne</th><td>'+plans+'</td></tr>'
     +'<tr><th>Nächster Plan</th><td>'+nextPlan+'</td></tr>'
     +'<tr><th>Geschichten</th><td>'+lzStoriesRead(z)+' von '+lzStoriesTotal()+' gelesen</td></tr>'
+    +'<tr><th>Wolken</th><td>'+(z.cloud?'über der '+z.cloud.r+'er-Insel (seit '+z.cloud.d+')':'keine')+'. Wächter wacht frühestens nach '+LZ_CLOUD_DAYS+' Spieltagen auf ('+lzPlayDaysSince(S.days, z.cloudDay||z.helloDay||today)+' bisher), dann zu '+Math.round(LZ_CLOUD_P*100)+' % je App-Start. Gerettet: '+(z.rescues||0)+'</td></tr>'
     +'</table>'
     +'<p style="margin:6px 0;font-size:13px;color:var(--muted)">Achtung: Knöpfe ändern Romys echten Stand.</p>'
     +'<div class="btnrow" style="justify-content:flex-start">'
     +'<button class="smallbtn" id="lzPHello">Begrüßungsbrief zeigen</button>'
     +'<button class="smallbtn" id="lzPPlan">Heute noch einen Plan erlauben</button>'
     +'<button class="smallbtn" id="lzPFocus">Lieblingsinsel auf automatisch</button>'
+    +'<button class="smallbtn" id="lzPCloud">'+(z.cloud?'Wolken wegnehmen':'Wolken jetzt schicken')+'</button>'
     +'<button class="smallbtn" id="lzPAll">Alle Texte ansehen</button>'
     +'</div>';
 }
@@ -599,6 +716,7 @@ function lzParentWire(){
   const b=id=>$(id);
   if(b('lzPHello')) b('lzPHello').onclick=()=>lzShowHello({reread:false, onClose:()=>{ renderParent(); show('parent'); }});
   if(b('lzPPlan')) b('lzPPlan').onclick=()=>{ lz().lastPlanDay=''; save(); renderParent(); };
+  if(b('lzPCloud')) b('lzPCloud').onclick=()=>{ const z=lz(); if(z.cloud){ z.cloud=null; } else { const c=lzCloudCands(); if(c.length) lzCloudSet(z, c[Math.floor(Math.random()*c.length)], lzToday()); } save(); partyOpenSync(); renderParent(); };
   if(b('lzPFocus')) b('lzPFocus').onclick=()=>{ S.focus=null; save(); renderParent(); };
   if(b('lzPAll')) b('lzPAll').onclick=lzShowAll;
 }
@@ -606,10 +724,11 @@ function lzParentWire(){
 function lzShowAll(){
   const v=lzVars(null);
   const one=(title,x)=>'<h3>'+lzEsc(title)+'</h3><div class="kwpaper show in">'+lzPaperHTML(x)+'</div>'
-    +(x.q?'<p class="ans">Frage: '+lzEsc(x.q.ask)+'<br>Richtig: <b>'+lzEsc(x.q.a[x.q.ok])+'</b>, sonst: '+x.q.a.filter((a,i)=>i!==x.q.ok).map(lzEsc).join(', ')+'. Gelb: Absatz '+(x.q.hint+1)+'</p>':'');
+    +(x.q?'<p class="ans">Frage: '+lzEsc(x.q.ask)+'<br>Richtig: <b>'+lzEsc(x.q.a[x.q.ok])+'</b>, sonst: '+x.q.a.filter((a,i)=>i!==x.q.ok).map(lzEsc).join(', ')+'</p>':'');
   const hx=lzHelloText(v);
   let h='<h2>Lieses Texte</h2><div class="lzall">'+one('Begrüßungsbrief',{head:hx.head, lines:hx.lines, ps:hx.ps, q:hx.q});
   for(const r of [3,6,9,7]){ const p=lzPlanText(r, lzVars(r)); h+=one('Plan '+r+'er-Insel',{head:p.head, lines:p.lines, ps:p.ps, q:p.q}); }
+  LZ_RESCUES.forEach((x,i)=>{ const t=lzRescueText(i, lzVars(5)); h+=one('Wolken-Rettung '+(i+1)+' (Beispiel 5er)',{head:t.head, lines:t.lines, ps:t.ps, q:t.q}); });
   const ga=lzPlanText(4, lzVars(4));
   h+=one('Plan für andere Inseln (Beispiel 4er, kommt bei Romy nicht vor)',{head:ga.head, lines:ga.lines, ps:ga.ps, q:ga.q});
   for(const r of ROW_ORDER) (LZ_STORIES[r]||[]).forEach((st,i)=>{ h+=one(r+'er-Insel, Geschichte '+(i+1)+': '+st.title,{title:st.title, lines:st.lines, sigText:'Aus Lieses Notizbuch', q:st.q}); });
@@ -618,7 +737,7 @@ function lzShowAll(){
   $('lzAllClose').onclick=()=>lzClose();
 }
 
-window.LZ={maybeHello:lzMaybeHello, planWaiting:lzPlanWaiting, lockedTap:lzLockedTap, badges:lzBadges, islandButtons:lzIslandButtons,
+window.LZ={maybeHello:lzMaybeHello, maybeCloud:lzMaybeCloud, guideLine:lzGuideLine, rescue:lzShowRescue, planWaiting:lzPlanWaiting, lockedTap:lzLockedTap, badges:lzBadges, islandButtons:lzIslandButtons,
   animalHint:lzAnimalHint, mailItems:lzMailItems, openMail:lzOpenMail, parentHTML:lzParentHTML, parentWire:lzParentWire,
   hello:lzShowHello, plan:lzShowPlan, story:lzShowStory, all:lzShowAll};   // hello, plan, story, all: auch zum Prüfen
 }

@@ -647,10 +647,10 @@ button.ctawait:active{transform:none;}
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=72"></script>
-<script src="game.js?v=72"></script>
-<script src="kawumm.js?v=72"></script>
-<script src="liese.js?v=72"></script>
+<script src="islands.js?v=73"></script>
+<script src="game.js?v=73"></script>
+<script src="kawumm.js?v=73"></script>
+<script src="liese.js?v=73"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -711,7 +711,7 @@ function rowMastery(state,row){
    Einmal offen bleibt offen: state.unlocked merkt sich jede Insel, die je offen war (rememberUnlocks).
    Seit v72 öffnet auch Liese Inseln (liese.js, Plan lesen), auch außerhalb der Kette. Darum zählt jede gemerkte Insel,
    und die Kette läuft von jeder offenen Insel weiter. Ergebnis immer in ROW_ORDER-Reihenfolge. */
-function unlockedRows(state){
+function knownRows(state){
   const keep=Array.isArray(state.unlocked)?state.unlocked:[];
   const open=new Set([ROW_ORDER[0], ...keep.filter(r=>ROW_ORDER.includes(r))]);
   for(let i=0;i<ROW_ORDER.length-1;i++){
@@ -720,13 +720,19 @@ function unlockedRows(state){
   }
   return ROW_ORDER.filter(r=>open.has(r));
 }
-/* Neu Freigeschaltetes dauerhaft eintragen (läuft bei jedem save). Alte Stände ohne unlocked bekommen so den heutigen Stand. */
-function rememberUnlocks(state){ state.unlocked=unlockedRows(state); seedSwaps(state); return state.unlocked; }
+/* Wolken (seit v73, Entscheidung Simon: "ein bisschen verrückt"): Ab und zu schiebt der Wolkenwächter Wolken über eine offene Insel
+   (state.lz.cloud = {r, d, n}, liese.js). Sie ist dann zu, bis Romy Lieses Rettungsplan liest. Gemerkt bleibt sie trotzdem (knownRows).
+   unlockedRows = was gerade offen ist: alles für Aufgaben, Karte und Inselscreen. */
+function cloudedRow(state){ const c=state.lz&&state.lz.cloud; return c&&c.r!=null ? c.r : null; }
+function unlockedRows(state){ const c=cloudedRow(state), k=knownRows(state); return c===null ? k : k.filter(r=>r!==c); }
+/* Neu Freigeschaltetes dauerhaft eintragen (läuft bei jedem save). Alte Stände ohne unlocked bekommen so den heutigen Stand.
+   Seit v73 mit knownRows: eine Insel unter Wolken bleibt gemerkt. */
+function rememberUnlocks(state){ state.unlocked=knownRows(state); seedSwaps(state); return state.unlocked; }
 /* Urlaub (Entscheidung Simon): Die leichten Reihen 1 und 10 sind gesperrt, sobald sie sitzen (Tier wach).
    Das Tier fährt in den Urlaub, Inselscreen, Inselritt und Kawumms Schatzkarte dieser Reihe gibt es dann nicht mehr. */
 const VACATION_ROWS=[1,10];
 function onVacation(state,r){ return VACATION_ROWS.includes(r) && rowMastery(state,r)>=ROW_UNLOCK_SHARE; }
-function nextLockedRow(state){ const u=unlockedRows(state); return ROW_ORDER.find(r=>!u.includes(r)) ?? null; }
+function nextLockedRow(state){ const u=knownRows(state); return ROW_ORDER.find(r=>!u.includes(r)) ?? null; }   // nie geöffnete Insel (Wolken zählen nicht)
 /* Lieblingsinsel (seit v72, Entscheidung Simon: Romy bestimmt selbst, Sterne sind Bonus).
    Hier spielt Romy gerade: Sie kommt im Wolkenflug, Zaubertraining und in der Sternschnuppe am häufigsten dran,
    auf sie zeigen Wegweiser, Blockaden und Lumi-Tipps. Vorher war das immer die neueste Insel.
@@ -858,7 +864,7 @@ function applyRide(state, row, misses, rts, now){
 /* Blockade im Wolkenflug: eine Figur legt sich über die Tore, Romy tippt die Lösung selbst ein.
    Ziel: Fach 2, noch nie eingetippt (bevorzugt, Gewicht 3), oder schon lila, aber nie eingetippt (Gewicht 1).
    Nie neue oder wackelnde Fakten (Fach 0-1), nie ausgemusterte. Höchstens BLOCK_MAX pro Ritt. */
-const BLOCK_MAX = 3, BLOCK_P = 0.45;   // v69: 0.45 statt 0.35, dafür mit Abstand (BLOCK_GAP), also nicht öfter hintereinander
+const BLOCK_MAX = 1, BLOCK_P = 0.45;   // seit v73 höchstens einmal pro Flug (Simon: weniger Eintipp-Pausen). v69 bis v72: 3
 /* Seit v69: Fach 2 bleibt Ziel, auch wenn schon einmal (zu langsam) eingetippt. Vorher fiel so ein Fakt für immer
    aus der Blockade und war im Wolkenflug nie mehr lila zu kriegen. Neueste Insel zählt dreifach (dort fehlen die Sterne). */
 const BLOCK_NEWEST_W = 3;
@@ -1787,7 +1793,7 @@ function renderHome(){
   $('giftInfo').onclick = pend>0 ? ()=>showGiftChoice() : null;
   // Wegweiser: der Modus, der jetzt am meisten hilft, leuchtet sanft (kein Zwang)
   const gm=guideMode(S, kwDueNow());
-  const lzPlan=!!(window.LZ && LZ.planWaiting());   // seit v72: Liese hat einen Plan geschrieben → Inselwelt leuchtet
+  const lzPlan=!!(window.LZ && LZ.guideLine());   // seit v72: Liese hat einen Plan geschrieben (oder Wolken, v73) → Inselwelt leuchtet
   for(const id of ['btnRun','btnPractice','btnPath']) $(id).classList.toggle('guide', id===(lzPlan?'btnPath':GUIDE_BTN[gm.mode]));
   if(window.KW) KW.mailBtn();   // Briefkasten (Kawumm auf Reisen): nur sichtbar, wenn Kawumm da ist, Abzeichen für ungelesene Briefe
 }
@@ -1810,7 +1816,7 @@ function maybeGuideSay(tries){
   let busy=false; try{ busy=speechSynthesis.speaking||speechSynthesis.pending; }catch(e){}
   if(busy && tries<8){ setTimeout(()=>maybeGuideSay(tries+1),700); return; }   // Lumis Begrüßung nicht abschneiden
   guideSaid=true;
-  if(window.LZ && LZ.planWaiting()){ speak(pickOne(LZ_GUIDE_LINES)); return; }   // seit v72: Lieses neuer Plan geht vor
+  if(window.LZ && LZ.guideLine()){ speak(LZ.guideLine()); return; }   // seit v72: Lieses neuer Plan geht vor, v73 auch Wolken
   const gm=guideMode(S, kwDueNow());
   speak(pickOne(GUIDE_LINES[gm.why]).replace('{r}',gm.row));
 }
@@ -2833,7 +2839,7 @@ function renderParent(){
     +'<h2>Bestzeiten Inselritt</h2><div class="besttimes">'+bests+'</div>'
     +'<h2>Liese: Pläne, Geschichten, Lieblingsinsel</h2>'+(window.LZ?LZ.parentHTML():'')
     +'<h2>Kawumm (Rückwärtsreihen)</h2>'+(window.KW?KW.parentHTML():'')
-    +'<div class="setrow"><label>Wolkenflug: Blockade im nächsten Ritt (bis zu 3, ab dem 2. Tor). Figur: '+(window.KW&&KW.active()&&!KW.away()?'Kawumm':'Alien Plopp')+'</label><button class="smallbtn" id="setForceBlock">'+(forceBlockNext?'kommt':'erzwingen')+'</button></div>'
+    +'<div class="setrow"><label>Wolkenflug: Blockade im nächsten Ritt (eine, ab dem 2. Tor). Figur: '+(window.KW&&KW.active()&&!KW.away()?'Kawumm':'Alien Plopp')+'</label><button class="smallbtn" id="setForceBlock">'+(forceBlockNext?'kommt':'erzwingen')+'</button></div>'
     +'<h2>Einstellungen</h2>'
     +'<div class="setrow"><label>Name des Kindes</label><input type="text" id="setName" value="'+S.name.replace(/"/g,'&quot;')+'"></div>'
     +'<div class="setrow"><label>Ton und Vorlesen</label><button class="toggle'+(S.sound?' on':'')+'" id="setSound" role="switch" aria-checked="'+S.sound+'" aria-label="Ton"><i></i></button></div>'
@@ -2939,7 +2945,7 @@ function init(){
   else { setTimeout(startLetters, 600); setTimeout(maybeGuideSay,2500); }
 }
 /* Post beim App-Start: Lieses Begrüßungsbrief geht einmal vor (seit v72), sonst Kawumm (Einladung, Reisebrief, Rückkehr). */
-function startLetters(){ if(window.LZ && LZ.maybeHello()) return; if(window.KW) KW.maybeLetter(); }
+function startLetters(){ if(window.LZ && (LZ.maybeHello() || LZ.maybeCloud())) return; if(window.KW) KW.maybeLetter(); }   // v73: Wolken auch vor Kawumm
 const _boot=()=>init();
 (window.claude&&window.claude.hot&&window.claude.hot.ready)? window.claude.hot.ready(_boot) : _boot();
 </script>
