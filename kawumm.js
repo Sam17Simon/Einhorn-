@@ -1358,6 +1358,9 @@ function kwShowMailbox(o){
     const T=KW_TRIPS[m.t]; if(!T) continue;
     h+='<button class="kwmailitem'+(m.read?'':' new')+'" data-mi="'+i+'"><span class="ic">'+KW_MAIL_ICON[m.k]+'</span><span class="pl">'+T.place+'</span>'+(m.read?'':'<i class="dot"></i>')+'</button>';
   }
+  // seit v72: Lieses Briefe (Begrüßung, Pläne) liegen mit drin
+  const lzItems=(window.LZ&&LZ.mailItems())||[];
+  for(const x of lzItems) h+='<button class="kwmailitem" data-lz="'+x.id+'"><span class="ic">'+x.ic+'</span><span class="pl">'+x.label+'</span></button>';
   if(kw.joined) h+='<button class="kwmailitem" data-mi="invite"><span class="ic">⭐</span><span class="pl">Kawumm</span></button>';
   h+='</div><button class="cta" id="kwMailClose">Fertig</button>';
   box.innerHTML=h;
@@ -1366,6 +1369,7 @@ function kwShowMailbox(o){
     const v=b.dataset.mi, m = v==='invite' ? 'invite' : kw.mail[+v];
     kwShowMail(m, {reread:true, onClose:()=>kwShowMailbox(o)});
   }));
+  box.querySelectorAll('[data-lz]').forEach(b=>b.addEventListener('click',()=>LZ.openMail(b.dataset.lz, ()=>kwShowMailbox(o))));
   $('kwMailClose').onclick=()=>{ $('overlay').classList.remove('show'); box.classList.remove('kwletterbox'); kwMailBtn(); if(o.onClose) o.onClose(); };
 }
 /* ---------- Andenken (100x100, Stil wie die Behälter) ---------- */

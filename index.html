@@ -511,6 +511,7 @@ button.ctawait:active{transform:none;}
       <div class="islbubble" id="islBubble" hidden></div>
       <div class="islprogress" id="islProgress"></div>
       <button class="cta" id="btnIslandRide">Inselritt starten</button>
+      <div class="lzisl" id="islLz"></div>
       <div id="islKw" hidden style="width:100%;display:flex;justify-content:center"></div>
       <h2 class="islh2" hidden>Insel ausbauen</h2>
       <div class="shop" id="islShop"></div>
@@ -646,9 +647,10 @@ button.ctawait:active{transform:none;}
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=71"></script>
-<script src="game.js?v=71"></script>
-<script src="kawumm.js?v=71"></script>
+<script src="islands.js?v=72"></script>
+<script src="game.js?v=72"></script>
+<script src="kawumm.js?v=72"></script>
+<script src="liese.js?v=72"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -678,6 +680,7 @@ function defaultState(now){
     unlocked:[ROW_ORDER[0]],     // einmal offene Inseln bleiben offen (rememberUnlocks)
     swapDone:[ROW_ORDER[0]],     // Inseln, für die der Tausch-Start schon gelaufen ist (seedSwaps)
     divs:{}, divOn:true,         // Geteilt: eigener Lernstand je "42:7" (zählt nie für Inseln), Elternschalter
+    focus:null, awake:[],        // seit v72: Lieblingsinsel (Romy wählt), Inseln, deren Tier schon gefeiert wurde
     created: now
   };
 }
@@ -704,17 +707,18 @@ function rowMastery(state,row){
   return rowFacts(state,row).filter((f,b)=>(f&&f.box>=ROW_UNLOCK_MIN_BOX) || b===0).length/10;   // "mal 1" ist ausgemustert und zählt
 }
 
-/* Freigeschaltete Reihen: Reihe i+1 öffnet, wenn Reihe i gemeistert ist. Mindestens eine offen.
+/* Freigeschaltete Reihen: Reihe i+1 öffnet, wenn Reihe i offen und gemeistert ist. Mindestens eine offen.
    Einmal offen bleibt offen: state.unlocked merkt sich jede Insel, die je offen war (rememberUnlocks).
-   Fällt eine alte Reihe unter 80 %, geht keine Insel wieder zu. Ergebnis immer in ROW_ORDER-Reihenfolge. */
+   Seit v72 öffnet auch Liese Inseln (liese.js, Plan lesen), auch außerhalb der Kette. Darum zählt jede gemerkte Insel,
+   und die Kette läuft von jeder offenen Insel weiter. Ergebnis immer in ROW_ORDER-Reihenfolge. */
 function unlockedRows(state){
   const keep=Array.isArray(state.unlocked)?state.unlocked:[];
-  const open=[ROW_ORDER[0]];
+  const open=new Set([ROW_ORDER[0], ...keep.filter(r=>ROW_ORDER.includes(r))]);
   for(let i=0;i<ROW_ORDER.length-1;i++){
-    const nx=ROW_ORDER[i+1];
-    if(keep.includes(nx) || rowMastery(state,ROW_ORDER[i])>=ROW_UNLOCK_SHARE) open.push(nx); else break;
+    const r=ROW_ORDER[i];
+    if(open.has(r) && rowMastery(state,r)>=ROW_UNLOCK_SHARE) open.add(ROW_ORDER[i+1]);
   }
-  return open;
+  return ROW_ORDER.filter(r=>open.has(r));
 }
 /* Neu Freigeschaltetes dauerhaft eintragen (läuft bei jedem save). Alte Stände ohne unlocked bekommen so den heutigen Stand. */
 function rememberUnlocks(state){ state.unlocked=unlockedRows(state); seedSwaps(state); return state.unlocked; }
@@ -723,6 +727,31 @@ function rememberUnlocks(state){ state.unlocked=unlockedRows(state); seedSwaps(s
 const VACATION_ROWS=[1,10];
 function onVacation(state,r){ return VACATION_ROWS.includes(r) && rowMastery(state,r)>=ROW_UNLOCK_SHARE; }
 function nextLockedRow(state){ const u=unlockedRows(state); return ROW_ORDER.find(r=>!u.includes(r)) ?? null; }
+/* Lieblingsinsel (seit v72, Entscheidung Simon: Romy bestimmt selbst, Sterne sind Bonus).
+   Hier spielt Romy gerade: Sie kommt im Wolkenflug, Zaubertraining und in der Sternschnuppe am häufigsten dran,
+   auf sie zeigen Wegweiser, Blockaden und Lumi-Tipps. Vorher war das immer die neueste Insel.
+   Ohne Wahl (oder wenn die Insel nicht mehr passt): die neueste offene Insel, die nicht im Urlaub ist. */
+function focusRow(state){
+  const open=unlockedRows(state), f=state.focus;
+  if(f!=null && open.includes(f) && !onVacation(state,f)) return f;
+  for(let i=open.length-1;i>=0;i--) if(!onVacation(state,open[i])) return open[i];
+  return open[open.length-1];
+}
+/* Tier war schon einmal wach (Reihe einmal gemeistert). Solche Reihen werden normal wiederholt, auch wenn sie wackeln. */
+function everAwake(state,r){ return (Array.isArray(state.awake) && state.awake.includes(r)) || rowMastery(state,r)>=ROW_UNLOCK_SHARE; }
+/* Ruhende Insel (seit v72): offen, aber nicht die Lieblingsinsel und noch nie gemeistert (z. B. die 8er, wenn Romy auf der 3er spielt).
+   Von dort kommen nur Aufgaben, die schon fast sitzen (Fach 2 und höher), nie neue oder wackelnde. Keine Blockaden, keine Reihen-Sprünge.
+   So kommt 8 · 6 erst wieder, wenn Romy selbst auf die 8er-Insel geht. */
+const PARK_ROW_W = 0.5, PARK_MIN_BOX = 2;
+/* Kleine Schritte (seit v72, Simon: "viel, viel langsamer"): Je Reihe sind höchstens ACTIVE_MAX Aufgaben gleichzeitig neu oder wackelnd
+   (Fach 0-1) im Spiel, die leichtesten zuerst (EASE_ORDER, Malnehmer: Kernaufgaben 1, 2, 10, 5, dann 3, 4, 6, 9, 8, 7).
+   Erst wenn eine davon Fach 2 erreicht, kommt die nächste dazu. 8 · 6 und 8 · 7 kommen so ganz zum Schluss.
+   Fach 2 und höher läuft wie bisher. Inselritt (ganze Reihe am Stück) ist davon nicht betroffen. */
+const EASE_ORDER = [1,2,10,5,3,4,6,9,8,7], ACTIVE_MAX = 3;
+function activeSet(state,r){
+  return new Set(EASE_ORDER.filter(b=>!isRetired(state,r,b) && state.facts[factKey(r,b)].box<2).slice(0,ACTIVE_MAX));
+}
+function isParked(state,r){ return r!==focusRow(state) && !onVacation(state,r) && !everAwake(state,r); }
 
 function isDue(f, now){
   if(f.seen===0) return true;
@@ -740,13 +769,17 @@ function isRetired(state,r,b){ return onVacation(state,1) && (r===1 || b===1); }
 function pickTask(state, recentKeys, now, rng, opts){
   rng = rng || Math.random;
   if(opts && opts.div && state.divOn!==false && rng()<DIV_SHARE){ const d=pickDiv(state, recentKeys, now, rng); if(d) return d; }
-  const open = unlockedRows(state), newest = open[open.length-1];
+  const open = unlockedRows(state), focus = focusRow(state);   // seit v72: Lieblingsinsel statt neueste Insel
   const cand = [];
   for(const r of open){
-    const rowW = rowMastery(state,r)>=ROW_UNLOCK_SHARE ? DONE_ROW_W : (r===newest ? NEW_ROW_W : 1);
+    const parked = isParked(state,r);
+    const rowW = parked ? PARK_ROW_W : rowMastery(state,r)>=ROW_UNLOCK_SHARE ? DONE_ROW_W : (r===focus ? NEW_ROW_W : 1);
+    const active = activeSet(state,r);
     for(let b=1;b<=10;b++){
       if(isRetired(state,r,b)) continue;
       const k=factKey(r,b), f=state.facts[k];
+      if(parked && f.box<PARK_MIN_BOX) continue;      // ruhende Insel: nichts Neues, nichts Wackelndes
+      if(f.box<2 && !active.has(b)) continue;         // kleine Schritte: höchstens ACTIVE_MAX neue/wackelnde je Reihe
       let w = BOX_WEIGHT[f.box]*rowW;
       if(isDue(f,now)) w*=2.2;
       if(f.no>f.ok) w*=1.6;                           // Stolperfakten anziehen
@@ -833,9 +866,9 @@ function blockWeight(f){ if(!f) return 0; if(f.box===2) return 3; if(f.box>=3 &&
 function pickBlockTarget(state, recentKeys, rng){
   rng=rng||Math.random;
   const cand=[]; let sum=0;
-  const open=unlockedRows(state), newest=open[open.length-1];
+  const open=unlockedRows(state), newest=focusRow(state);   // seit v72: Lieblingsinsel zählt dreifach, ruhende Inseln nie
   for(const r of open) for(let b=1;b<=10;b++){
-    if(isRetired(state,r,b)) continue;
+    if(isRetired(state,r,b) || isParked(state,r)) continue;
     const k=factKey(r,b); let w=blockWeight(state.facts[k]);
     if(w && r===newest) w*=BLOCK_NEWEST_W;
     if(!w) continue;
@@ -855,7 +888,7 @@ function pickBlockTarget(state, recentKeys, rng){
    sonst: Fach-2-Aufgaben übrig (schon getippt, aber zu langsam) → practice (schnell eintippen), sonst run. */
 const GUIDE_NEW = 3, GUIDE_UNTYPED = 2;
 function guideMode(state, kwDue){
-  const open=unlockedRows(state), row=open[open.length-1], facts=rowFacts(state,row);
+  const row=focusRow(state), facts=rowFacts(state,row);   // seit v72: Lieblingsinsel
   const live=facts.filter((f,i)=>!isRetired(state,row,i+1));
   const neu=live.filter(f=>f.seen===0&&f.box===0).length;          // Tausch-Start (Fach 1-2 ungesehen) ist nicht neu
   const wackelt=live.filter(f=>f.box<=1&&!(f.seen===0&&f.box===0)).length;
@@ -872,7 +905,7 @@ function guideMode(state, kwDue){
 /* Gibt es bei Lumi vorwärts etwas zu tun? (Kawumm auf Reisen fliegt nur dann los)
    Ja, wenn die neueste offene Insel noch nicht 8 von 10 lila hat oder eine Lumi-Wiederholung fällig ist. */
 function lumiWorkLeft(state, now){
-  const open=unlockedRows(state), row=open[open.length-1];
+  const open=unlockedRows(state), row=focusRow(state);
   if(rowMastery(state,row)<ROW_UNLOCK_SHARE) return true;
   return open.some(r=>!onVacation(state,r) && rowFacts(state,r).some((f,i)=>!isRetired(state,r,i+1) && f.seen>0 && isDue(f,now)));
 }
@@ -944,7 +977,7 @@ function makeOptions(answer,a,b,rng){
 /* Reihen-Sprung: "…, 8, 12, ?" – nächste Zahl der Reihe finden */
 function seqQuestion(state,rng){
   rng=rng||Math.random;
-  const open=unlockedRows(state).filter(r=>r>1 && !(r===10 && onVacation(state,10)));
+  const open=unlockedRows(state).filter(r=>r>1 && !(r===10 && onVacation(state,10)) && !isParked(state,r));   // ruhende Inseln nie (seit v72)
   const row=open.length?open[Math.min(open.length-1,Math.floor(rng()*open.length))]:2;
   const k=3+Math.floor(rng()*8);              // Position 3..10
   const answer=k*row, shown=[(k-2)*row,(k-1)*row];
@@ -1186,6 +1219,9 @@ function upgradeState(p){
   if(!Array.isArray(p.unlocked)) rememberUnlocks(p);               // alter Stand: heutige Inseln merken
   for(const k in p.facts){ const f=p.facts[k]; if(f && typeof f.typed!=='number') f.typed=0; }   // seit Paket B: selbst eingetippt (alte Stände: noch nie)
   if(p.kw && typeof kwTripEnsure==='function') kwTripEnsure(p.kw);   // seit v64: Kawumm auf Reisen (Reise, Briefe, Andenken)
+  if(!Array.isArray(p.awake)) p.awake=ROW_ORDER.filter(r=>rowMastery(p,r)>=ROW_UNLOCK_SHARE);   // seit v72: schon wache Tiere nicht nochmal feiern
+  if(p.focus===undefined) p.focus=null;                                // seit v72: Lieblingsinsel (null = neueste offene)
+  if(typeof lzEnsure==='function') lzEnsure(p);                        // seit v72: Lieses Pläne und Inselgeschichten (liese.js)
   return p;
 }
 function load(){
@@ -1739,8 +1775,7 @@ function renderDots(el, rows, cols, caption, opt){
 function renderHome(){
   $('starCount').textContent=S.stars;
   $('homeTitle').textContent='Hallo '+S.name+'!';
-  const open=unlockedRows(S), m=masteredCount(S);
-  const cur=open[open.length-1];
+  const m=masteredCount(S), cur=focusRow(S);
   $('homeSub').textContent = m>=100 ? 'Alle Inseln leuchten! Du kannst das ganze Einmaleins! 🦄' :
     'Weiter geht es auf der '+cur+'er-Insel. '+FRIENDS[cur][1]+' wartet dort auf dich.';
   $('unicornHome').innerHTML=unicornSVG(S.gear,200)+[[8,18,0],[86,4,.6],[12,70,1.1],[90,60,.3],[48,-2,.9],[70,82,1.4]].map(([x,y,d])=>'<span class="gl" style="left:'+x+'%;top:'+y+'%;animation-delay:'+d+'s">✦</span>').join('');
@@ -1752,7 +1787,8 @@ function renderHome(){
   $('giftInfo').onclick = pend>0 ? ()=>showGiftChoice() : null;
   // Wegweiser: der Modus, der jetzt am meisten hilft, leuchtet sanft (kein Zwang)
   const gm=guideMode(S, kwDueNow());
-  for(const id of ['btnRun','btnPractice','btnPath']) $(id).classList.toggle('guide', id===GUIDE_BTN[gm.mode]);
+  const lzPlan=!!(window.LZ && LZ.planWaiting());   // seit v72: Liese hat einen Plan geschrieben → Inselwelt leuchtet
+  for(const id of ['btnRun','btnPractice','btnPath']) $(id).classList.toggle('guide', id===(lzPlan?'btnPath':GUIDE_BTN[gm.mode]));
   if(window.KW) KW.mailBtn();   // Briefkasten (Kawumm auf Reisen): nur sichtbar, wenn Kawumm da ist, Abzeichen für ungelesene Briefe
 }
 /* ---------- Wegweiser (Startseite) ----------
@@ -1774,6 +1810,7 @@ function maybeGuideSay(tries){
   let busy=false; try{ busy=speechSynthesis.speaking||speechSynthesis.pending; }catch(e){}
   if(busy && tries<8){ setTimeout(()=>maybeGuideSay(tries+1),700); return; }   // Lumis Begrüßung nicht abschneiden
   guideSaid=true;
+  if(window.LZ && LZ.planWaiting()){ speak(pickOne(LZ_GUIDE_LINES)); return; }   // seit v72: Lieses neuer Plan geht vor
   const gm=guideMode(S, kwDueNow());
   speak(pickOne(GUIDE_LINES[gm.why]).replace('{r}',gm.row));
 }
@@ -1964,24 +2001,38 @@ function claimGift(it){
   bigKnall(); sndFanfare();
   speak('Lumi hat jetzt: '+nm+'! Wunderschön!');
 }
-let lastOpenCount=null;
+/* Inselfest (seit v72 umgebaut): gefeiert wird, wenn ein Tier aufwacht (Reihe zum ersten Mal 8 von 10 lila).
+   Das ist der Bonus, keine Pflicht mehr: Inseln öffnet auch Liese (liese.js). Geht dabei über die Kette eine neue Insel auf,
+   wird sie mit genannt, und war die gemeisterte Insel die Lieblingsinsel, zieht Lumi dorthin weiter.
+   Urlaubsreihen (1er, 10er) haben ihre eigene Ansage und werden still gemerkt. Neu offene Inseln merkt sich PARTY_OPEN,
+   damit Lieses Öffnungen (LZ setzt PARTY_OPEN selbst nach) kein falsches Fest auslösen. */
+let PARTY_OPEN=null;
+function partyOpenSync(){ PARTY_OPEN=unlockedRows(S).slice(); }
 function maybeRowParty(){
-  const n=unlockedRows(S).length;
-  if(lastOpenCount===null){ lastOpenCount=n; return; }
-  if(n>lastOpenCount){
-    lastOpenCount=n;
-    const row=unlockedRows(S)[n-1];           // neue Insel
-    const done=unlockedRows(S)[n-2];          // gemeisterte Insel -> Freund befreit
-    const fr=FRIENDS[done];
-    setTimeout(()=>{
-      showOverlay('<h2>Die '+done+'er-Insel leuchtet! 🌈</h2>'
-        +'<div style="font-size:64px;line-height:1">'+fr[0]+'</div>'
-        +'<div class="pill">'+fr[1]+' ist aufgewacht und fliegt jetzt mit!</div>'
-        +'<p style="margin:0;font-weight:600;color:var(--muted)">Nächstes Abenteuer: die '+row+'er-Insel</p>','Weiter zur '+row+'er-Insel!');
-      bigKnall(); sndFanfare();
-      speak('Juhu! Die '+done+'er-Insel leuchtet wieder! '+fr[1]+' ist aufgewacht! Weiter zur '+row+'er-Insel!'+swapNewsLine(row,true));
-    },2000);
-  }
+  const open=unlockedRows(S);
+  if(PARTY_OPEN===null) PARTY_OPEN=open.slice();
+  const opened=open.filter(r=>!PARTY_OPEN.includes(r));
+  PARTY_OPEN=open.slice();
+  S.awake=Array.isArray(S.awake)?S.awake:[];
+  const woke=ROW_ORDER.filter(r=>!S.awake.includes(r) && rowMastery(S,r)>=ROW_UNLOCK_SHARE);
+  if(!woke.length) return;
+  const wasFocus=focusRow(S);
+  woke.forEach(r=>S.awake.push(r));
+  const done=woke.find(r=>!VACATION_ROWS.includes(r));
+  if(done===undefined){ save(); return; }
+  const row=opened.length?opened[0]:null;
+  if(row!==null && wasFocus===done) S.focus=row;           // Lumi zieht mit zur neuen Insel
+  save();
+  const fr=FRIENDS[done];
+  setTimeout(()=>{
+    showOverlay('<h2>Die '+done+'er-Insel leuchtet! 🌈</h2>'
+      +'<div style="font-size:64px;line-height:1">'+fr[0]+'</div>'
+      +'<div class="pill">'+fr[1]+' ist aufgewacht!</div>'
+      +(row!==null?'<p style="margin:0;font-weight:600;color:var(--muted)">Neue Insel: die '+row+'er-Insel</p>':''),
+      row!==null?'Weiter zur '+row+'er-Insel!':'Juhu!');
+    bigKnall(); sndFanfare();
+    speak('Juhu! Die '+done+'er-Insel leuchtet! '+fr[1]+' ist aufgewacht!'+(row!==null?' Und die '+row+'er-Insel ist aufgetaucht!'+swapNewsLine(row,true):''));
+  },2000);
 }
 /* Tauschaufgaben (seit v66): Beim Öffnen einer Insel sagt Lumi einmal, wie viele Aufgaben der neuen Reihe Romy
    andersrum schon kann (seedSwaps legt S.swapNews an). Nur gesprochen. consume: Eintrag verbrauchen und speichern. */
@@ -2564,7 +2615,8 @@ function hideBlock(instant){
 /* Rundenende: neue lila Sterne seit Rundenstart nennen (seit v69). Sichtbar: Insel, lila Sterne, Aufgaben. Gesprochen ein Satz.
    Liefert den Satz (leer, wenn nichts dazukam). */
 let LILA0=null;
-function lilaStart(){ const o=unlockedRows(S); LILA0={keys:lilaSnap(S), newest:o[o.length-1]}; }
+function lilaStart(){ LILA0={keys:lilaSnap(S), newest:focusRow(S)}; }
+/* Seit v72 kein "Jetzt hast du 6 von 8" mehr (Entscheidung Simon: Sterne sind Bonus, kein Druck). Lumi freut sich nur. */
 function lilaEnd(){
   const el=$('endLila'); el.hidden=true; el.innerHTML=''; el.className='';
   if(!LILA0) return '';
@@ -2573,13 +2625,8 @@ function lilaEnd(){
   if(!g.length) return '';
   el.className='endlila'; el.hidden=false;
   el.innerHTML=g.map(x=>'<div class="ln">'+x.row+'er-Insel '+x.keys.map(()=>starSVG('#9A6AE8')).join('')+x.keys.map(k=>'<span>'+k.replace('x',' · ')+'</span>').join('')+'</div>').join('');
-  const open=unlockedRows(S), cur=open[open.length-1], next=nextLockedRow(S);
   const part=x=>(x.keys.length===1?'einen lila Stern':x.keys.length+' lila Sterne')+' für die '+x.row+'er-Insel';
-  let line='Und du hast '+(g.length===1?part(g[0]):g.slice(0,-1).map(part).join(', ')+' und '+part(g[g.length-1]))+' gesammelt!';
-  if(next!==null && cur===start.newest && g.some(x=>x.row===cur)){   // ist in der Runde eine Insel aufgegangen, feiert maybeRowParty
-    const have=Math.round(rowMastery(S,cur)*10), need=Math.ceil(ROW_UNLOCK_SHARE*10);
-    if(have<need) line+=' Jetzt hast du '+have+' von '+need+'.';
-  }
+  const line='Und du hast '+(g.length===1?part(g[0]):g.slice(0,-1).map(part).join(', ')+' und '+part(g[g.length-1]))+' gesammelt!';
   return ' '+line;
 }
 function finishRun(){
@@ -2614,7 +2661,7 @@ let ISL=null;
 function starsAvail(){ return Math.max(0, S.stars-(S.spent||0)); }
 function islandBuilt(r){ return (S.islands&&S.islands[r])||[]; }
 function renderPath(){
-  const open=unlockedRows(S), next=nextLockedRow(S), W=IW();
+  const open=unlockedRows(S), W=IW(), focus=focusRow(S);
   $('mapStarCount').textContent=starsAvail();
   const el=$('pathList'); el.innerHTML='';
   if(window.KW) KW.mapCard(el);
@@ -2623,75 +2670,74 @@ function renderPath(){
     const facts=rowFacts(S,r);
     const stars=facts.map((f,i)=> f.box>=5?starSVG('#F2B83C') : (f.box>=3||isRetired(S,r,i+1))?starSVG('#9A6AE8') : (f.seen>0||f.box>0)?starSVG('#D9CFF0'):starSVG('#EEE8F8')).join('');
     const mastered=rowMastery(S,r)>=ROW_UNLOCK_SHARE, isOpen=open.includes(r), away=isOpen&&onVacation(S,r);
+    const plan=!isOpen && !!(window.LZ && LZ.planWaiting());     // seit v72: Liese hat einen Plan für geschlossene Inseln
     const b=document.createElement(away?'div':'button');   // im Urlaub: kein Knopf, keine Interaktion
-    b.className='islcard'+(isOpen?'':' locked')+(away?' away':'');
+    b.className='islcard'+(isOpen?'':' locked')+(away?' away':'')+(plan?' lzplan':'')+(isOpen&&!away&&r===focus?' lzfocus':'');
     b.dataset.row=r;
     b.innerHTML=W.islandSVG(r,{open:isOpen, mastered, built:islandBuilt(r), size:200})
       +'<div class="nm">'+r+'er-Insel</div>'
       +'<div class="ministars">'+stars+'</div>'
       +(away?'<div class="awaysign"><b>Im Urlaub</b><span>🧳 🏖</span></div>':'')
+      +(window.LZ?LZ.badges(r,isOpen,away,r===focus):'')
       +(isOpen&&!away&&window.KW?KW.badge(r):'');
     if(away && !(S.vacSaid&&S.vacSaid[r])){ S.vacSaid=S.vacSaid||{}; S.vacSaid[r]=true; newAway.push(r); }   // Ansage nur ein einziges Mal
     else if(isOpen) b.addEventListener('click',()=>openIsland(r));
-    else b.addEventListener('click',()=>{ speak(r===next?'Diese Insel taucht bald auf. Erst die '+open[open.length-1]+'er-Reihe schaffen!':'Diese Insel ist noch hinter den Wolken.'); });
+    else b.addEventListener('click',()=>{ if(window.LZ && LZ.lockedTap(r)) return; speak('Diese Insel ist noch hinter den Wolken.'); });
     el.appendChild(b);
   }
   if(newAway.length){ save(); const t=newAway.length===1?vacationLine(newAway[0]):newAway.map(r=>FRIENDS[r][1]).join(' und ')+' machen Urlaub! Du kannst die '+newAway.join('er- und die ')+'er-Reihe schon so gut, dass sie am Strand liegen und Eis essen.'; setTimeout(()=>speak(t),900); }
 }
+/* Seit v72 sagt kein Tier mehr "Schaffst du die Reihe?" oder "was noch fehlt". Druck raus (Entscheidung Simon). */
 const ANIMAL_LINES={
-  wait:['Hallo! Ich bin {n}. Übst du die {r}er-Reihe mit mir? Tipp mich an, dann sag ich dir, was noch fehlt.','Hallo, ich warte hier auf dich. Schaffst du die {r}er-Reihe?','Die {r}er-Reihe macht mich ganz müde. Hilfst du mir?'],
-  awake:['Juhu, du bist da! Die {r}er-Reihe kannst du schon! Tipp mich an, dann verrate ich dir die nächste Insel.','Reiten wir noch eine Runde? Ich liebe den Inselritt!','Schau dir meine Insel an! Hast du Sterne für etwas Neues?']
+  wait:['Hallo! Ich bin {n}. Schön, dass du mich besuchst!','Hallo, ich bin {n}! Tipp mich an, dann erzähl ich dir was.','Hallo! Hier auf meiner Insel ist es toll. Schau dich um!'],
+  awake:['Juhu, du bist da! Die {r}er-Reihe kannst du schon!','Reiten wir noch eine Runde? Ich liebe den Inselritt!','Schau dir meine Insel an! Hast du Sterne für etwas Neues?']
 };
 function islandLine(r){
   const m=rowMastery(S,r)>=ROW_UNLOCK_SHARE, pool=ANIMAL_LINES[m?'awake':'wait'];
   return pool[Math.floor(Math.random()*pool.length)].replace('{n}',FRIENDS[r][1]).replace('{r}',r);
 }
-/* Was fehlt bis zur nächsten Insel? Kindgerecht, mit Spieltipp. Wird gesagt, wenn man das Tier antippt.
-   Regel: Die neueste offene Insel braucht 8 lila Sterne (Aufgaben in Box 3+), dann taucht die nächste auf.
-   Lila wird eine Aufgabe nur durch eine schnelle, selbst eingetippte Antwort (seit Paket B).
-   Der Tipp kommt aus guideMode (dieselbe Regel wie der Wegweiser auf der Startseite; Kawumm spielt hier keine Rolle). */
+/* Was das Tier sagt, wenn man es antippt (seit v72): kein "noch X lila Sterne, dann kommt die nächste Insel" mehr.
+   Stattdessen: Spielt Romy hier? Dann ein Spieltipp aus guideMode (dieselbe Regel wie der Wegweiser). Sonst die Einladung, hier zu spielen.
+   Dazu Lieses neuer Plan oder eine neue Geschichte, wenn es sie gibt. Lila Sterne nur als Bonus: Bei 8 wacht das Tier auf. */
 function nextIslandLine(r){
-  const open=unlockedRows(S), cur=open[open.length-1], next=nextLockedRow(S);
-  if(next===null) return pickOne(['Alle Inseln sind schon offen! Jetzt kannst du alle Sterne golden machen.','Du hast alle Inseln geweckt! Schaffst du es, dass alle Sterne golden leuchten?']);
-  const facts=rowFacts(S,cur), need=Math.ceil(ROW_UNLOCK_SHARE*10);
-  const sure=Math.round(rowMastery(S,cur)*10), rest=Math.max(1,need-sure);   // ausgemusterte zählen mit (rowMastery)
-  const gm=guideMode(S,false), fast=gm.fast;
-  const nextName='die '+next+'er-Insel', nextFriend=FRIENDS[next][1];
-  const where = r===cur ? 'auf meiner Insel' : 'auf der '+cur+'er-Insel';
-  const TIPS={
-    new: r===cur ? 'Tipp: Reite den Inselritt hier bei mir. Da lernst du die ganze '+cur+'er-Reihe kennen.' : 'Tipp: Flieg zur '+cur+'er-Insel und reite dort den Inselritt.',
-    shaky:'Tipp: Spiel das Zaubertraining. Da übst du ganz in Ruhe die Aufgaben, die noch wackeln.',
-    untyped:'Tipp: Spiel den Wolkenflug. Wenn sich jemand auf die Tore legt, tippst du die Zahl selbst ein. Dann werden die Sterne lila.',
-    speed:'Tipp: Spiel das Zaubertraining und tipp die Ergebnisse ganz schnell ein. Dann werden die Sterne lila.',
-    fun: gm.neu>0 ? 'Tipp: Spiel das Zaubertraining, da kommen auch die letzten neuen Aufgaben dran.' : 'Tipp: Spiel das Zaubertraining und tipp die Ergebnisse schnell ein.'
-  };
-  const tip=TIPS[gm.why]||TIPS.shaky;
-  const almost = fast>0 && fast>=rest ? ' Bei '+plural(fast,'Aufgabe','Aufgaben')+' fehlt nur noch eine schnelle Antwort, selbst eingetippt!' : '';
-  const head = rest===1
-    ? pickOne(['Nur noch 1 lila Stern '+where+', dann taucht '+nextName+' auf!','Fast geschafft! Noch 1 lila Stern '+where+', dann kommt '+nextName+'.'])
-    : pickOne(['Noch '+rest+' lila Sterne '+where+', dann taucht '+nextName+' auf!','Weißt du was? Mit '+rest+' lila Sternen mehr '+where+' wacht '+nextName+' auf.']
-        .concat(sure>0?['Du hast schon '+sure+' von '+need+' lila Sternen '+where+'. Bei '+need+' taucht '+nextName+' auf!']:[]));
-  const friend = r===cur ? ' Dort wartet '+nextFriend+'.' : '';
-  const done = r!==cur ? pickOne(['Meine Insel leuchtet schon, danke! ','Mich hast du schon geweckt! ']) : '';
-  return done+head+friend+almost+' '+tip;
+  const fr=FRIENDS[r][1], mastered=rowMastery(S,r)>=ROW_UNLOCK_SHARE, here=focusRow(S)===r;
+  const parts=[];
+  if(mastered) parts.push(pickOne(['Meine Insel leuchtet, danke!','Mich hast du schon geweckt! Danke!']));
+  else if(here){
+    const gm=guideMode(S,false);
+    const TIPS={
+      new:'Reite den Inselritt hier bei mir. Da lernst du die ganze '+r+'er-Reihe kennen.',
+      shaky:'Im Zaubertraining kannst du ganz in Ruhe üben.',
+      untyped:'Flieg mit Lumi im Wolkenflug. Da kommen meine Aufgaben oft dran.',
+      speed:'Im Zaubertraining kannst du die Ergebnisse selbst eintippen.',
+      fun:'Flieg mit Lumi im Wolkenflug!'
+    };
+    parts.push(pickOne(['Wie schön, dass du hier spielst!','Wir spielen zusammen, juhu!'])+' '+(TIPS[gm.why]||TIPS.fun));
+    if(Math.random()<0.5) parts.push('Wenn hier 8 Sterne lila sind, wache ich ganz auf. Aber das hat Zeit.');
+  }
+  else parts.push('Willst du hier spielen? Dann tipp auf Hier spielen. Dann kommen meine Aufgaben im Wolkenflug.');
+  if(window.LZ){ const x=LZ.animalHint(r); if(x) parts.push(x); }
+  return parts.join(' ');
 }
 function pickOne(a){ return a[Math.floor(Math.random()*a.length)]; }
 const VACATION_LINES=['{n} ist im Urlaub! Du kannst die {r}er-Reihe schon so gut, dass {n} am Strand liegt und Eis isst.','Hör mal, {n} macht Ferien. Die {r}er-Reihe kannst du ja schon!','{n} hat eine Postkarte geschickt: Liebe Grüße aus dem Urlaub! Die {r}er-Reihe kannst du schon.'];
 function vacationLine(r){ return pickOne(VACATION_LINES).replace(/\{n\}/g,FRIENDS[r][1]).replace(/\{r\}/g,r); }
-function openIsland(r){
+function openIsland(r, o){
+  o=o||{};
   if(onVacation(S,r)){ renderPath(); show('path'); return; }
   const W=IW(); ISL=r;
   const mastered=rowMastery(S,r)>=ROW_UNLOCK_SHARE;
   $('islTitle').textContent=r+'er · '+W.ISLANDS[r].title;
   $('islStarCount').textContent=starsAvail();
   $('islStage').innerHTML=W.islandSVG(r,{open:true, mastered, built:islandBuilt(r), animate:true, size:420});
-  const line=islandLine(r);
+  const line=o.line||islandLine(r);
   $('islBubble').textContent=line;
-  const facts=rowFacts(S,r), sure=Math.round(rowMastery(S,r)*10);   // ausgemusterte zählen mit
-  $('islProgress').innerHTML=facts.map((f,i)=> f.box>=5?starSVG('#F2B83C') : (f.box>=3||isRetired(S,r,i+1))?starSVG('#9A6AE8') : (f.seen>0||f.box>0)?starSVG('#D9CFF0'):starSVG('#EEE8F8')).join('')+'<span style="margin-left:6px">'+(()=>{ const op=unlockedRows(S), nx=nextLockedRow(S); return (r===op[op.length-1]&&nx!==null)? Math.min(sure,8)+' / 8' : ''; })()+(S.best.rows[r]?' · 🏆 '+(S.best.rows[r]/1000).toFixed(1).replace('.',',')+' s':'')+'</span>';
+  const facts=rowFacts(S,r);
+  $('islProgress').innerHTML=facts.map((f,i)=> f.box>=5?starSVG('#F2B83C') : (f.box>=3||isRetired(S,r,i+1))?starSVG('#9A6AE8') : (f.seen>0||f.box>0)?starSVG('#D9CFF0'):starSVG('#EEE8F8')).join('')+(S.best.rows[r]?'<span style="margin-left:6px">🏆 '+(S.best.rows[r]/1000).toFixed(1).replace('.',',')+' s</span>':'');   // seit v72 ohne "x / 8"
   const an=$('islStage').querySelector('.isl-animal');
   if(an){ an.style.cursor='pointer'; an.addEventListener('click',()=>{ an.classList.remove('hop'); void an.getBBox(); an.classList.add('hop'); smallSparkle(); sndGood(); const t=nextIslandLine(r); $('islBubble').textContent=t; speak(t); }); }
   renderShop(r);
+  if(window.LZ) LZ.islandButtons(r);
   if(window.KW) KW.islandCard(r);
   show('island');
   speak(line+swapNewsLine(r,true));
@@ -2785,6 +2831,7 @@ function renderParent(){
     +'<div class="legend"><span><i style="background:#F3F0F8"></i>neu</span><span><i style="background:#E3D6F6"></i>in Arbeit</span><span><i style="background:#CDB4F0"></i>sicher</span><span><i style="background:#F2B83C"></i>blitzschnell</span><span>! = Stolperfakt</span></div>'
     +heat
     +'<h2>Bestzeiten Inselritt</h2><div class="besttimes">'+bests+'</div>'
+    +'<h2>Liese: Pläne, Geschichten, Lieblingsinsel</h2>'+(window.LZ?LZ.parentHTML():'')
     +'<h2>Kawumm (Rückwärtsreihen)</h2>'+(window.KW?KW.parentHTML():'')
     +'<div class="setrow"><label>Wolkenflug: Blockade im nächsten Ritt (bis zu 3, ab dem 2. Tor). Figur: '+(window.KW&&KW.active()&&!KW.away()?'Kawumm':'Alien Plopp')+'</label><button class="smallbtn" id="setForceBlock">'+(forceBlockNext?'kommt':'erzwingen')+'</button></div>'
     +'<h2>Einstellungen</h2>'
@@ -2808,6 +2855,7 @@ function renderParent(){
     +'</div><div id="bkMsg" style="font-size:13px;color:var(--muted);font-weight:700;"></div>';
 
   if(window.KW) KW.parentWire();
+  if(window.LZ) LZ.parentWire();
   $('setForceBlock').addEventListener('click',()=>{ forceBlockNext=BLOCK_MAX; $('setForceBlock').textContent='kommt'; });
   $('setName').addEventListener('change',e=>{ S.name=(e.target.value||'').trim()||'Du'; save(); });
   $('setSound').addEventListener('click',()=>{ S.sound=!S.sound; save(); renderParent(); });
@@ -2829,7 +2877,7 @@ function renderParent(){
   $('bkFileBtn').addEventListener('click',()=>$('bkFile').click());
   $('bkFile').addEventListener('change',async e=>{
     const f=e.target.files&&e.target.files[0]; if(!f) return;
-    try{ const p=JSON.parse(await f.text()); if(p&&p.v===1&&p.facts){ S=upgradeState(p); save(); renderParent(); $('bkMsg').textContent='Lernstand aus der Datei geladen.'; } else throw 0; }
+    try{ const p=JSON.parse(await f.text()); if(p&&p.v===1&&p.facts){ S=upgradeState(p); save(); partyOpenSync(); renderParent(); $('bkMsg').textContent='Lernstand aus der Datei geladen.'; } else throw 0; }
     catch(err){ $('bkMsg').textContent='Das ist keine Lumi-Sicherungsdatei.'; }
   });
   $('bkExport').addEventListener('click',()=>{ $('backupTa').value=JSON.stringify(S); $('bkMsg').textContent='Stand steht im Feld.'; });
@@ -2839,13 +2887,13 @@ function renderParent(){
     catch(e){ $('backupTa').focus(); $('backupTa').select(); $('bkMsg').textContent='Bitte manuell kopieren (Text ist markiert).'; }
   });
   $('bkImport').addEventListener('click',()=>{
-    try{ const p=JSON.parse($('backupTa').value); if(p&&p.v===1&&p.facts){ S=upgradeState(p); save(); renderParent(); $('bkMsg').textContent='Lernstand geladen.'; } else throw 0; }
+    try{ const p=JSON.parse($('backupTa').value); if(p&&p.v===1&&p.facts){ S=upgradeState(p); save(); partyOpenSync(); renderParent(); $('bkMsg').textContent='Lernstand geladen.'; } else throw 0; }
     catch(e){ $('bkMsg').textContent='Das sieht nicht nach einem Lernstand aus.'; }
   });
   let resetArmed=false;
   $('bkReset').addEventListener('click',()=>{
     if(!resetArmed){ resetArmed=true; $('bkReset').textContent='Wirklich? Nochmal tippen'; setTimeout(()=>{resetArmed=false; const b=$('bkReset'); if(b) b.textContent='Alles zurücksetzen';},4000); return; }
-    S=defaultState(); save(); lastOpenCount=1; renderParent(); $('bkMsg').textContent='Alles auf Anfang.';
+    S=defaultState(); save(); partyOpenSync(); renderParent(); $('bkMsg').textContent='Alles auf Anfang.';
   });
 }
 
@@ -2884,12 +2932,14 @@ function sndWhoosh(){ for(let i=0;i<6;i++) tone(220+i*90,.12,i*0.08,'triangle',.
 function init(){
   load();
   initStars();
-  lastOpenCount=unlockedRows(S).length;
+  partyOpenSync();
   if(window.KW) KW.setup();
   show('home');
-  if(!matchMedia('(prefers-reduced-motion: reduce)').matches) setTimeout(()=>playIntroOnce().then(()=>{ if(window.KW) KW.maybeLetter(); setTimeout(maybeGuideSay,2200); }), 150);
-  else { if(window.KW) setTimeout(()=>KW.maybeLetter(), 600); setTimeout(maybeGuideSay,2500); }
+  if(!matchMedia('(prefers-reduced-motion: reduce)').matches) setTimeout(()=>playIntroOnce().then(()=>{ startLetters(); setTimeout(maybeGuideSay,2200); }), 150);
+  else { setTimeout(startLetters, 600); setTimeout(maybeGuideSay,2500); }
 }
+/* Post beim App-Start: Lieses Begrüßungsbrief geht einmal vor (seit v72), sonst Kawumm (Einladung, Reisebrief, Rückkehr). */
+function startLetters(){ if(window.LZ && LZ.maybeHello()) return; if(window.KW) KW.maybeLetter(); }
 const _boot=()=>init();
 (window.claude&&window.claude.hot&&window.claude.hot.ready)? window.claude.hot.ready(_boot) : _boot();
 </script>

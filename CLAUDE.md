@@ -68,8 +68,9 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 - Intro: Der Tipp zum Überspringen darf nicht ins Menü durchrutschen. `#intro` bleibt beim Ausblenden tippbar, danach schluckt `tapGuard(1400)` alle Klicks, aber nur wenn im Intro getippt wurde (`introTouched`). Läuft das Intro durch, ist das Menü sofort tippbar.
 - Elternbereich: "Stimme testen" zeigt Stimmen, gesprochen x von y, Weg, Neuversuche, letzten Fehler.
 
-## Nächste Insel (seit v34)
-- Tippt man auf der Insel das Tier an, sagt es `nextIslandLine(r)`: wie viele lila Sterne (Box 3+) auf der neuesten offenen Insel noch fehlen (8 von 10 nötig), welche Insel dann kommt und einen Spieltipp.
+## Nächste Insel (seit v34, seit v72 ohne Druck)
+- Seit v72 sagt das Tier kein "noch X lila Sterne, dann kommt die nächste Insel" mehr. `nextIslandLine(r)`: Spielt Romy hier, ein Spieltipp aus `guideMode`; sonst Einladung zu "Hier spielen"; dazu Lieses Plan oder neue Geschichte (`LZ.animalHint`). Kein "x / 8" mehr unter den Sternen, kein "Jetzt hast du 6 von 8" am Rundenende.
+- Alt (bis v71): Tier sagte, wie viele lila Sterne (Box 3+) auf der neuesten offenen Insel noch fehlen (8 von 10 nötig), welche Insel dann kommt und einen Spieltipp.
 - Tipp-Regel: kommt aus `guideMode` (siehe Wegweiser, seit v63), dieselbe Regel wie auf der Startseite. Box 2 → 3 nur bei schneller, selbst eingetippter Antwort (siehe Lila nur nach Eintippen).
 - Unter den Sternen der aktuellen Insel steht "x von 8 für die Ner-Insel". Elemente in `.islwrap` dürfen nicht schrumpfen (`flex-shrink:0`).
 
@@ -173,3 +174,23 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 - Nur in Zaubertraining, Sternschnuppe (dort auch ohne Fach 2) und an normalen Wolkenflug-Toren (`makeDivOptions`: Nachbarn des Ergebnisses). Nie am Weltentor, nie als Blockade, nie im Inselritt, nie bei Kawumm. Rätsel-Teilaufgaben (`friendRiddle`) buchen weiter auf den Mal-Fakt.
 - Anzeige "42 : 7", Sprache "42 geteilt durch 7". Elternbereich: Schalter "Geteilt-Aufgaben" (`S.divOn`, Standard an) und "Geteilt sicher x / y" (`divStats`).
 
+
+## Druck raus: Lieblingsinsel, ruhende Inseln, kleine Schritte (seit v72, Entscheidung Simon)
+- Anlass: Romy (Anfang 2. Klasse) hing an der 8er-Insel fest (8 · 6 zu schwer), keine neuen Inseln, Frust. Romy soll selbst bestimmen, lila Sterne sind Bonus.
+- Lieblingsinsel `S.focus` (null = neueste offene). `focusRow(state)` im LOGIC-Block ersetzt überall "neueste Insel": `pickTask` (Gewicht `NEW_ROW_W`), `pickBlockTarget`, `guideMode`, `lumiWorkLeft`, `lilaStart`, Startseite. Romy wählt auf dem Inselscreen "Hier spielen" (`LZ.islandButtons`), ein Plan von Liese setzt sie auch. Karte: Abzeichen "Hier spielst du".
+- Ruhende Insel (`isParked`): offen, nicht Lieblingsinsel, noch nie gemeistert (`everAwake`, `S.awake`). Von dort nur Fakten ab Fach 2 (`PARK_MIN_BOX`) mit Gewicht `PARK_ROW_W` 0.5, keine Blockaden, keine Reihen-Sprünge. Die 8er kommt so nur zurück, wenn Romy selbst hingeht.
+- Kleine Schritte (`activeSet`): je Reihe höchstens `ACTIVE_MAX` 3 Fakten in Fach 0-1 gleichzeitig, leichteste zuerst (`EASE_ORDER` Malnehmer 1, 2, 10, 5, 3, 4, 6, 9, 8, 7). Ab Fach 2 wie bisher. Inselritt nicht betroffen.
+- `unlockedRows`: alle gemerkten Inseln plus Kette ab jeder offenen, gemeisterten Insel (Liese öffnet auch außerhalb der Kette).
+- Inselfest (`maybeRowParty`): feiert, wenn ein Tier zum ersten Mal aufwacht (`S.awake`), nennt eine dabei über die Kette aufgetauchte Insel. `PARTY_OPEN`/`partyOpenSync()` merken offene Inseln, Liese ruft `partyOpenSync` nach dem Öffnen (kein falsches Fest). `upgradeState` setzt `awake` auf die heute wachen Tiere.
+
+## Liese: Pläne und Inselgeschichten (seit v72)
+- Alles in `liese.js` (nach kawumm.js geladen, in sw.js und release.py eingetragen). Logik zwischen LZ-LOGIC-START/END, Node: `require('./liese.js')`. Stand in `S.lz` = {hello, helloSeen, plans:{reihe:tag}, lastPlanDay, stories:{reihe:[{n,d}]}}, `lzEnsure` in `upgradeState`.
+- Nur wenn Kawumm da ist (`lzActive`: `KW_LIVE` und `S.kw.joined`).
+- Begrüßungsbrief beim App-Start (`startLetters` in index.html: Liese vor Kawumm, Kawumm wartet dann bis zum nächsten Start), bis die Frage gelöst ist. Liese kennt den Trick gegen den Wolkenwächter (die alte 8/10-Regel in der Geschichte) und nennt die schwere Insel (`lzCurLine`).
+- Plan: geschlossene Inseln zeigen Liese mit "Plan" (`LZ.badges`), Romy wählt die Insel selbst. Höchstens ein Plan pro Tag (`lzPlanReady`). Richtig beantwortet: `lzOpenByPlan` (in `S.unlocked`, Lieblingsinsel), `lzArrive` (Fest), Inselscreen. Texte `LZ_PLANS` (3, 6, 9, 7), `LZ_PLAN_ANY` für andere Reihen.
+- Frage (`lzShowPaper`): erscheint 2,5 s nach dem Text, Antworten gemischt. Falsch: Knopf blass, Absatz `q.hint` gelb, Lumi sagt es. Richtig: grün, Lob gesprochen, Weiter-Knopf. "Später" schließt ohne Folgen. Texte werden nie vorgelesen.
+- Inselgeschichten `LZ_STORIES` (je Insel 2, Reihenfolge fest, neue einfach anhängen): erste sofort, jede weitere ab dem nächsten Tag (`lzStoryNext`). Gelöst: 3 Sterne (`LZ_STORY_STARS`, zählen für Geschenke und Ausbauten). Knopf "Neue Geschichte" auf dem Inselscreen, Abzeichen "Neu" auf der Karte, danach "Geschichten" zum Nochmal-Lesen.
+- Wegweiser: wartet ein Plan, leuchtet die Inselwelt und Lumi sagt `LZ_GUIDE_LINES`.
+- Briefkasten: Begrüßung und Pläne liegen mit drin (`LZ.mailItems`, `LZ.openMail`).
+- Elternbereich: Lieblingsinsel, ruhende Inseln, Stand, "Begrüßungsbrief zeigen", "Heute noch einen Plan erlauben", "Lieblingsinsel auf automatisch", "Alle Texte ansehen" (mit Frage und richtiger Antwort, zum Gegenlesen).
+- Texte: Lesestufe Anfang 2. Klasse, länger als Kawumms Briefe (Romy kann mehr), keine Gedankenstriche, Liese schlau und ein bisschen ängstlich, Pupstierchen nie Störenfried.
