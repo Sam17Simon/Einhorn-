@@ -650,10 +650,10 @@ button.ctawait:active{transform:none;}
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=76"></script>
-<script src="game.js?v=76"></script>
-<script src="kawumm.js?v=76"></script>
-<script src="liese.js?v=76"></script>
+<script src="islands.js?v=77"></script>
+<script src="game.js?v=77"></script>
+<script src="kawumm.js?v=77"></script>
+<script src="liese.js?v=77"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -1365,40 +1365,63 @@ document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==
 function altVoice(){ const de=deVoices(), main=pickVoice(); return de.find(v=>v!==main&&v.localService) || de.find(v=>v!==main) || main; }
 function makeUtt(text,mode,vo){
   const u=new SpeechSynthesisUtterance(sayEr(text));
-  u.rate=(vo&&vo.rate)||1.04; u.pitch=(vo&&vo.pitch)||1.14; u.volume=1;
+  u.rate=(vo&&vo.rate)||LUMI_RATE; u.pitch=(vo&&vo.pitch)||1.14; u.volume=1;
   if(mode==='lang'){ u.lang='de-DE'; }
   else if(mode==='voice'){ const v=(vo&&vo.alt)?altVoice():pickVoice(); if(v){ u.voice=v; u.lang=v.lang; } else u.lang='de-DE'; }
   return u;                                     // 'plain': gar nichts setzen, Gerätestandard
 }
+/* Ruhiger sprechen (seit v77, Simon: "Das war immer hart getackert"). Jeder Text wird in Sätze geteilt, zwischen zwei Sätzen
+   SPEECH_PAUSE_MS Pause. Lumi spricht etwas langsamer (LUMI_RATE, vorher 1.04). Erklärungen nach Fehlern noch langsamer (EXPLAIN_VO).
+   Alles unter einem speakSeq: ein neuer speak() bricht die ganze Kette ab, cb kommt nach dem letzten Satz.
+   speechGap = gerade Pause zwischen zwei Sätzen, zählt als "spricht noch" (speechBusy, Weiter-Knopf, Wegweiser). */
+const SPEECH_PAUSE_MS=650, LUMI_RATE=0.97, EXPLAIN_VO={rate:0.86};
+let speechGap=false;
+function speechBusy(){ try{ return speechGap || speechSynthesis.speaking || speechSynthesis.pending; }catch(e){ return speechGap; } }
+function splitSentences(t){
+  const m=String(t).match(/[^.!?]+(?:[.!?]+["“”«»]?)+|[^.!?]+$/g);
+  const out=(m||[String(t)]).map(x=>x.trim()).filter(Boolean);
+  return out.length?out:[String(t)];
+}
 function speak(text, cb, vo){
-  let done=false; const fire=()=>{ if(done) return; done=true; cb&&cb(); };
+  let done=false; const fire=()=>{ if(done) return; done=true; speechGap=false; cb&&cb(); };
   if(!S.sound || !('speechSynthesis' in window) || !text){ fire(); return; }
   const my=++speakSeq; speechDiag.calls++; speechDiag.lastText=String(text).slice(0,60);
   const ss=window.speechSynthesis;
+  speechGap=false;
   let busy=false; try{ busy=ss.speaking||ss.pending; if(busy) ss.cancel(); }catch(e){}
-  if(cb) setTimeout(fire, Math.max(3000, String(text).length*120)+1600);
-  const order=[speechMode].concat(SPEECH_MODES.filter(m=>m!==speechMode));
-  const go=(i)=>{
-    if(my!==speakSeq){ fire(); return; }        // ein neuerer Satz hat übernommen
-    if(i>=order.length){ fire(); return; }
-    const mode=order[i]; let started=false, failed=false;
-    const next=()=>{ if(failed||started||my!==speakSeq) return; failed=true; speechDiag.retries++; try{ ss.cancel(); }catch(e){} setTimeout(()=>go(i+1),150); };
-    try{
-      const u=makeUtt(text,mode,vo);
-      u.onstart=()=>{ started=true; speechDiag.starts++; speechDiag.mode=mode;
-        if(speechMode!==mode){ speechMode=mode; try{ localStorage.setItem('einhorn_speechMode',mode); }catch(e){} } };
-      u.onend=fire;
-      u.onerror=e=>{ const err=(e&&e.error)||'?'; speechDiag.lastErr=err+' ('+mode+')';
-        if(err==='interrupted'||err==='canceled'){ if(!started&&my===speakSeq) next(); else fire(); return; }
-        started?fire():next(); };
-      curUtt=u;                                   // Referenz halten, sonst räumt Chrome sie weg
-      if(!IS_ANDROID){ try{ ss.resume(); }catch(e){} }
-      ss.speak(u);
-      setTimeout(()=>{ if(!started) next(); },1500);
-    }catch(e){ speechDiag.lastErr=String(e&&e.message||e); next(); }
+  const parts=splitSentences(text), slow=(vo&&vo.rate&&vo.rate<1)?1/vo.rate:1;
+  if(cb) setTimeout(fire, (Math.max(3000, String(text).length*120)+1600)*slow+parts.length*SPEECH_PAUSE_MS);
+  const say=(p)=>{
+    if(my!==speakSeq){ fire(); return; }
+    let pdone=false;
+    const partDone=()=>{ if(pdone) return; pdone=true;
+      if(my!==speakSeq || p+1>=parts.length){ fire(); return; }
+      speechGap=true;
+      setTimeout(()=>{ if(my!==speakSeq){ fire(); return; } speechGap=false; say(p+1); }, SPEECH_PAUSE_MS); };
+    const order=[speechMode].concat(SPEECH_MODES.filter(m=>m!==speechMode));
+    const go=(i)=>{
+      if(my!==speakSeq){ fire(); return; }        // ein neuerer Satz hat übernommen
+      if(i>=order.length){ partDone(); return; }
+      const mode=order[i]; let started=false, failed=false;
+      const next=()=>{ if(failed||started||my!==speakSeq) return; failed=true; speechDiag.retries++; try{ ss.cancel(); }catch(e){} setTimeout(()=>go(i+1),150); };
+      try{
+        const u=makeUtt(parts[p],mode,vo);
+        u.onstart=()=>{ started=true; speechDiag.starts++; speechDiag.mode=mode;
+          if(speechMode!==mode){ speechMode=mode; try{ localStorage.setItem('einhorn_speechMode',mode); }catch(e){} } };
+        u.onend=partDone;
+        u.onerror=e=>{ const err=(e&&e.error)||'?'; speechDiag.lastErr=err+' ('+mode+')';
+          if(err==='interrupted'||err==='canceled'){ if(!started&&my===speakSeq) next(); else partDone(); return; }
+          started?partDone():next(); };
+        curUtt=u;                                   // Referenz halten, sonst räumt Chrome sie weg
+        if(!IS_ANDROID){ try{ ss.resume(); }catch(e){} }
+        ss.speak(u);
+        setTimeout(()=>{ if(!started) next(); },1500);
+      }catch(e){ speechDiag.lastErr=String(e&&e.message||e); next(); }
+    };
+    go(0);
   };
   // nach cancel() kurz warten, sonst verschluckt Chrome den neuen Satz
-  setTimeout(()=>go(0), busy?150:0);
+  setTimeout(()=>say(0), busy?150:0);
 }
 let AC=null;
 function tone(freq,dur,when,type,gain){
@@ -1807,7 +1830,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==
    spätestens nach WEITER_MAX_MS. Bis dahin ist an der Stelle nichts zum Tippen. */
 const WEITER_MIN_MS=2500, WEITER_AFTER_MS=1200, WEITER_QUIET_MS=4000, WEITER_MAX_MS=14000;
 let WEITER=null;
-function weiterSpeaking(){ try{ return speechSynthesis.speaking || speechSynthesis.pending; }catch(e){ return false; } }
+function weiterSpeaking(){ return speechBusy(); }
 function showWeiter(onGo){
   hideWeiter();
   const b=document.createElement('button'); b.className='cta weiterbtn'; b.textContent='Weiter'; b.setAttribute('data-noarm','');
@@ -1893,7 +1916,7 @@ let guideSaid=false;
 function maybeGuideSay(tries){
   tries=tries||0;
   if(guideSaid || current!=='home' || $('overlay').classList.contains('show')) return;
-  let busy=false; try{ busy=speechSynthesis.speaking||speechSynthesis.pending; }catch(e){}
+  const busy=speechBusy();
   if(busy && tries<8){ setTimeout(()=>maybeGuideSay(tries+1),700); return; }   // Lumis Begrüßung nicht abschneiden
   guideSaid=true;
   if(window.LZ && LZ.guideLine()){ speak(LZ.guideLine()); return; }   // seit v72: Lieses neuer Plan geht vor, v73 auch Wolken
@@ -2016,7 +2039,7 @@ function submit(val, how){
       // erst weiter, wenn der Rechenweg fertig gesprochen ist (nächste Aufgabe würde ihn abschneiden), mindestens 3,4 s
       // seit v75: weiter erst, wenn Romy auf "Weiter" tippt (vorher automatisch nach dem Satz, mindestens 3,4 s)
       const run=R, task=R.task;
-      speak(R.task.say+' ist '+R.task.answer+'. '+(rw?rw.say+' ':'')+'Gleich nochmal!');
+      speak(R.task.say+' ist '+R.task.answer+'. '+(rw?rw.say+' ':'')+'Gleich nochmal!', null, EXPLAIN_VO);
       showWeiter(()=>{ if(R===run && R.task===task) nextTask(); });
       return;
     }
@@ -2568,7 +2591,7 @@ async function chooseGate(val, lane, how){
     const msg = (val===null ? 'Hui, vorbeigeritten! ' : 'Fast! ')+(t.fbShow ? t.fbShow : t.show? t.show+' = '+t.answer : 'Es war '+t.answer);
     if(wasRiddle){ friendSay('Macht nix! Es sind '+t.answer+'.'); }
     else setQ(msg,'');
-    if(!wasWorldGate && !wasBlock) speak(sayIt+(rw?' '+rw.short:''));
+    if(!wasWorldGate && !wasBlock) speak(sayIt+(rw?' '+rw.short:''), null, EXPLAIN_VO);
     if(t.kind==='fact' && t.show) RN.redo.push({key:t.key, answer:t.answer, a:t.a, b:t.b, show:t.show, div:t.div, say:t.say, after:RN.gate+3});
     else if(t.kind==='und') RN.redo.push({key:t.key, answer:t.prod, a:t.a, b:t.b, show:t.show, say:t.say, after:RN.gate+3});   // danach als normales Tor nochmal
     RN.lastWay=rw;
@@ -2580,7 +2603,7 @@ async function chooseGate(val, lane, how){
     // Weltentor: Türen auf, Blick in die neue Welt, Durchritt, dann wechselt der Himmel
     const w=RN.worlds[RN.wIdx+1];
     if(good) speak('Das Tor geht auf! '+WORLD_INFO[w].willk.replace('-',' '));
-    else { speak(t.show.replace('·','mal')+' ist '+t.answer+'. Das Tor geht trotzdem auf!'); await weiterWait(); if(!RN) return; }   // seit v75
+    else { speak(t.show.replace('·','mal')+' ist '+t.answer+'. Das Tor geht trotzdem auf!', null, EXPLAIN_VO); await weiterWait(); if(!RN) return; }   // seit v75
     await eng.resolveWorldGate({goodLane, pickedLane:lane, good, onOpen:()=>sndWorld()});
     if(!RN) return;
     RN.wIdx++;
@@ -2707,7 +2730,7 @@ function blockReact(good, t, rw, newLila){
     return;
   }
   let seq=0;
-  speak(good?pickOne(B.fig.ok):pickOne(B.fig.no).replace('{a}',t.answer), rw?()=>{ if(seq===speakSeq && RN) speak(rw.short); }:null, B.fig.voice);
+  speak(good?pickOne(B.fig.ok):pickOne(B.fig.no).replace('{a}',t.answer), rw?()=>{ if(seq===speakSeq && RN) setTimeout(()=>{ if(seq===speakSeq && RN) speak(rw.short, null, EXPLAIN_VO); }, SPEECH_PAUSE_MS); }:null, B.fig.voice);
   seq=speakSeq;
 }
 function hideBlock(instant){
