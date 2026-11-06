@@ -932,7 +932,7 @@ function kwTypedDone(){
   const IN=$('kwLayerIn'), opts=IN.querySelectorAll('.kwopt'), ai=KR.opts.indexOf(ans), blk=IN.querySelector('.kwblock'), pad=$('kwPad');
   if(correct){ sndGood(); kwSayLine(kwPick(['Kawumm! Aus dem Kopf gewusst!','Ha! Da staunt '+B.c.name+'!','Richtig! Und tschüss, '+B.c.name+'!'])); }
   else { sndAgain(); kwSayLine('Fast! Es ist die '+ans+'. Tschüss, '+B.c.name+'!'); }
-  setTimeout(()=>{
+  const cont=()=>{
     if(!KR||KR.id!==my) return;
     if(pad) pad.classList.remove('show');
     if(blk) blk.classList.add('bye');
@@ -941,7 +941,8 @@ function kwTypedDone(){
     setTimeout(()=>{ if(pad) pad.remove(); if(blk) blk.remove(); },1000);
     KR.block=null;
     kwSail(ai, 1000);
-  }, correct?1000:2000);
+  };
+  if(correct) setTimeout(cont,1000); else showWeiter(cont);   // seit v75: nach Fehler erst auf Weiter
 }
 /* Ergebnis eines Schritts eintragen (Tippen auf Insel oder Eintippen) */
 function kwRecord(val, rt){
@@ -968,7 +969,7 @@ function kwChoose(i){
     sndAgain();
     btns[i].classList.add('fog'); btns[ai].classList.add('glow');
     kwSayLine(kwPick(KR.space?KW_LINES.wrongSpace:KW_LINES.wrong).replace('{n}',ans));
-    kwSail(ai,2200);
+    const my=KR.id; showWeiter(()=>{ if(KR&&KR.id===my) kwSail(ai,0); });   // seit v75: Romy tippt selbst auf Weiter
   }
 }
 function kwSail(ai, delay){
@@ -1085,7 +1086,7 @@ const KW_GENUS={1:'m',2:'f',10:'n',5:'f',4:'n',8:'f',3:'n',6:'n',9:'f',7:'m'};
 function artNom(r){ return {m:'der',f:'die',n:'das'}[KW_GENUS[r]]; }
 function artDet(r){ return 'dein'+{m:'',f:'e',n:''}[KW_GENUS[r]]; }
 function artAcc(r){ return {m:'deinen',f:'deine',n:'dein'}[KW_GENUS[r]]; }
-function kwStop(){ KR=null; const p=$('kwPad'); if(p) p.remove(); }
+function kwStop(){ KR=null; const p=$('kwPad'); if(p) p.remove(); if(typeof hideWeiter==='function') hideWeiter(); }
 function kwLeave(){
   const ret=KR?KR.ret:'path'; const r=KR?KR.r:null; kwStop();
   if(ret==='island' && typeof openIsland==='function' && r && unlockedRows(S).includes(r)) openIsland(r);

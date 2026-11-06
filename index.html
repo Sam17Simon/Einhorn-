@@ -443,6 +443,9 @@ button.ctawait:active{transform:none;}
 #overlay .box{background:var(--card); border-radius:28px; padding:26px 22px; max-width:420px; width:100%; text-align:center; display:flex; flex-direction:column; gap:12px; align-items:center;}
 #overlay h2{font-family:var(--font-disp); margin:0; font-size:30px;}
 #fx{position:fixed; inset:0; pointer-events:none; z-index:50;}
+.weiterbtn{position:fixed; left:50%; bottom:calc(28px + env(safe-area-inset-bottom)); min-width:220px; font-size:26px; z-index:45; opacity:0; transform:translateX(-50%) scale(.85); pointer-events:none; transition:opacity .5s, transform .5s;}
+.weiterbtn.show{opacity:1; transform:translateX(-50%); pointer-events:auto;}
+.weiterbtn.show:active{transform:translateX(-50%) translateY(2px);}
 .pop{animation:pop .5s ease;}
 @keyframes pop{0%{transform:scale(.4)}70%{transform:scale(1.12)}100%{transform:scale(1)}}
 .wiggle{animation:wiggle .6s ease;}
@@ -647,10 +650,10 @@ button.ctawait:active{transform:none;}
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=74"></script>
-<script src="game.js?v=74"></script>
-<script src="kawumm.js?v=74"></script>
-<script src="liese.js?v=74"></script>
+<script src="islands.js?v=75"></script>
+<script src="game.js?v=75"></script>
+<script src="kawumm.js?v=75"></script>
+<script src="liese.js?v=75"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -1782,7 +1785,7 @@ function show(name){
 }
 document.querySelectorAll('#scr-end button').forEach(b=>b.addEventListener('click',maybeDailyBackup,{capture:true}));
 document.querySelectorAll('[data-home]').forEach(b=>b.addEventListener('click',()=>{ leaveActivity(); show('home'); }));
-function leaveActivity(){ stopRide(); stopRun(); clearInterval(bzTick); BZ=null; endRound(false); if(window.KW) KW.stop(); }
+function leaveActivity(){ hideWeiter(); stopRide(); stopRun(); clearInterval(bzTick); BZ=null; endRound(false); if(window.KW) KW.stop(); }
 
 /* Zeiterfassung: zählt nur in Übungs-Screens bei sichtbarem Tab */
 let secTimer=null;
@@ -1795,6 +1798,22 @@ function trackScreen(){
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') save(); });
 
 /* ---------- Belohnungs-Helfer ---------- */
+/* Weiter nach Erklärungen (seit v75, Simon: "Sämtliche Erklärungen waren immer viel zu schnell").
+   Nach einem Fehler geht es erst weiter, wenn Romy selbst auf "Weiter" tippt: Zaubertraining, Sternschnuppe (Uhr steht so lange),
+   Wolkenflug (Tor, Blockade, Weltentor, vorbeigeritten), Kawumms Schatzsuche. Der Knopf kommt nach WEITER_DELAY,
+   damit kein Tipp aus Versehen durchrutscht. Tippen bricht den laufenden Satz ab (Romy entscheidet), 150 ms Pause danach. */
+const WEITER_DELAY=900;
+let WEITER=null;
+function showWeiter(onGo){
+  hideWeiter();
+  const b=document.createElement('button'); b.className='cta weiterbtn'; b.textContent='Weiter'; b.setAttribute('data-noarm','');
+  document.body.appendChild(b);
+  const w={b}; WEITER=w;
+  setTimeout(()=>{ if(WEITER===w) b.classList.add('show'); }, WEITER_DELAY);
+  b.addEventListener('click',()=>{ if(WEITER!==w || !b.classList.contains('show')) return; hideWeiter(); try{ speakSeq++; speechSynthesis.cancel(); }catch(e){} setTimeout(onGo,150); });
+}
+function hideWeiter(){ if(WEITER){ WEITER.b.remove(); WEITER=null; } }
+function weiterWait(){ return new Promise(res=>showWeiter(res)); }
 const PRAISE=['Zack, richtig!','Volltreffer!','Sternenstark!','Mega!','Wusch, stimmt!','Du Rechenstar!'];
 const FRIENDS={2:['🐥','Küken Piep'],10:['🦉','Eule Luna'],5:['🐸','Frosch Hüpf'],1:['🐰','Hase Mümmel'],4:['🦊','Fuchs Flux'],8:['🐢','Schildi Panzi'],3:['🦋','Falter Flora'],6:['🐬','Delfin Dido'],9:['🐼','Panda Pom'],7:['🐲','Drache Dax']};
 const STAR_SVG='<svg viewBox="0 0 24 24" width="30" height="30"><path d="M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 16.9 5.9 20.4l1.5-6.8L2.2 9l6.9-.7z" fill="#F2B83C"/></svg>';
@@ -1984,14 +2003,20 @@ function submit(val, how){
       if(rw) renderDots($('qDots'), rw.dots.rows, rw.dots.cols, rw.show, rw.dots);
       save(); R.i++;
       // erst weiter, wenn der Rechenweg fertig gesprochen ist (nächste Aufgabe würde ihn abschneiden), mindestens 3,4 s
-      const run=R, task=R.task, t0=performance.now(); let gone=false;
-      const go=()=>{ if(gone) return; gone=true; setTimeout(()=>{ if(R===run && R.task===task) nextTask(); }, Math.max(700, 3400-(performance.now()-t0))); };
-      speak(R.task.say+' ist '+R.task.answer+'. '+(rw?rw.say+' ':'')+'Gleich nochmal!', go);
-      setTimeout(go, 12000);         // falls die Sprachausgabe hängt
+      // seit v75: weiter erst, wenn Romy auf "Weiter" tippt (vorher automatisch nach dem Satz, mindestens 3,4 s)
+      const run=R, task=R.task;
+      speak(R.task.say+' ist '+R.task.answer+'. '+(rw?rw.say+' ':'')+'Gleich nochmal!');
+      showWeiter(()=>{ if(R===run && R.task===task) nextTask(); });
       return;
     }
     // Sternschnuppe: Rechenweg nur als Zahlen (dort hört das Mikro mit, gesprochene Zahlen würden als Antwort zählen)
     if(rw){ fb.innerHTML='Fast! '+R.task.show+' = '+R.task.answer+'<small class="fbway">'+rw.show+'</small>'; wait=2400; }
+    if(R.mode==='blitz' && BZ){   // seit v75: Uhr steht, bis Romy auf "Weiter" tippt
+      save(); R.i++;
+      const bz=BZ; bz.pausedAt=performance.now();
+      showWeiter(()=>{ if(BZ!==bz) return; if(bz.t0) bz.t0+=performance.now()-bz.pausedAt; bz.pausedAt=0; nextBlitzTask(); });
+      return;
+    }
   }
   save();
   R.i++;
@@ -2273,7 +2298,7 @@ function startBlitz(){
     BZ.t0=performance.now();
     clearInterval(bzTick);
     bzTick=setInterval(()=>{
-      if(!BZ||!BZ.t0) return;
+      if(!BZ||!BZ.t0||BZ.pausedAt) return;   // seit v75: steht während "Weiter"
       const left=Math.max(0,BZ.dur-(performance.now()-BZ.t0));
       $('blitzBar').style.width=(left/BZ.dur*100)+'%';
       if(left<=0) finishBlitz();
@@ -2544,7 +2569,7 @@ async function chooseGate(val, lane, how){
     // Weltentor: Türen auf, Blick in die neue Welt, Durchritt, dann wechselt der Himmel
     const w=RN.worlds[RN.wIdx+1];
     if(good) speak('Das Tor geht auf! '+WORLD_INFO[w].willk.replace('-',' '));
-    else speak(t.show.replace('·','mal')+' ist '+t.answer+'. Das Tor geht trotzdem auf!');
+    else { speak(t.show.replace('·','mal')+' ist '+t.answer+'. Das Tor geht trotzdem auf!'); await weiterWait(); if(!RN) return; }   // seit v75
     await eng.resolveWorldGate({goodLane, pickedLane:lane, good, onOpen:()=>sndWorld()});
     if(!RN) return;
     RN.wIdx++;
@@ -2553,13 +2578,15 @@ async function chooseGate(val, lane, how){
     await wait(1500); if(!RN) return;
     nextGate(); return;
   }
+  let waited=false;
   if(wasBlock){
     const newLila = good && !lilaBefore && isLila(S,t.key);
     blockReact(good, t, good?null:RN.lastWay, newLila);
     if(newLila){ $('blockAns').classList.add('lila'); tone(784,.25,0,'sine',.08); tone(1047,.4,.22,'sine',.08); }
     // Neuer lila Stern: die Figur sagt es in Ruhe, erst danach geht es weiter (Satzende abwarten, höchstens ca. 6 s)
     if(newLila) await new Promise(res=>{ RN.block.onSaid=res; setTimeout(res,9000); });
-    else await wait(good?1300:2600);
+    else if(good) await wait(1300);
+    else { await weiterWait(); waited=true; }   // seit v75: nach der Erklärung tippt Romy selbst auf Weiter
     if(!RN) return;
     hideBlock(false);
     await wait(700); if(!RN) return;
@@ -2577,6 +2604,7 @@ async function chooseGate(val, lane, how){
   if(!RN) return;
   if(good){ eng.collectStar(); pling(); }
   await wait(good?350:900); if(!RN) return;
+  if(!good && !waited){ await weiterWait(); if(!RN) return; }   // seit v75: nach Fehler oder Vorbeireiten erst auf Weiter
   nextGate();
 }
 function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
@@ -2719,7 +2747,7 @@ function finishRun(){
   if(unlockedItem) setTimeout(()=>showItemOverlay(unlockedItem),1400);
   maybeRowParty();
 }
-function stopRun(){ RN=null; const eng=G(); if(eng&&eng.ready){ eng.blocked=false; eng.stop(); } if($('friendRig')) hideFriend(true); hideBlock(true); }
+function stopRun(){ hideWeiter(); RN=null; const eng=G(); if(eng&&eng.ready){ eng.blocked=false; eng.stop(); } if($('friendRig')) hideFriend(true); hideBlock(true); }
 /* ---------- Mein Weg ---------- */
 function starSVG(fill){ return '<svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 16.9 5.9 20.4l1.5-6.8L2.2 9l6.9-.7z" fill="'+fill+'"/></svg>'; }
 const IW=()=>window.Inselwelt;

@@ -203,3 +203,9 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 - B, Verstehens-Tore (`understandGate`, LOGIC-Block, `UND_P`): `bridge` Aufgabe mit Tipp über eine lila Bezugsaufgabe (aus `rechenweg`, nur plus, minus, double, half, split), `which` "Welche Aufgabe ergibt 24?" (Tore zeigen Aufgaben wie 4·6, genau ein Tor mit dem Ergebnis), `swap` Tauschpaar, `miss` "6 · ? = 42". which, swap, miss nur für schon bekannte Aufgaben (Fach 1+ oder gesehen). Nie am Weltentor, nie im allerersten Flug, nie bei Wiederholung nach Fehler. Im Test etwa 30 % der Tore.
 - Verstehens-Tore warten wie neue Aufgaben (`gatePlan('neu')`), Lumi sagt die Frage (`t.ask`). Gebucht als Auswahl auf die Aufgabe dahinter (höchstens Fach 2). Falsch: eigener Satz (`t.fb`, `t.fbShow`), Rechenweg nur bei which und miss, danach kommt die Aufgabe als normales Tor nochmal (`RN.redo` mit `t.prod`).
 - Tor-Schilder (game.js `makePortal`): Text mit mehr als 3 Zeichen wird kleiner geschrieben (10·10 passt).
+
+## Weiter nach Erklärungen (seit v75, Simon: "Sämtliche Erklärungen waren immer viel zu schnell")
+- Nach jedem Fehler mit Erklärung geht es erst weiter, wenn Romy selbst auf "Weiter" tippt (`showWeiter(onGo)`, `weiterWait()`, `hideWeiter()` in index.html). Fester Knopf unten, erscheint nach `WEITER_DELAY` 900 ms, `data-noarm`. Tippen bricht den laufenden Satz ab, 150 ms später geht es weiter.
+- Wo: Zaubertraining (statt automatisch nach dem Rechenweg), Sternschnuppe (Uhr steht, `BZ.pausedAt`, danach wird `BZ.t0` nachgeschoben), Wolkenflug (falsches Tor und Vorbeireiten nach dem Durchritt, Blockade statt 2,6 s, Weltentor vor dem Öffnen), Kawumms Schatzsuche (falsche Insel statt 2,2 s, falsch eingetippt statt 2 s).
+- Nicht: Inselritt (dort wackelt nur die Wolke, Romy tippt sofort neu), Lieses Fragen (dort einfach nochmal tippen).
+- `leaveActivity`, `stopRun` und `kwStop` räumen den Knopf weg.
