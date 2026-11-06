@@ -647,10 +647,10 @@ button.ctawait:active{transform:none;}
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=73"></script>
-<script src="game.js?v=73"></script>
-<script src="kawumm.js?v=73"></script>
-<script src="liese.js?v=73"></script>
+<script src="islands.js?v=74"></script>
+<script src="game.js?v=74"></script>
+<script src="kawumm.js?v=74"></script>
+<script src="liese.js?v=74"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -754,6 +754,55 @@ const PARK_ROW_W = 0.5, PARK_MIN_BOX = 2;
    Erst wenn eine davon Fach 2 erreicht, kommt die nächste dazu. 8 · 6 und 8 · 7 kommen so ganz zum Schluss.
    Fach 2 und höher läuft wie bisher. Inselritt (ganze Reihe am Stück) ist davon nicht betroffen. */
 const EASE_ORDER = [1,2,10,5,3,4,6,9,8,7], ACTIVE_MAX = 3;
+/* Wolkenflug am Rand (seit v73, Simon: kein monotones Antippen von Aufgaben, die längst sitzen): lila Aufgaben, die nicht
+   zur Wiederholung fällig sind, kommen dort nur mit diesem Faktor. Fällige Wiederholung bleibt normal. */
+const EDGE_SURE_W = 0.2;
+/* Verstehens-Tore (seit v73, Entscheidung Simon: A + B). Statt immer nur "Ergebnis antippen" wechselt die Art des Tors:
+   bridge = Aufgabe mit Tipp über eine sichere Aufgabe (Kernaufgabe, Verdoppeln, Halbieren, 5 + 2), wie der Rechenweg nach Fehlern.
+   which  = "Welche Aufgabe ergibt 24?" Tore zeigen Aufgaben (4·6, 4·5, 3·7).
+   swap   = Tauschpaar: "Gleich viel wie 3 · 8?" Tore 8·3, 8·4, 9·3.
+   miss   = "Welche Zahl fehlt? 6 · ? = 42".
+   which, swap, miss nur für Aufgaben, die Romy schon kennt (Fach 1+ oder gesehen); bridge nur mit lila Bezugsaufgabe.
+   Gebucht wird wie ein normales Tor (Auswahl, höchstens Fach 2) auf die Aufgabe dahinter. Die Tore warten, bis getippt wird. */
+const UND_P = {bridge:0.2, which:0.15, swap:0.1, miss:0.15};   // zusammen 60 % der normalen Tore, Rest wie bisher
+function undShuffle(a,rng){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(rng()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function mulLabel(a,b){ return a+'·'+b; }
+function understandGate(state, p, rng){
+  rng=rng||Math.random;
+  if(!p || p.div || p.type!=='mul') return null;
+  const a=p.a, b=p.b, P=a*b, f=state.facts[p.key];
+  const x=rng(); let acc=0, und=null;
+  for(const k of ['bridge','which','swap','miss']){ acc+=UND_P[k]; if(x<acc){ und=k; break; } }
+  if(!und) return null;
+  const t={kind:'und', und, key:p.key, a, b, prod:P, say:p.say, show:p.show, fbShow:p.show+' = '+P, fb:p.say+' ist '+P+'.'};
+  const ok=(m,n)=>m>=1&&m<=10&&n>=1&&n<=10;
+  if(und==='bridge'){
+    const rw=rechenweg(state,{a,b,key:p.key});
+    if(!rw || !rw.sure || !['plus','minus','double','half','split'].includes(rw.op)) return null;
+    return Object.assign(t,{answer:P, opts:makeOptions(P,a,b,rng), small:'Tipp: '+rw.base[0]+' · '+rw.base[1]+' = '+(rw.base[0]*rw.base[1]), big:p.show+' = ?', ask:'Wie viel ist '+p.say+'? Tipp: '+rw.short});
+  }
+  if(!f || !(f.box>=1 || f.seen>0)) return null;
+  if(und==='which'){
+    const d=undShuffle([[a,b+1],[a,b-1],[a+1,b],[a-1,b]].filter(([m,n])=>ok(m,n)&&m*n!==P),rng).slice(0,2);
+    if(d.length<2) return null;
+    const right=mulLabel(a,b);
+    return Object.assign(t,{answer:right, opts:undShuffle([right,...d.map(([m,n])=>mulLabel(m,n))],rng), small:'Welche Aufgabe ergibt …', big:'? = '+P, ask:'Welche Aufgabe ergibt '+P+'?'});
+  }
+  if(und==='swap'){
+    if(a===b) return null;
+    const d=undShuffle([[b,a+1],[b+1,a],[b,a-1],[b-1,a]].filter(([m,n])=>ok(m,n)&&m*n!==P),rng).slice(0,2);
+    if(d.length<2) return null;
+    const right=mulLabel(b,a);
+    return Object.assign(t,{answer:right, opts:undShuffle([right,...d.map(([m,n])=>mulLabel(m,n))],rng), small:'Gleich viel wie …', big:p.show, ask:'Welche Aufgabe ist gleich viel wie '+p.say+'?',
+      fb:b+' mal '+a+' ist dasselbe wie '+p.say+'. Beides ist '+P+'.'});
+  }
+  if(und==='miss'){
+    const d=undShuffle([b-1,b+1,b-2,b+2].filter(n=>n>=1&&n<=10),rng).slice(0,2);
+    if(d.length<2) return null;
+    return Object.assign(t,{answer:b, opts:undShuffle([b,...d],rng), small:'Welche Zahl fehlt?', big:a+' · ? = '+P, ask:'Welche Zahl fehlt? '+a+' mal wie viel ist '+P+'?'});
+  }
+  return null;
+}
 function activeSet(state,r){
   return new Set(EASE_ORDER.filter(b=>!isRetired(state,r,b) && state.facts[factKey(r,b)].box<2).slice(0,ACTIVE_MAX));
 }
@@ -787,6 +836,7 @@ function pickTask(state, recentKeys, now, rng, opts){
       if(parked && f.box<PARK_MIN_BOX) continue;      // ruhende Insel: nichts Neues, nichts Wackelndes
       if(f.box<2 && !active.has(b)) continue;         // kleine Schritte: höchstens ACTIVE_MAX neue/wackelnde je Reihe
       let w = BOX_WEIGHT[f.box]*rowW;
+      if(opts && opts.edge && f.box>=3 && !isDue(f,now)) w*=EDGE_SURE_W;   // Wolkenflug (seit v73): Sicheres, das nicht fällig ist, nur selten
       if(isDue(f,now)) w*=2.2;
       if(f.no>f.ok) w*=1.6;                           // Stolperfakten anziehen
       if(recentKeys.includes(k)) w*=0.05;             // direkte Wiederholung vermeiden
@@ -2269,7 +2319,7 @@ function finishBlitz(){
 
 /* ---------- Wolkenritt v4: PixiJS-Szene, Welten, Weltentore, Rätsel-Stopp ---------- */
 let RN=null;
-const RUN_GATES=12;
+const RUN_GATES=8;   // seit v73 kürzer (vorher 12): weniger, dafür jedes Tor mit Sinn
 /* Ruhe im Wolkenflug (seit v69, Entscheidung Simon: zu hektisch). Keine Rätsel-Freunde mehr, weniger Reihen-Sprünge,
    Blockaden mit Abstand. Pro Ritt also fast nur Tore, dazwischen höchstens 3 Blockaden und 2 Weltentore. */
 const RUN_RIDDLES = false;        // Freunde mit Rätselfrage: aus. Code bleibt, true schaltet sie wieder ein
@@ -2402,10 +2452,14 @@ function nextGate(){
     setQ('Lumi springt in '+t.row+'er-Sprüngen!','… '+t.shown[0]+' … '+t.shown[1]+' … <b style="color:var(--accent)">?</b>');
   }else{
     // Geteilt nur an normalen Toren, nie am Weltentor (dort nur eine Malaufgabe)
-    const p=pickTask(S,RN.recent,Date.now(),undefined,{div:!isWorldGate});
-    t={kind:'fact', key:p.key, answer:p.answer, opts:p.div?makeDivOptions(p.answer):makeOptions(p.answer,p.a,p.b), show:p.show, a:p.a, b:p.b, div:!!p.div, say:p.say};
+    const p=pickTask(S,RN.recent,Date.now(),undefined,{div:!isWorldGate, edge:true});
+    const u=(!isWorldGate && !RN.first) ? understandGate(S,p) : null;   // seit v73: Verstehens-Tore
+    if(u){ t=u; setQ(u.small, u.big); }
+    else {
+      t={kind:'fact', key:p.key, answer:p.answer, opts:p.div?makeDivOptions(p.answer):makeOptions(p.answer,p.a,p.b), show:p.show, a:p.a, b:p.b, div:!!p.div, say:p.say};
+      setQ('Durch welches Tor, Lumi?', p.show+' = ?');
+    }
     RN.recent.push(p.key); if(RN.recent.length>4) RN.recent.shift();
-    setQ('Durch welches Tor, Lumi?', p.show+' = ?');
   }
   RN.task=t; RN.locked=false; RN.riddle=riddle; RN.isWorldGate=isWorldGate; RN.t0=performance.now();
   if(t.block){ startBlock(t); return; }
@@ -2427,6 +2481,11 @@ function nextGate(){
       speak(t.name+' fragt: '+t.text.replace(/^[^:]*:\s*/,'').replace(/[„“]/g,''));
       RN.t0=performance.now();
     },700);
+  }else if(t.kind==='und'){
+    // Verstehens-Tor: Tore warten, bis getippt wird; Lumi sagt die Frage einmal
+    const plan=gatePlan('neu', factOf(S,t.key)); RN.plan=plan;
+    eng.spawnGates(t.opts,Object.assign({onWaitLong:()=>{ if(RN&&!RN.locked) speak('Schau dir die Tore in Ruhe an.'); }},plan));
+    speak(t.ask);
   }else{
     const plan=planFor(t); RN.plan=plan;
     if(plan.stage==='neu' && t.kind==='fact' && !t.div && S.facts[t.key].seen===0 && S.facts[t.key].box===0){ setQ('Neue Aufgabe, lass dir Zeit!', t.show+' = ?'); }
@@ -2467,14 +2526,15 @@ async function chooseGate(val, lane, how){
   }else{
     RN.combo=0; $('comboN').textContent='0'; $('comboBar').style.width='0%'; $('comboChip').classList.remove('hot');
     sndAgain();
-    const sayIt = t.kind==='seq' ? 'Nach '+t.shown[1]+' kommt '+t.answer+'.' : (t.show? (t.say||t.show.replace('·','mal'))+' ist '+t.answer+'.' : 'Es sind '+t.answer+'.');
+    const sayIt = t.fb ? t.fb : t.kind==='seq' ? 'Nach '+t.shown[1]+' kommt '+t.answer+'.' : (t.show? (t.say||t.show.replace('·','mal'))+' ist '+t.answer+'.' : 'Es sind '+t.answer+'.');
     // Rechenweg nach einer falschen Antwort (nicht beim Vorbeireiten, nicht am Weltentor): ein kurzer Satz, kein Bild
-    const rw = (val!==null && t.kind!=='seq' && !wasWorldGate) ? rechenweg(S,t) : null;
-    const msg = (val===null ? 'Hui, vorbeigeritten! ' : 'Fast! ')+(t.show? t.show+' = '+t.answer : 'Es war '+t.answer);
+    const rw = (val!==null && t.kind!=='seq' && !wasWorldGate && t.und!=='bridge' && t.und!=='swap') ? rechenweg(S,t.kind==='und'?{a:t.a,b:t.b,key:t.key}:t) : null;   // bridge: Tipp kam schon; swap: Satz sagt es schon
+    const msg = (val===null ? 'Hui, vorbeigeritten! ' : 'Fast! ')+(t.fbShow ? t.fbShow : t.show? t.show+' = '+t.answer : 'Es war '+t.answer);
     if(wasRiddle){ friendSay('Macht nix! Es sind '+t.answer+'.'); }
     else setQ(msg,'');
     if(!wasWorldGate && !wasBlock) speak(sayIt+(rw?' '+rw.short:''));
     if(t.kind==='fact' && t.show) RN.redo.push({key:t.key, answer:t.answer, a:t.a, b:t.b, show:t.show, div:t.div, say:t.say, after:RN.gate+3});
+    else if(t.kind==='und') RN.redo.push({key:t.key, answer:t.prod, a:t.a, b:t.b, show:t.show, say:t.say, after:RN.gate+3});   // danach als normales Tor nochmal
     RN.lastWay=rw;
   }
   eng.setCombo(RN.combo);

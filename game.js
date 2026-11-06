@@ -4,7 +4,7 @@
 (function(){
 'use strict';
 const P = window.PIXI;
-const VERSION='73';   // wird vom Release-Skript hochgezählt (Cache-Buster)
+const VERSION='74';   // wird vom Release-Skript hochgezählt (Cache-Buster)
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*t;
 const easeOut=t=>1-Math.pow(1-t,3);
@@ -271,7 +271,8 @@ function makePortal(value,lane,worldgate){
   c.puffs=puffs;
   const star=new P.Sprite(T.star); star.anchor.set(0.5); star.scale.set(0.6); inner.addChild(star); c.star=star; c.orb=Math.random()*6;
   const sign=new P.Container(); const sb=new P.Sprite(T.sign); sb.anchor.set(0.5); sign.addChild(sb);
-  const txt=new P.Text({text:String(value), style:{fontFamily:'"Baloo 2", Nunito, sans-serif', fontSize:84, fontWeight:'700', fill:0x3B2A52}}); txt.anchor.set(0.5); txt.position.set(0,-4); sign.addChild(txt);
+  const lbl=String(value), fs=lbl.length>3 ? Math.round(84*3.1/lbl.length) : 84;   // seit v73 auch Aufgaben auf Toren (4·6), längere kleiner
+  const txt=new P.Text({text:lbl, style:{fontFamily:'"Baloo 2", Nunito, sans-serif', fontSize:fs, fontWeight:'700', fill:0x3B2A52}}); txt.anchor.set(0.5); txt.position.set(0,-4); sign.addChild(txt);
   sign.position.set(0,-286); inner.addChild(sign); c.sign=sign; c.txt=txt; c.sb=sb;
   c.worldgate=!!worldgate; c.base=Math.min(G.W*0.34,170)/208*(worldgate?1.18:1);
   c.eventMode='static'; c.cursor='pointer';
