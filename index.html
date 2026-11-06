@@ -754,10 +754,10 @@ const PARK_ROW_W = 0.5, PARK_MIN_BOX = 2;
    Erst wenn eine davon Fach 2 erreicht, kommt die nächste dazu. 8 · 6 und 8 · 7 kommen so ganz zum Schluss.
    Fach 2 und höher läuft wie bisher. Inselritt (ganze Reihe am Stück) ist davon nicht betroffen. */
 const EASE_ORDER = [1,2,10,5,3,4,6,9,8,7], ACTIVE_MAX = 3;
-/* Wolkenflug am Rand (seit v73, Simon: kein monotones Antippen von Aufgaben, die längst sitzen): lila Aufgaben, die nicht
+/* Wolkenflug am Rand (seit v74, Simon: kein monotones Antippen von Aufgaben, die längst sitzen): lila Aufgaben, die nicht
    zur Wiederholung fällig sind, kommen dort nur mit diesem Faktor. Fällige Wiederholung bleibt normal. */
 const EDGE_SURE_W = 0.2;
-/* Verstehens-Tore (seit v73, Entscheidung Simon: A + B). Statt immer nur "Ergebnis antippen" wechselt die Art des Tors:
+/* Verstehens-Tore (seit v74, Entscheidung Simon: A + B). Statt immer nur "Ergebnis antippen" wechselt die Art des Tors:
    bridge = Aufgabe mit Tipp über eine sichere Aufgabe (Kernaufgabe, Verdoppeln, Halbieren, 5 + 2), wie der Rechenweg nach Fehlern.
    which  = "Welche Aufgabe ergibt 24?" Tore zeigen Aufgaben (4·6, 4·5, 3·7).
    swap   = Tauschpaar: "Gleich viel wie 3 · 8?" Tore 8·3, 8·4, 9·3.
@@ -836,7 +836,7 @@ function pickTask(state, recentKeys, now, rng, opts){
       if(parked && f.box<PARK_MIN_BOX) continue;      // ruhende Insel: nichts Neues, nichts Wackelndes
       if(f.box<2 && !active.has(b)) continue;         // kleine Schritte: höchstens ACTIVE_MAX neue/wackelnde je Reihe
       let w = BOX_WEIGHT[f.box]*rowW;
-      if(opts && opts.edge && f.box>=3 && !isDue(f,now)) w*=EDGE_SURE_W;   // Wolkenflug (seit v73): Sicheres, das nicht fällig ist, nur selten
+      if(opts && opts.edge && f.box>=3 && !isDue(f,now)) w*=EDGE_SURE_W;   // Wolkenflug (seit v74): Sicheres, das nicht fällig ist, nur selten
       if(isDue(f,now)) w*=2.2;
       if(f.no>f.ok) w*=1.6;                           // Stolperfakten anziehen
       if(recentKeys.includes(k)) w*=0.05;             // direkte Wiederholung vermeiden
@@ -2319,7 +2319,7 @@ function finishBlitz(){
 
 /* ---------- Wolkenritt v4: PixiJS-Szene, Welten, Weltentore, Rätsel-Stopp ---------- */
 let RN=null;
-const RUN_GATES=8;   // seit v73 kürzer (vorher 12): weniger, dafür jedes Tor mit Sinn
+const RUN_GATES=8;   // seit v74 kürzer (vorher 12): weniger, dafür jedes Tor mit Sinn
 /* Ruhe im Wolkenflug (seit v69, Entscheidung Simon: zu hektisch). Keine Rätsel-Freunde mehr, weniger Reihen-Sprünge,
    Blockaden mit Abstand. Pro Ritt also fast nur Tore, dazwischen höchstens 3 Blockaden und 2 Weltentore. */
 const RUN_RIDDLES = false;        // Freunde mit Rätselfrage: aus. Code bleibt, true schaltet sie wieder ein
@@ -2453,7 +2453,7 @@ function nextGate(){
   }else{
     // Geteilt nur an normalen Toren, nie am Weltentor (dort nur eine Malaufgabe)
     const p=pickTask(S,RN.recent,Date.now(),undefined,{div:!isWorldGate, edge:true});
-    const u=(!isWorldGate && !RN.first) ? understandGate(S,p) : null;   // seit v73: Verstehens-Tore
+    const u=(!isWorldGate && !RN.first) ? understandGate(S,p) : null;   // seit v74: Verstehens-Tore
     if(u){ t=u; setQ(u.small, u.big); }
     else {
       t={kind:'fact', key:p.key, answer:p.answer, opts:p.div?makeDivOptions(p.answer):makeOptions(p.answer,p.a,p.b), show:p.show, a:p.a, b:p.b, div:!!p.div, say:p.say};
