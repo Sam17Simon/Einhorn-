@@ -205,7 +205,7 @@ Es gibt genau ein Produkt: die PWA aus diesem Repo (Sam17Simon/Einhorn-), ausgel
 - Tor-Schilder (game.js `makePortal`): Text mit mehr als 3 Zeichen wird kleiner geschrieben (10·10 passt).
 
 ## Weiter nach Erklärungen (seit v75, Simon: "Sämtliche Erklärungen waren immer viel zu schnell")
-- Nach jedem Fehler mit Erklärung geht es erst weiter, wenn Romy selbst auf "Weiter" tippt (`showWeiter(onGo)`, `weiterWait()`, `hideWeiter()` in index.html). Fester Knopf unten, erscheint nach `WEITER_DELAY` 900 ms, `data-noarm`. Tippen bricht den laufenden Satz ab, 150 ms später geht es weiter.
+- Nach jedem Fehler mit Erklärung geht es erst weiter, wenn Romy selbst auf "Weiter" tippt (`showWeiter(onGo)`, `weiterWait()`, `hideWeiter()` in index.html). Fester Knopf unten, `data-noarm`. Seit v76 (Simon: sonst nur schnelles Weitertippen) erscheint er erst, wenn Lumi fertig gesprochen hat und danach `WEITER_AFTER_MS` 1,2 s still ist, frühestens nach `WEITER_MIN_MS` 2,5 s, spätestens nach `WEITER_MAX_MS` 14 s; ohne Ton nach `WEITER_QUIET_MS` 4 s. 150 ms nach dem Tipp geht es weiter.
 - Wo: Zaubertraining (statt automatisch nach dem Rechenweg), Sternschnuppe (Uhr steht, `BZ.pausedAt`, danach wird `BZ.t0` nachgeschoben), Wolkenflug (falsches Tor und Vorbeireiten nach dem Durchritt, Blockade statt 2,6 s, Weltentor vor dem Öffnen), Kawumms Schatzsuche (falsche Insel statt 2,2 s, falsch eingetippt statt 2 s).
 - Nicht: Inselritt (dort wackelt nur die Wolke, Romy tippt sofort neu), Lieses Fragen (dort einfach nochmal tippen).
 - `leaveActivity`, `stopRun` und `kwStop` räumen den Knopf weg.

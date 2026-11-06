@@ -650,10 +650,10 @@ button.ctawait:active{transform:none;}
 <canvas id="fx"></canvas>
 
 <script src="vendor/pixi.min.js?v=8.6.6"></script>
-<script src="islands.js?v=75"></script>
-<script src="game.js?v=75"></script>
-<script src="kawumm.js?v=75"></script>
-<script src="liese.js?v=75"></script>
+<script src="islands.js?v=76"></script>
+<script src="game.js?v=76"></script>
+<script src="kawumm.js?v=76"></script>
+<script src="liese.js?v=76"></script>
 <script>
 'use strict';
 /* ================= LOGIC-START (pure, DOM-free, node-testable) ================= */
@@ -1800,19 +1800,30 @@ document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==
 /* ---------- Belohnungs-Helfer ---------- */
 /* Weiter nach Erklärungen (seit v75, Simon: "Sämtliche Erklärungen waren immer viel zu schnell").
    Nach einem Fehler geht es erst weiter, wenn Romy selbst auf "Weiter" tippt: Zaubertraining, Sternschnuppe (Uhr steht so lange),
-   Wolkenflug (Tor, Blockade, Weltentor, vorbeigeritten), Kawumms Schatzsuche. Der Knopf kommt nach WEITER_DELAY,
+   Wolkenflug (Tor, Blockade, Weltentor, vorbeigeritten), Kawumms Schatzsuche. Der Knopf kommt erst nach dem Satz (siehe unten),
    damit kein Tipp aus Versehen durchrutscht. Tippen bricht den laufenden Satz ab (Romy entscheidet), 150 ms Pause danach. */
-const WEITER_DELAY=900;
+/* Seit v76 (Simon: sonst tippt sie nur schnell weiter): Der Knopf kommt erst, wenn Lumi fertig gesprochen hat und dann noch
+   WEITER_AFTER_MS still ist, frühestens nach WEITER_MIN_MS. Ohne Ton (oder wenn die Sprachausgabe hängt) nach WEITER_QUIET_MS bzw.
+   spätestens nach WEITER_MAX_MS. Bis dahin ist an der Stelle nichts zum Tippen. */
+const WEITER_MIN_MS=2500, WEITER_AFTER_MS=1200, WEITER_QUIET_MS=4000, WEITER_MAX_MS=14000;
 let WEITER=null;
+function weiterSpeaking(){ try{ return speechSynthesis.speaking || speechSynthesis.pending; }catch(e){ return false; } }
 function showWeiter(onGo){
   hideWeiter();
   const b=document.createElement('button'); b.className='cta weiterbtn'; b.textContent='Weiter'; b.setAttribute('data-noarm','');
   document.body.appendChild(b);
-  const w={b}; WEITER=w;
-  setTimeout(()=>{ if(WEITER===w) b.classList.add('show'); }, WEITER_DELAY);
+  const w={b}, t0=Date.now(); let quietSince=0; WEITER=w;
+  w.timer=setInterval(()=>{
+    if(WEITER!==w){ clearInterval(w.timer); return; }
+    const now=Date.now(), el=now-t0;
+    if(weiterSpeaking()) quietSince=0; else if(!quietSince) quietSince=now;
+    const silentLong = quietSince && now-quietSince>=WEITER_AFTER_MS;
+    const ready = !S.sound ? el>=WEITER_QUIET_MS : (el>=WEITER_MIN_MS && silentLong) || el>=WEITER_MAX_MS;
+    if(ready){ clearInterval(w.timer); b.classList.add('show'); }
+  },200);
   b.addEventListener('click',()=>{ if(WEITER!==w || !b.classList.contains('show')) return; hideWeiter(); try{ speakSeq++; speechSynthesis.cancel(); }catch(e){} setTimeout(onGo,150); });
 }
-function hideWeiter(){ if(WEITER){ WEITER.b.remove(); WEITER=null; } }
+function hideWeiter(){ if(WEITER){ clearInterval(WEITER.timer); WEITER.b.remove(); WEITER=null; } }
 function weiterWait(){ return new Promise(res=>showWeiter(res)); }
 const PRAISE=['Zack, richtig!','Volltreffer!','Sternenstark!','Mega!','Wusch, stimmt!','Du Rechenstar!'];
 const FRIENDS={2:['🐥','Küken Piep'],10:['🦉','Eule Luna'],5:['🐸','Frosch Hüpf'],1:['🐰','Hase Mümmel'],4:['🦊','Fuchs Flux'],8:['🐢','Schildi Panzi'],3:['🦋','Falter Flora'],6:['🐬','Delfin Dido'],9:['🐼','Panda Pom'],7:['🐲','Drache Dax']};
